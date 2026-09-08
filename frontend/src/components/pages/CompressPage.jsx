@@ -28,17 +28,11 @@ export default function CompressPage({
           <span>All Tools</span>
         </button>
         <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-current">📉 Compact to Fewer Pages</span>
+        <span className="breadcrumb-current">Compress PDF</span>
       </div>
 
       <div className="tool-page-header">
-        <div className="tool-badge-pill" style={{ background: '#f0fdf4', color: '#16a34a' }}>
-          <span>📉</span> True Space Compactor
-        </div>
-        <h1 className="tool-page-title">Compact PDF &amp; Save Printing Paper</h1>
-        <p className="tool-page-subtitle">
-          Eliminates huge 3-inch headers and artificial margins from coaching booklets. Restructures questions into dense, readable 2-column study layouts saving 40% to 65% printing costs.
-        </p>
+        <h1 className="tool-page-title">Compress PDF</h1>
       </div>
 
       <div className="tool-work-grid">
@@ -46,15 +40,10 @@ export default function CompressPage({
         <div className="tool-action-card">
           {/* Interactive Savings Calculator */}
           <div className="savings-calculator-card">
-            <div className="savings-calc-header">
-              <span className="savings-calc-title">⚡ Estimated Xerox &amp; Paper Savings</span>
-              <span className="savings-calc-badge">64% Less Paper</span>
-            </div>
-
-            <div style={{ marginBottom: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>
-                <span>Document Page Count:</span>
-                <span style={{ color: '#16a34a', fontWeight: 800 }}>{pageCount} Pages</span>
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '6px' }}>
+                <span>Document Length:</span>
+                <span style={{ color: '#16a34a', fontWeight: 700 }}>{pageCount} Pages</span>
               </div>
               <input
                 type="range"
@@ -69,23 +58,20 @@ export default function CompressPage({
 
             <div className="savings-stat-row">
               <div className="savings-stat-box">
-                <span className="savings-stat-val" style={{ color: '#991b1b' }}>{pageCount} pgs</span>
+                <span className="savings-stat-val" style={{ color: '#dc2626' }}>{pageCount} pgs</span>
                 <span className="savings-stat-lbl">Original Scan</span>
               </div>
-              <span style={{ fontSize: '18px', color: '#64748b' }}>➔</span>
+              <span style={{ fontSize: '16px', color: 'var(--text-subtle)' }}>➔</span>
               <div className="savings-stat-box">
-                <span className="savings-stat-val" style={{ color: '#166534' }}>{compactedPages} pgs</span>
+                <span className="savings-stat-val" style={{ color: '#16a34a' }}>{compactedPages} pgs</span>
                 <span className="savings-stat-lbl">Compacted A4</span>
               </div>
-              <div className="savings-stat-box" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <span className="savings-stat-val" style={{ color: '#15803d' }}>Save ₹{moneySaved}</span>
-                <span className="savings-stat-lbl">Per Xerox Copy</span>
+              <div className="savings-stat-box" style={{ background: 'var(--surface-selected)', border: '1px solid var(--border-default)' }}>
+                <span className="savings-stat-val" style={{ color: '#16a34a' }}>Save ₹{moneySaved}</span>
+                <span className="savings-stat-lbl">Per Printout</span>
               </div>
             </div>
           </div>
-
-          <h3 className="tool-action-title">Upload Booklet to Compact</h3>
-          <p className="tool-action-desc">Drop your booklet or class notes here to compress pages.</p>
 
           <DropZone
             file={null}
@@ -101,35 +87,29 @@ export default function CompressPage({
 
           {/* Density Settings */}
           <div className="tool-settings-group">
-            <h4 className="tool-settings-header">Compaction Intensity</h4>
-
             <div className="tool-setting-row">
-              <div>
-                <div className="tool-setting-label">Layout Density</div>
-                <div className="tool-setting-desc">Balanced margins or maximum 2-column print saver</div>
-              </div>
+              <span className="tool-setting-label">Compaction mode</span>
               <select
                 value={config.quality || 'balanced'}
                 onChange={(e) => onChangeConfig({ ...config, quality: e.target.value })}
                 style={{
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1.5px solid #cbd5e1',
+                  padding: '7px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid var(--border-default)',
+                  background: 'var(--surface-white)',
+                  color: 'var(--text-main)',
                   fontSize: '12px',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
-                <option value="balanced">Balanced A4 (Recommended)</option>
-                <option value="ultra_dense">Ultra-Dense 2-Column (Print Saver)</option>
+                <option value="balanced">Normal margins (Standard)</option>
+                <option value="ultra_dense">Dense 2-column (Paper saver)</option>
               </select>
             </div>
 
             <div className="tool-setting-row">
-              <div>
-                <div className="tool-setting-label">Strip Repeated Header Margins</div>
-                <div className="tool-setting-desc">Removes 3-inch coaching institute headers from every single page</div>
-              </div>
+              <span className="tool-setting-label">Remove repeated headers</span>
               <input
                 type="checkbox"
                 checked={config.strip_metadata !== false}
@@ -142,15 +122,12 @@ export default function CompressPage({
 
         {/* Right column: Interactive Anime.js Proof */}
         <InteractiveProofViewer
-          title="Space & Page Compaction Benchmark"
-          badge="UPSC Economy Booklet"
-          badgeColor="#16a34a"
-          badgeBg="#f0fdf4"
+          title="Page Compaction Test"
           beforeImg="/samples/doc_2_before.jpg"
           afterImg="/samples/doc_2_after.jpg"
-          beforeLabel="50 Loose Pages (₹250 Xerox)"
-          afterLabel="18 Dense Sheets (₹90 Xerox)"
-          highlights={['64% Pages Saved', '2-Column Compact', 'Zero Content Deleted']}
+          beforeLabel="50 Loose Pages"
+          afterLabel="18 Compacted Sheets"
+          features={['Save ~60% Pages', 'Cut Printing Cost', 'Zero Questions Lost']}
         />
       </div>
     </div>

@@ -21,27 +21,18 @@ export default function CleanFormatPage({
           <span>All Tools</span>
         </button>
         <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-current">✨ Clean &amp; Beautify Notes</span>
+        <span className="breadcrumb-current">Clean &amp; Format</span>
       </div>
 
       {/* Header */}
       <div className="tool-page-header">
-        <div className="tool-badge-pill" style={{ background: '#eff6ff', color: '#2563eb' }}>
-          <span>✨</span> Scan Enhancement
-        </div>
-        <h1 className="tool-page-title">Clean &amp; Beautify Scanned Notes</h1>
-        <p className="tool-page-subtitle">
-          Eliminate Telegram promotion watermarks, photocopy shadows, and dark borders. Restores handwritten and printed math into clean, print-ready A4 documents.
-        </p>
+        <h1 className="tool-page-title">Clean &amp; Format</h1>
       </div>
 
       {/* 2-Column Working Area */}
       <div className="tool-work-grid">
         {/* Left column: Dropzone & Settings */}
         <div className="tool-action-card">
-          <h3 className="tool-action-title">Upload Your Document</h3>
-          <p className="tool-action-desc">Drop your scanned notes or booklet here to begin cleanup.</p>
-
           <DropZone
             file={null}
             setFile={(f) => f && onFileSelect(f)}
@@ -56,13 +47,8 @@ export default function CleanFormatPage({
 
           {/* Dedicated Clean Controls */}
           <div className="tool-settings-group">
-            <h4 className="tool-settings-header">Clean &amp; Format Settings</h4>
-
             <div className="tool-setting-row">
-              <div>
-                <div className="tool-setting-label">Remove Telegram &amp; Coaching Ads</div>
-                <div className="tool-setting-desc">Detects and strips @channel usernames, phone numbers &amp; banners</div>
-              </div>
+              <span className="tool-setting-label">Remove ads &amp; watermarks</span>
               <input
                 type="checkbox"
                 checked={config.clean_watermarks !== false}
@@ -72,10 +58,7 @@ export default function CleanFormatPage({
             </div>
 
             <div className="tool-setting-row">
-              <div>
-                <div className="tool-setting-label">Fix &amp; Render LaTeX Formulas</div>
-                <div className="tool-setting-desc">Converts faint math handwriting into crisp textbook vector equations</div>
-              </div>
+              <span className="tool-setting-label">Sharpen math formulas &amp; handwriting</span>
               <input
                 type="checkbox"
                 checked={config.fix_formulas !== false}
@@ -85,19 +68,18 @@ export default function CleanFormatPage({
             </div>
 
             <div className="tool-setting-row">
-              <div>
-                <div className="tool-setting-label">Custom Coaching Name to Remove</div>
-                <div className="tool-setting-desc">Add specific coaching names or channels (e.g. Allen, Toppers)</div>
-              </div>
+              <span className="tool-setting-label">Custom words to remove</span>
               <input
                 type="text"
-                placeholder="e.g. Kota Toppers, PhysicsWallah"
+                placeholder="e.g. Channel Name, Telegram"
                 value={config.custom_spam_words || ''}
                 onChange={(e) => onChangeConfig({ ...config, custom_spam_words: e.target.value })}
                 style={{
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1.5px solid #cbd5e1',
+                  padding: '7px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid var(--border-default)',
+                  background: 'var(--surface-white)',
+                  color: 'var(--text-main)',
                   fontSize: '12px',
                   width: '180px',
                 }}
@@ -108,15 +90,12 @@ export default function CleanFormatPage({
 
         {/* Right column: Interactive Anime.js Before/After Proof */}
         <InteractiveProofViewer
-          title="Real Scan Restoration Benchmark"
-          badge="Physics & JEE Notes"
-          badgeColor="#2563eb"
-          badgeBg="#eff6ff"
+          title="Scan Cleanup Test"
           beforeImg="/samples/doc_1_before.jpg"
           afterImg="/samples/doc_1_after.jpg"
-          beforeLabel="Telegram Ads & Faint Scan"
-          afterLabel="Pristine A4 & Vector Math"
-          highlights={['0 Ads', 'LaTeX Restored', 'Whiter Background']}
+          beforeLabel="Faint Scan & Watermarks"
+          afterLabel="Clean White Note"
+          features={['Zero Watermarks', 'Clean White Pages', 'Formulas Kept Sharp']}
         />
       </div>
     </div>

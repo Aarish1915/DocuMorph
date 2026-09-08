@@ -38,39 +38,32 @@ export default function ExtractTextPage({
           <span>All Tools</span>
         </button>
         <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-current">📋 Copy Text &amp; Tables</span>
+        <span className="breadcrumb-current">Extract Text</span>
       </div>
 
       <div className="tool-page-header">
-        <div className="tool-badge-pill" style={{ background: '#f0f9ff', color: '#0369a1' }}>
-          <span>📋</span> Structured OCR &amp; Table Extractor
-        </div>
-        <h1 className="tool-page-title">Extract Text &amp; Tables to Markdown</h1>
-        <p className="tool-page-subtitle">
-          Unlock uncopyable flat scan tables, constitutional case laws, and tabular syllabus data into clean Markdown, CSV, or structured JSON with 1-click clipboard copy.
-        </p>
+        <h1 className="tool-page-title">Extract Text</h1>
       </div>
 
       <div className="tool-work-grid">
         {/* Left column: Format chooser, DropZone & Options */}
         <div className="tool-action-card">
           <div className="format-selection-group">
-            <h4 className="format-group-title">Select Output Format</h4>
             <div className="format-pills-row">
               <div
                 className={`format-pill ${activeFormat === 'markdown' ? 'selected' : ''}`}
                 onClick={() => onChangeConfig({ ...config, output_format: 'markdown' })}
               >
                 <div className="format-pill-name">Markdown</div>
-                <div className="format-pill-ext">.md (Notion/Obsidian)</div>
+                <div className="format-pill-ext">.md (Notion)</div>
               </div>
 
               <div
                 className={`format-pill ${activeFormat === 'json' ? 'selected' : ''}`}
                 onClick={() => onChangeConfig({ ...config, output_format: 'json' })}
               >
-                <div className="format-pill-name">Structured JSON</div>
-                <div className="format-pill-ext">.json (API/Dev)</div>
+                <div className="format-pill-name">JSON</div>
+                <div className="format-pill-ext">.json (Devs)</div>
               </div>
 
               <div
@@ -78,13 +71,10 @@ export default function ExtractTextPage({
                 onClick={() => onChangeConfig({ ...config, output_format: 'raw' })}
               >
                 <div className="format-pill-name">Plain Text</div>
-                <div className="format-pill-ext">.txt (Clean Raw)</div>
+                <div className="format-pill-ext">.txt</div>
               </div>
             </div>
           </div>
-
-          <h3 className="tool-action-title">Upload Scanned Document</h3>
-          <p className="tool-action-desc">Drop your scanned table, syllabus schedule, or legal document.</p>
 
           <DropZone
             file={null}
@@ -99,13 +89,8 @@ export default function ExtractTextPage({
           />
 
           <div className="tool-settings-group">
-            <h4 className="tool-settings-header">Extraction Settings</h4>
-
             <div className="tool-setting-row">
-              <div>
-                <div className="tool-setting-label">Strict Table Alignment</div>
-                <div className="tool-setting-desc">Enforces vertical pipe | column borders without breaking cell text</div>
-              </div>
+              <span className="tool-setting-label">Keep table columns aligned</span>
               <input
                 type="checkbox"
                 checked={config.preserve_tables !== false}
@@ -118,13 +103,13 @@ export default function ExtractTextPage({
           {/* 1-Click Clipboard Table Micro-Interaction */}
           <div className="clipboard-preview-box">
             <div className="clipboard-preview-header">
-              <span className="clipboard-preview-title">⚡ Output Preview (Notion / Obsidian Ready)</span>
+              <span className="clipboard-preview-title">Sample Output Preview</span>
               <button 
                 type="button"
                 className={`btn-quick-copy ${copied ? 'copied' : ''}`}
                 onClick={handleCopySample}
               >
-                {copied ? '✓ Copied to Clipboard!' : '📋 Copy Sample Table'}
+                {copied ? '✓ Copied!' : 'Copy Sample Table'}
               </button>
             </div>
             <pre className="clipboard-code-preview">
@@ -139,15 +124,12 @@ export default function ExtractTextPage({
 
         {/* Right column: Interactive Anime.js Proof */}
         <InteractiveProofViewer
-          title="Structured Table Extraction Benchmark"
-          badge="Constitutional Rights Table"
-          badgeColor="#0284c7"
-          badgeBg="#f0f9ff"
+          title="Table Extraction Test"
           beforeImg="/samples/doc_3_before.jpg"
           afterImg="/samples/doc_3_after.jpg"
-          beforeLabel="Locked in Flat Scanned Image"
-          afterLabel="1-Click Copyable Markdown Table"
-          highlights={['Markdown Ready', 'Notion Compatible', 'Zero Alignment Jitter']}
+          beforeLabel="Flat Scan (Uncopyable)"
+          afterLabel="Clean Markdown Table"
+          features={['Notion & Excel Ready', 'Columns Neatly Aligned', '1-Click Copy']}
         />
       </div>
     </div>

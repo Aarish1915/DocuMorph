@@ -2,16 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { animate } from 'animejs';
 
 export default function InteractiveProofViewer({
-  title = 'Document Transformation Proof',
-  badge = 'Verified Benchmark',
-  badgeColor = '#2563eb',
-  badgeBg = '#eff6ff',
+  title = 'Quality Comparison',
   beforeImg,
   afterImg,
-  beforeLabel = 'Original Scan (Ads & Smudges)',
-  afterLabel = 'DocuMorph Clean A4',
-  highlights = ['Ads Removed', 'LaTeX Restored'],
+  beforeLabel = 'Scan with Ads & Watermarks',
+  afterLabel = 'Clean Printable Note',
+  features = ['Watermarks Removed', 'Sharp Math & Formulas', 'Clean White Pages'],
 }) {
+  const [displayMode, setDisplayMode] = useState('split'); // 'split' | 'side'
   const [viewMode, setViewMode] = useState('split'); // 'split' | 'before' | 'after'
   const [isInteracting, setIsInteracting] = useState(false);
   const [phase, setPhase] = useState('sweeping');
@@ -21,7 +19,7 @@ export default function InteractiveProofViewer({
   const sweepAnimRef = useRef(null);
   const idleResumeTimerRef = useRef(null);
 
-  // Check if user prefers reduced motion (WCAG accessibility compliance)
+  // Check if user prefers reduced motion (WCAG compliance)
   const prefersReducedMotion = typeof window !== 'undefined' &&
     window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -45,7 +43,7 @@ export default function InteractiveProofViewer({
     const tracker = { pct: currentSplitRef.current };
     animate(tracker, {
       pct: targetPct,
-      duration: 50,
+      duration: 45,
       ease: 'outQuad',
       onUpdate: () => setSplitDOM(tracker.pct),
     });
@@ -93,26 +91,26 @@ export default function InteractiveProofViewer({
 
   // Anime.js auto-sweep animation
   useEffect(() => {
-    if (isInteracting || viewMode !== 'split' || prefersReducedMotion) return;
+    if (isInteracting || viewMode !== 'split' || displayMode !== 'split' || prefersReducedMotion) return;
 
     if (phase === 'sweeping') {
       const splitObj = { pct: currentSplitRef.current };
       sweepAnimRef.current = animate(splitObj, {
-        pct: 88,
-        duration: 2400,
+        pct: 92,
+        duration: 2500,
         ease: 'inOutQuad',
         onUpdate: () => setSplitDOM(splitObj.pct),
         onComplete: () => {
           setTimeout(() => {
             if (!isInteracting) {
-              const backObj = { pct: 88 };
+              const backObj = { pct: 92 };
               sweepAnimRef.current = animate(backObj, {
-                pct: 12,
-                duration: 2400,
+                pct: 8,
+                duration: 2500,
                 ease: 'inOutQuad',
                 onUpdate: () => setSplitDOM(backObj.pct),
                 onComplete: () => {
-                  setTimeout(() => setPhase('sweeping'), 1000);
+                  setTimeout(() => setPhase('sweeping'), 1200);
                 },
               });
             }
@@ -126,114 +124,186 @@ export default function InteractiveProofViewer({
         }
       };
     }
-  }, [phase, isInteracting, viewMode, prefersReducedMotion, setSplitDOM]);
+  }, [phase, isInteracting, viewMode, displayMode, prefersReducedMotion, setSplitDOM]);
 
   return (
     <div className="proof-viewer-card">
-      {/* Header */}
-      <div className="proof-viewer-header">
-        <div>
-          <div className="proof-viewer-title">{title}</div>
-          <div className="proof-highlights-row">
-            {highlights.map((h, i) => (
-              <span key={i} className="proof-highlight-pill">✓ {h}</span>
+      {/* Top Bar with Mode Controls */}
+      <div className="proof-viewer-top-bar">
+        <div className="proof-status-indicator">
+          <span className="pulse-live-dot" />
+          <span className="proof-title-text">{title}</span>
+          <span className="proof-page-badge">Full A4 Page • 0% Cropped</span>
+        </div>
+
+        <div className="proof-controls-right">
+          {/* Comparison Mode: Split Slider vs Side-by-Side */}
+          <div className="proof-display-mode-switch">
+            <button
+              type="button"
+              className={`proof-mode-btn ${displayMode === 'split' ? 'active' : ''}`}
+              onClick={() => setDisplayMode('split')}
+              title="Interactive Draggable Split Slider"
+            >
+              <span>⚡</span> Split Slider
+            </button>
+            <button
+              type="button"
+              className={`proof-mode-btn ${displayMode === 'side' ? 'active' : ''}`}
+              onClick={() => setDisplayMode('side')}
+              title="View Both Full Pages Side by Side"
+            >
+              <span>⊞</span> Side-by-Side
+            </button>
+          </div>
+
+          {displayMode === 'split' && (
+            <div className="proof-mode-tabs-bar">
+              <button
+                type="button"
+                className={`proof-mode-btn ${viewMode === 'before' ? 'active' : ''}`}
+                onClick={() => handleModeToggle('before')}
+              >
+                <span className="dot red" /> Scan
+              </button>
+              <button
+                type="button"
+                className={`proof-mode-btn ${viewMode === 'split' ? 'active' : ''}`}
+                onClick={() => handleModeToggle('split')}
+              >
+                <span>50/50</span>
+              </button>
+              <button
+                type="button"
+                className={`proof-mode-btn ${viewMode === 'after' ? 'active' : ''}`}
+                onClick={() => handleModeToggle('after')}
+              >
+                <span className="dot green" /> Clean
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── MODE 1: INTERACTIVE SPLIT SLIDER (True A4 Ratio, Zero Cropping) ── */}
+      {displayMode === 'split' ? (
+        <div className="proof-split-container">
+          <div
+            className="proof-canvas-stage true-a4-canvas"
+            ref={viewportRef}
+            style={{ '--split-pct': '50%' }}
+            onMouseDown={(e) => startInteraction(e.clientX)}
+            onMouseMove={(e) => isInteracting && handleMove(e.clientX)}
+            onMouseUp={endInteraction}
+            onMouseLeave={() => isInteracting && endInteraction()}
+            onTouchStart={(e) => e.touches[0] && startInteraction(e.touches[0].clientX)}
+            onTouchMove={onTouchMove}
+            onTouchEnd={endInteraction}
+            title="Drag left or right to compare full page"
+          >
+            {/* Floating Badges */}
+            <div className="proof-status-overlay">
+              <span className="status-chip before">
+                <span className="dot red" /> Scan (Watermarks)
+              </span>
+              <span className="status-chip after">
+                <span className="dot green" /> Clean Note
+              </span>
+            </div>
+
+            {/* Layer Before: Whole Scanned Page */}
+            <div className="proof-layer layer-before">
+              <img
+                src={beforeImg}
+                alt="Original scan full page"
+                className="proof-full-page-img"
+                draggable="false"
+              />
+            </div>
+
+            {/* Layer After: Whole Cleaned Page */}
+            <div className="proof-layer layer-after">
+              <img
+                src={afterImg}
+                alt="Cleaned full page"
+                className="proof-full-page-img"
+                draggable="false"
+              />
+            </div>
+
+            {/* Draggable Laser Split Divider */}
+            <div className="proof-split-divider">
+              <div className="divider-laser" />
+              <div className="divider-knob" title="Drag to compare full page">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
+                  <polyline points="7 8 3 12 7 16" />
+                  <polyline points="17 8 21 12 17 16" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ── MODE 2: DUAL FULL-PAGE SIDE-BY-SIDE (CamScanner & vFlat Standard) ── */
+        <div className="proof-side-by-side-grid">
+          {/* Left: Original Scan Document */}
+          <div className="side-doc-card">
+            <div className="side-doc-header before">
+              <span className="dot red" />
+              <span className="side-doc-title">Original Scanned Page</span>
+            </div>
+            <div className="side-doc-stage">
+              <img
+                src={beforeImg}
+                alt="Original full scan"
+                className="proof-full-page-img"
+                draggable="false"
+              />
+            </div>
+            <div className="side-doc-footer before">
+              <span>❌ Ads &amp; watermarks across questions</span>
+            </div>
+          </div>
+
+          {/* Right: Cleaned Document */}
+          <div className="side-doc-card">
+            <div className="side-doc-header after">
+              <span className="dot green" />
+              <span className="side-doc-title">DocuMorph Clean A4</span>
+            </div>
+            <div className="side-doc-stage">
+              <img
+                src={afterImg}
+                alt="Cleaned full page"
+                className="proof-full-page-img"
+                draggable="false"
+              />
+            </div>
+            <div className="side-doc-footer after">
+              <span>✅ 100% Ads removed • Clean white paper</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Proof Viewer Bottom Value Strip */}
+      <div className="proof-viewer-footer">
+        <div className="proof-labels-row">
+          <span className="footer-side before">{beforeLabel}</span>
+          <span className="footer-arrow">➔</span>
+          <span className="footer-side after">{afterLabel}</span>
+        </div>
+
+        {features && features.length > 0 && (
+          <div className="proof-features-row">
+            {features.map((f, i) => (
+              <span key={i} className="proof-feature-tag">
+                ✓ {f}
+              </span>
             ))}
           </div>
-        </div>
-        <span
-          className="proof-badge-pill"
-          style={{ color: badgeColor, backgroundColor: badgeBg }}
-        >
-          {badge}
-        </span>
-      </div>
-
-      {/* Mode Switcher Tabs */}
-      <div className="proof-mode-tabs-bar">
-        <button
-          type="button"
-          className={`proof-mode-btn ${viewMode === 'before' ? 'active' : ''}`}
-          onClick={() => handleModeToggle('before')}
-        >
-          <span className="dot red"></span> Original Scan
-        </button>
-        <button
-          type="button"
-          className={`proof-mode-btn ${viewMode === 'split' ? 'active' : ''}`}
-          onClick={() => handleModeToggle('split')}
-        >
-          <span>⚡</span> Split Comparison
-        </button>
-        <button
-          type="button"
-          className={`proof-mode-btn ${viewMode === 'after' ? 'active' : ''}`}
-          onClick={() => handleModeToggle('after')}
-        >
-          <span className="dot green"></span> Clean A4
-        </button>
-      </div>
-
-      {/* Interactive Split Canvas */}
-      <div
-        className="proof-canvas-stage"
-        ref={viewportRef}
-        style={{ '--split-pct': '50%' }}
-        onMouseDown={(e) => startInteraction(e.clientX)}
-        onMouseMove={(e) => isInteracting && handleMove(e.clientX)}
-        onMouseUp={endInteraction}
-        onMouseLeave={() => isInteracting && endInteraction()}
-        onTouchStart={(e) => e.touches[0] && startInteraction(e.touches[0].clientX)}
-        onTouchMove={onTouchMove}
-        onTouchEnd={endInteraction}
-      >
-        {/* Floating Badges */}
-        <div className="proof-status-overlay">
-          <span className="status-chip before">
-            <span className="dot red"></span> Scan
-          </span>
-          <span className="status-chip after">
-            <span className="dot green"></span> Clean A4
-          </span>
-        </div>
-
-        {/* Layer Before: Scanned Page */}
-        <div className="proof-layer layer-before">
-          <img
-            src={beforeImg}
-            alt="Original scanned document"
-            className="proof-img"
-            draggable="false"
-          />
-        </div>
-
-        {/* Layer After: Clean Vector A4 */}
-        <div className="proof-layer layer-after">
-          <img
-            src={afterImg}
-            alt="DocuMorph cleaned document"
-            className="proof-img"
-            draggable="false"
-          />
-        </div>
-
-        {/* Draggable Laser Split Divider */}
-        <div className="proof-split-divider">
-          <div className="divider-laser"></div>
-          <div className="divider-knob" title="Drag to compare">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
-              <polyline points="7 8 3 12 7 16" />
-              <polyline points="17 8 21 12 17 16" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer Info Bar */}
-      <div className="proof-viewer-footer">
-        <span className="footer-side before">{beforeLabel}</span>
-        <span className="footer-arrow">➔</span>
-        <span className="footer-side after">{afterLabel}</span>
+        )}
       </div>
     </div>
   );

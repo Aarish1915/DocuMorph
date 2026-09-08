@@ -16,6 +16,7 @@ import CleanFormatPage from './components/pages/CleanFormatPage';
 import CompressPage from './components/pages/CompressPage';
 import ExtractTextPage from './components/pages/ExtractTextPage';
 import TranslatePage from './components/pages/TranslatePage';
+import InteractiveProofViewer from './components/common/InteractiveProofViewer';
 
 const STAGES = [
   { icon: '📄', label: 'Reading',    desc: 'Loading PDF' },
@@ -78,6 +79,49 @@ export default function App() {
   const [step, setStep] = useState(1);
   const [serviceType, setServiceType] = useState('clean_format');
   const [configs, setConfigs] = useState(DEFAULT_CONFIGS);
+
+  // Theme Engine (System auto-detect + localStorage + manual toggle)
+  const [themeMode, setThemeMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('documorph_theme') || 'system';
+    }
+    return 'system';
+  });
+
+  const [appliedTheme, setAppliedTheme] = useState('light');
+
+  useEffect(() => {
+    const updateTheme = () => {
+      let isDark = false;
+      if (themeMode === 'dark') {
+        isDark = true;
+      } else if (themeMode === 'light') {
+        isDark = false;
+      } else {
+        isDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+      const active = isDark ? 'dark' : 'light';
+      setAppliedTheme(active);
+      document.documentElement.setAttribute('data-theme', active);
+    };
+
+    updateTheme();
+
+    if (themeMode === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = () => updateTheme();
+      media.addEventListener('change', listener);
+      return () => media.removeEventListener('change', listener);
+    }
+  }, [themeMode]);
+
+  const toggleTheme = () => {
+    const next = appliedTheme === 'dark' ? 'light' : 'dark';
+    setThemeMode(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('documorph_theme', next);
+    }
+  };
 
   // Dedicated Tool View Routing: 'home' | 'clean' | 'compress' | 'extract' | 'translate'
   const getInitialView = () => {
@@ -350,6 +394,8 @@ export default function App() {
         onToggleHistory={() => setShowHistory(true)}
         historyCount={jobHistory.length}
         onToggleSettings={() => setShowSettings(!showSettings)}
+        appliedTheme={appliedTheme}
+        onToggleTheme={toggleTheme}
       />
 
       {/* ── ADVANCED SETTINGS MODAL ── */}
@@ -453,20 +499,37 @@ export default function App() {
             onChangeConfig={(cfg) => setConfigs((prev) => ({ ...prev, translate: cfg }))}
           />
         ) : (
-          /* ── SCREEN 1: HOME HUB TOOL DIRECTORY (CLEAN iLovePDF STYLE) ── */
+          /* ── SCREEN 1: HOME HUB TOOL DIRECTORY & QUALITY SHOWCASE ── */
           <>
             <HeroSection />
             <ToolDirectory
               activeTool={activeView}
               onSelectTool={(tool) => navigateView(tool)}
             />
+            <section className="home-showcase-section">
+              <div className="home-showcase-header">
+                <span className="home-showcase-pill">Quality Comparison</span>
+                <h2 className="home-showcase-title">See the difference before you start</h2>
+                <p className="home-showcase-subtitle">
+                  Drag the slider to see watermarks, ads, and dark shadows disappear into clean notes.
+                </p>
+              </div>
+              <InteractiveProofViewer
+                title="Live Quality Test"
+                beforeImg="/samples/doc_1_before.jpg"
+                afterImg="/samples/doc_1_after.jpg"
+                beforeLabel="Raw Scan with Telegram Ads"
+                afterLabel="Clean Printable Note"
+                features={['Zero Telegram Ads', 'Sharp Math & Formulas', 'Clean White Background']}
+              />
+            </section>
           </>
         )}
       </main>
 
       {/* ── MINIMAL FOOTER ── */}
       <footer className="site-footer">
-        <span>DocuMorph AI • Clean, Fast, Ephemeral Document Processing</span>
+        <span>DocuMorph • 100% Private. Files are never stored.</span>
       </footer>
 
       {/* ── TOAST CONTAINER ── */}

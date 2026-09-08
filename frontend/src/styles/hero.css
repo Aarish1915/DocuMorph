@@ -1,13 +1,13 @@
 /* =====================================================
-   DocuMorph Clean Hero Section (iLovePDF Style)
-   Ultra-clean, punchy, compact typography
+   DocuMorph Clean Hero Section
+   Balanced typography with dark and light theme support
    ===================================================== */
 
 .hero-section {
   max-width: 900px;
   margin: 0 auto;
   text-align: center;
-  padding: 36px 16px 20px 16px;
+  padding: 32px 16px 20px 16px;
 }
 
 .hero-headline-group {
@@ -16,49 +16,36 @@
   align-items: center;
 }
 
-.hero-pill-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
-  border-radius: 20px;
-  color: #1d4ed8;
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 16px;
-  letter-spacing: -0.01em;
-}
-
-.badge-sparkle {
-  font-size: 13px;
-}
-
 .hero-title {
-  font-size: clamp(30px, 4vw, 48px);
-  font-weight: 800;
-  line-height: 1.15;
+  font-size: clamp(28px, 4vw, 46px);
+  font-weight: 850;
+  line-height: 1.18;
   letter-spacing: -0.035em;
-  color: #0f172a;
-  margin: 0 0 12px 0;
-  font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  color: var(--text-main);
+  margin: 0 0 10px 0;
+  font-family: var(--font-family, sans-serif);
   max-width: 780px;
 }
 
 .title-gradient {
-  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #4f46e5 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme="dark"] .title-gradient {
+  background: linear-gradient(135deg, #60a5fa 0%, #38bdf8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .hero-description {
-  max-width: 620px;
   margin: 0 auto;
   font-size: 16px;
-  line-height: 1.55;
-  color: #64748b;
+  line-height: 1.5;
+  color: var(--text-muted);
   font-weight: 450;
+  max-width: 620px;
 }
 
 @media (max-width: 640px) {
@@ -67,7 +54,7 @@
   }
   .hero-title {
     font-size: 26px;
-    line-height: 1.2;
+    line-height: 1.22;
   }
   .hero-description {
     font-size: 14px;

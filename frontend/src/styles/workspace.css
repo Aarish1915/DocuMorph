@@ -3,14 +3,14 @@
    (Hick's Law, Fitts's Law, Action-First Simplicity)
    ===================================================== */
 
-/* ── HOME WORKSPACE CARD ── */
+/* ── HOME WORKSPACE CARD (STANDARDIZED 860px) ── */
 .home-workspace-card {
-  max-width: 780px;
+  max-width: 860px;
   margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-card, var(--surface-white));
+  border: 1.5px solid var(--border-default);
   border-radius: 20px;
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-card);
   padding: 24px 28px;
 }
 
@@ -97,11 +97,23 @@
   transition: all 0.2s ease;
 }
 
+[data-theme="dark"] .main-dropzone {
+  border-color: rgba(59, 130, 246, 0.45);
+  background-color: rgba(17, 24, 39, 0.85);
+}
+
 .main-dropzone:hover,
 .main-dropzone.dragging {
   background-color: #dbeafe;
   border-color: #2563eb;
   transform: translateY(-1px);
+}
+
+[data-theme="dark"] .main-dropzone:hover,
+[data-theme="dark"] .main-dropzone.dragging {
+  background-color: rgba(59, 130, 246, 0.16);
+  border-color: #60a5fa;
+  box-shadow: 0 0 24px rgba(59, 130, 246, 0.25);
 }
 
 .dropzone-icon-circle {
@@ -117,6 +129,11 @@
   transition: transform 0.2s ease;
 }
 
+[data-theme="dark"] .dropzone-icon-circle {
+  background-color: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+}
+
 .main-dropzone:hover .dropzone-icon-circle {
   transform: scale(1.08);
 }
@@ -124,18 +141,18 @@
 .dropzone-main-text {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-main);
   margin: 0 0 6px;
 }
 
 .browse-link {
-  color: #2563eb;
+  color: var(--color-primary);
   text-decoration: underline;
 }
 
 .dropzone-sub-text {
-  font-size: 12.5px;
-  color: #64748b;
+  font-size: 13px;
+  color: var(--text-muted);
   margin: 0 0 14px;
 }
 
@@ -143,9 +160,9 @@
   display: flex;
   justify-content: center;
   gap: 16px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-subtle);
 }
 
 /* ── FILE READY CARD ── */
