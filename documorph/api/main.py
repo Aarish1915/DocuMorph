@@ -135,12 +135,18 @@ async def process_pdf(
 
     try:
         doc = fitz.open(stream=file_bytes, filetype="pdf")
-        page_count = len(doc)
-        doc.close()
-        if page_count > 130:
+        if doc.is_encrypted:
+            doc.close()
             raise HTTPException(
                 status_code=400, 
-                detail=f"Free tier limit exceeded. Your PDF has {page_count} pages. Please upload PDFs under 55 pages."
+                detail="This PDF is password-protected. Please remove the password before uploading."
+            )
+        page_count = len(doc)
+        doc.close()
+        if page_count > 55:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Limit exceeded: Your document has {page_count} pages. To ensure fast processing, please upload PDFs under 55 pages or select a page range."
             )
     except Exception as e:
         if isinstance(e, HTTPException):
