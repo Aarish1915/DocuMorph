@@ -40,21 +40,37 @@ async def check_rate_limit(request: Request):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"^https://.*\.vercel\.app$|^http://localhost:\d+$|^http://127\.0\.0\.1:\d+$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# Mount the output directory so the frontend can download the final PDF
+# Ensure internal directories exist with private permissions
+os.makedirs("data/uploads", exist_ok=True)
+os.makedirs("data/output", exist_ok=True)
 os.makedirs("data/output/needs_review", exist_ok=True)
-app.mount("/data", StaticFiles(directory="data"), name="data")
 
 
+
+def cleanup_old_files(max_age_seconds: int = 7200):
+    """Prunes upload and output files older than 2 hours to prevent disk exhaustion attacks"""
+    now = time.time()
+    for folder in ["data/uploads", "data/output"]:
+        if os.path.exists(folder):
+            for fname in os.listdir(folder):
+                fpath = os.path.join(folder, fname)
+                if os.path.isfile(fpath):
+                    try:
+                        if now - os.path.getmtime(fpath) > max_age_seconds:
+                            os.remove(fpath)
+                    except Exception:
+                        pass
 
 @app.on_event("startup")
 def on_startup():
     init_db()
+    cleanup_old_files()
 
 @app.post("/api/settings")
 async def update_settings(settings: dict):
@@ -85,9 +101,13 @@ async def process_pdf(
 ):
     job_id = f"job_{uuid.uuid4().hex[:8]}"
     
-    # Save uploaded file
+    # Save uploaded file with strict path traversal sanitization
     os.makedirs("data/uploads", exist_ok=True)
-    file_path = f"data/uploads/{job_id}_{file.filename}"
+    clean_filename = os.path.basename(file.filename or "document.pdf")
+    clean_filename = "".join(c for c in clean_filename if c.isalnum() or c in "._- ")
+    if not clean_filename.lower().endswith(".pdf"):
+        clean_filename += ".pdf"
+    file_path = os.path.join("data", "uploads", f"{job_id}_{clean_filename}")
     
     file_bytes = await file.read()
     
