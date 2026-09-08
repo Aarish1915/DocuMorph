@@ -1,6 +1,7 @@
 import React from 'react';
 import DropZone from '../workspace/DropZone';
 import InteractiveProofViewer from '../common/InteractiveProofViewer';
+import StudentExamLanguageSelector from '../common/StudentExamLanguageSelector';
 
 export default function CleanFormatPage({
   onNavigateHome,
@@ -34,7 +35,7 @@ export default function CleanFormatPage({
 
       {/* 2-Column Working Area */}
       <div className="tool-work-grid">
-        {/* Left column: Dropzone & Settings */}
+        {/* Left column: Dropzone, Language & Settings */}
         <div className="tool-action-card">
           <DropZone
             file={file}
@@ -79,8 +80,14 @@ export default function CleanFormatPage({
             </div>
           )}
 
+          {/* Student & Exam Language Selector */}
+          <StudentExamLanguageSelector
+            languageMode={config.language_mode || 'auto'}
+            onChange={(mode) => onChangeConfig({ ...config, language_mode: mode })}
+          />
+
           {/* Clean Controls */}
-          <div className="tool-settings-group" style={{ marginTop: '20px' }}>
+          <div className="tool-settings-group" style={{ marginTop: '16px' }}>
             <div className="tool-setting-row">
               <span className="tool-setting-label">Remove watermarks &amp; ads</span>
               <input

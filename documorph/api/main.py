@@ -72,6 +72,10 @@ def on_startup():
     init_db()
     cleanup_old_files()
 
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "timestamp": time.time(), "worker": "active"}
+
 @app.post("/api/settings")
 async def update_settings(settings: dict):
     with open("config.json", "w", encoding="utf-8") as f:

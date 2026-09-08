@@ -1,13 +1,15 @@
 #!/bin/bash
+set -e
 
-# Initialize the SQLite Database
-mkdir -p data
+# Initialize directory structure and SQLite database
+mkdir -p data data/uploads data/output data/output/needs_review
 python -c "from documorph.core.database import init_db; init_db()"
 
-# Start the Background Queue Worker as a background process (&)
-echo "Starting Background Queue Worker..."
+# Start background queue worker in background
+echo "Starting DocuMorph Queue Worker..."
 python -m documorph.worker.queue_worker &
 
-# Start the FastAPI Web Server in the foreground on Port 7860
-echo "Starting FastAPI Gateway on Port 7860..."
-uvicorn documorph.api.main:app --host 0.0.0.0 --port 7860
+# Start FastAPI gateway on Render or local port
+PORT="${PORT:-8000}"
+echo "Starting DocuMorph FastAPI Gateway on port $PORT..."
+exec uvicorn documorph.api.main:app --host 0.0.0.0 --port "$PORT"

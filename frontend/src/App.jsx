@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import './DesignTokens.css';
 import './index.css';
-import { API_BASE } from './config';
+import { API_BASE, probeBackend, getStoredConfig } from './config';
 
 import Header from './components/common/Header';
 import Sidebar from './components/common/Sidebar';
@@ -183,6 +183,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [customApiKey, setCustomApiKey] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [activeNode, setActiveNode] = useState(null);
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
@@ -203,20 +204,44 @@ export default function App() {
     }
   };
 
-  const fetchHistory = () => {
-    fetch(`${API_BASE}/api/jobs`)
-      .then((r) => r.json())
-      .then((d) => {
+  const fetchHistory = async (overrideUrl) => {
+    let baseUrl = overrideUrl;
+    if (!baseUrl) {
+      const node = await probeBackend();
+      baseUrl = node.url || API_BASE;
+    }
+
+    try {
+      const r = await fetch(`${baseUrl}/api/jobs`);
+      if (r.ok) {
+        const d = await r.json();
         setJobHistory(d);
-        setHistoryLoading(false);
-      })
-      .catch(() => {
-        setHistoryLoading(false);
-      });
+      }
+    } catch {
+      // If primary failed, try fallback
+      const cfg = getStoredConfig();
+      if (baseUrl !== cfg.renderUrl && cfg.renderUrl) {
+        try {
+          const r = await fetch(`${cfg.renderUrl}/api/jobs`);
+          if (r.ok) {
+            const d = await r.json();
+            setJobHistory(d);
+          }
+        } catch {}
+      }
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
-  const resumeJobStream = (jobId) => {
-    const evtSource = new EventSource(`${API_BASE}/api/progress/${jobId}`);
+  const resumeJobStream = async (jobId, overrideUrl) => {
+    let baseUrl = overrideUrl;
+    if (!baseUrl) {
+      const node = await probeBackend();
+      baseUrl = node.url || API_BASE;
+    }
+
+    const evtSource = new EventSource(`${baseUrl}/api/progress/${jobId}`);
     evtSource.onmessage = (e) => {
       try {
         const s = JSON.parse(e.data);
@@ -224,7 +249,7 @@ export default function App() {
         setJobStatus(s);
         if (['Completed', 'COMPLETED', 'Error', 'ERROR', 'FAILED'].includes(s.status)) {
           evtSource.close();
-          fetchHistory();
+          fetchHistory(baseUrl);
         }
       } catch (err) {
         console.error('Error parsing SSE event:', err);
@@ -235,40 +260,54 @@ export default function App() {
     };
   };
 
-  // Restore active job if running on mount
+  // Probe backend node on mount & restore active jobs
   useEffect(() => {
-    fetchHistory();
+    probeBackend().then((nodeInfo) => {
+      setActiveNode(nodeInfo);
+      fetchHistory(nodeInfo.url);
+    });
+
+    const handleNodeChange = (e) => {
+      if (e.detail) setActiveNode(e.detail);
+    };
+    window.addEventListener('documorph:backend-node', handleNodeChange);
+
     const activeJobId = localStorage.getItem('activeJobId');
     if (activeJobId) {
-      fetch(`${API_BASE}/api/jobs`)
-        .then((r) => r.json())
-        .then((jobs) => {
-          const job = jobs.find((j) => j.id === activeJobId);
-          if (!job) {
-            localStorage.removeItem('activeJobId');
-          } else if (['QUEUED', 'PROCESSING', 'QUEUED_REPROCESS'].includes(job.status)) {
-            setStep(4);
-            if (job.service_type) setServiceType(job.service_type);
-            resumeJobStream(activeJobId);
-          } else {
-            setJobStatus({
-              id: job.id,
-              status: job.status,
-              progress: 100,
-              message: 'Previous document result',
-              result_url: job.result_url,
-              download_url: job.download_url,
-              service_type: job.service_type,
-              output_format: job.output_format,
-              original_file_size: job.original_file_size,
-              compressed_file_size: job.compressed_file_size,
-            });
-            if (job.service_type) setServiceType(job.service_type);
-            setStep(4);
-          }
-        })
-        .catch(() => localStorage.removeItem('activeJobId'));
+      probeBackend().then((nodeInfo) => {
+        const url = nodeInfo.url || API_BASE;
+        fetch(`${url}/api/jobs`)
+          .then((r) => r.json())
+          .then((jobs) => {
+            const job = jobs.find((j) => j.id === activeJobId);
+            if (!job) {
+              localStorage.removeItem('activeJobId');
+            } else if (['QUEUED', 'PROCESSING', 'QUEUED_REPROCESS'].includes(job.status)) {
+              setStep(4);
+              if (job.service_type) setServiceType(job.service_type);
+              resumeJobStream(activeJobId, url);
+            } else {
+              setJobStatus({
+                id: job.id,
+                status: job.status,
+                progress: 100,
+                message: 'Previous document result',
+                result_url: job.result_url,
+                download_url: job.download_url,
+                service_type: job.service_type,
+                output_format: job.output_format,
+                original_file_size: job.original_file_size,
+                compressed_file_size: job.compressed_file_size,
+              });
+            }
+          })
+          .catch(() => {});
+      });
     }
+
+    return () => {
+      window.removeEventListener('documorph:backend-node', handleNodeChange);
+    };
   }, []);
 
   // Navigation Handlers
@@ -325,10 +364,30 @@ export default function App() {
     });
 
     try {
-      const res = await fetch(`${API_BASE}/api/process`, {
-        method: 'POST',
-        body: fd,
-      });
+      const activeBackend = await probeBackend();
+      let targetUrl = activeBackend.url || API_BASE;
+
+      let res;
+      try {
+        res = await fetch(`${targetUrl}/api/process`, {
+          method: 'POST',
+          body: fd,
+        });
+      } catch (netErr) {
+        // Laptop offline or tunnel dropped — failover to Render Cloud
+        const cfg = getStoredConfig();
+        if (targetUrl !== cfg.renderUrl && cfg.renderUrl) {
+          addToast('Laptop node offline. Diverting to Render Cloud...', 'info');
+          targetUrl = cfg.renderUrl;
+          res = await fetch(`${targetUrl}/api/process`, {
+            method: 'POST',
+            body: fd,
+          });
+        } else {
+          throw netErr;
+        }
+      }
+
       const data = await res.json();
 
       if (!res.ok) {
@@ -341,11 +400,12 @@ export default function App() {
         return;
       }
 
-      addToast('Uploaded successfully! Processing started.', 'success');
+      const nodeName = targetUrl.includes('trycloudflare') ? 'Laptop (8GB)' : 'Cloud';
+      addToast(`Processing started on ${nodeName}!`, 'success');
       localStorage.setItem('activeJobId', data.job_id);
-      resumeJobStream(data.job_id);
+      resumeJobStream(data.job_id, targetUrl);
     } catch {
-      addToast('Cannot connect to backend server. Is it running on port 8000?', 'error');
+      addToast('Cannot connect to backend server. Check Settings or launch tunnel.', 'error');
       setJobStatus({
         status: 'ERROR',
         progress: -1,
@@ -376,14 +436,16 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/reprocess`, {
+      const activeBackend = await probeBackend();
+      const targetUrl = activeBackend.url || API_BASE;
+      const res = await fetch(`${targetUrl}/api/reprocess`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job_id: activeJobId, pages: [pageInt] }),
       });
       if (res.ok) {
         addToast(`Page ${pageInt} queued for rapid re-processing!`, 'success');
-        resumeJobStream(activeJobId);
+        resumeJobStream(activeJobId, targetUrl);
       } else {
         addToast('Failed to reprocess page.', 'error');
       }
@@ -407,6 +469,7 @@ export default function App() {
         step={headerStep}
         serviceTitle={getServiceTitle()}
         activeView={activeView}
+        activeNode={activeNode}
         onNavigateView={navigateView}
         onBack={handleBack}
         onNewJob={handleNewJob}

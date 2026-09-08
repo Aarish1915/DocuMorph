@@ -38,15 +38,17 @@ export default function QuickSettingsToggles({
 
         {/* 1. LANGUAGE MODE CHIPS */}
         <div className="quick-control-card">
-          <span className="control-label">🌐 Document Language:</span>
-          <div className="chips-row">
+          <span className="control-label">🌐 Language &amp; Math Equations:</span>
+          <div className="chips-row" style={{ flexWrap: 'wrap', gap: '6px' }}>
             {[
-              { id: 'bilingual', label: 'Bilingual (Hindi + Eng)' },
-              { id: 'en', label: 'English Only' },
-              { id: 'hi', label: 'Hindi Only' },
-              { id: 'math', label: 'Math Formulas' }
+              { id: 'auto', label: '🌐 Dual (Hindi + Eng) + Maths' },
+              { id: 'en+math', label: '🇬🇧+📐 English + Maths (JEE/NEET)' },
+              { id: 'math+hindi', label: '🇮🇳+📐 Hindi + Maths' },
+              { id: 'only_english', label: '🇬🇧 Only English (Law/Text)' },
+              { id: 'only_hindi', label: '🇮🇳 Only Hindi' },
+              { id: 'only_math', label: '📐 Only Maths' }
             ].map((lang) => {
-              const active = (config.language_mode || 'bilingual') === lang.id;
+              const active = (config.language_mode || 'auto') === lang.id;
               return (
                 <button
                   key={lang.id}

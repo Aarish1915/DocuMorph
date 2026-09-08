@@ -1,6 +1,7 @@
 import React from 'react';
 import DropZone from '../workspace/DropZone';
 import InteractiveProofViewer from '../common/InteractiveProofViewer';
+import StudentExamLanguageSelector from '../common/StudentExamLanguageSelector';
 
 export default function ExtractTextPage({
   onNavigateHome,
@@ -34,7 +35,7 @@ export default function ExtractTextPage({
       </div>
 
       <div className="tool-work-grid">
-        {/* Left column: Format chooser, DropZone & Options */}
+        {/* Left column: Format chooser, DropZone, Language & Options */}
         <div className="tool-action-card">
           <div className="format-selection-group" style={{ marginBottom: '16px' }}>
             <div className="format-pills-row">
@@ -107,7 +108,13 @@ export default function ExtractTextPage({
             </div>
           )}
 
-          <div className="tool-settings-group" style={{ marginTop: '20px' }}>
+          {/* Student & Exam Language Selector */}
+          <StudentExamLanguageSelector
+            languageMode={config.language_mode || 'auto'}
+            onChange={(mode) => onChangeConfig({ ...config, language_mode: mode })}
+          />
+
+          <div className="tool-settings-group" style={{ marginTop: '16px' }}>
             <div className="tool-setting-row">
               <span className="tool-setting-label">Preserve table structure</span>
               <input

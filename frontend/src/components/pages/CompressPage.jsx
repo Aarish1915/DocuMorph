@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import DropZone from '../workspace/DropZone';
 import InteractiveProofViewer from '../common/InteractiveProofViewer';
+import StudentExamLanguageSelector from '../common/StudentExamLanguageSelector';
 
 export default function CompressPage({
   onNavigateHome,
@@ -39,7 +40,7 @@ export default function CompressPage({
       </div>
 
       <div className="tool-work-grid">
-        {/* Left column: Calculator, Dropzone & Controls */}
+        {/* Left column: Calculator, Dropzone, Language & Controls */}
         <div className="tool-action-card">
           {/* Streamlined Savings Calculator */}
           <div className="savings-calculator-card">
@@ -119,8 +120,14 @@ export default function CompressPage({
             </div>
           )}
 
+          {/* Student & Exam Language Selector */}
+          <StudentExamLanguageSelector
+            languageMode={config.language_mode || 'auto'}
+            onChange={(mode) => onChangeConfig({ ...config, language_mode: mode })}
+          />
+
           {/* Density Settings */}
-          <div className="tool-settings-group" style={{ marginTop: '20px' }}>
+          <div className="tool-settings-group" style={{ marginTop: '16px' }}>
             <div className="tool-setting-row">
               <span className="tool-setting-label">Compaction level</span>
               <select
