@@ -58,13 +58,8 @@ export default function DropZone({
               Drop your PDF here, or <span className="browse-link">browse files</span>
             </h3>
             <p className="dropzone-sub-text">
-              Supports messy phone scans, coaching booklets &amp; university notes up to 50MB (under 130 pages)
+              PDF documents up to 50MB
             </p>
-            <div className="dropzone-footer-tags">
-              <span>⚡ Zero wait time</span>
-              <span>🔒 100% Private</span>
-              <span>✨ Auto-detects Hindi &amp; Math</span>
-            </div>
           </div>
         </div>
       ) : (

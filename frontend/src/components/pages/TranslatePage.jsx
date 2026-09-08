@@ -11,7 +11,7 @@ const LANGUAGES = [
   { id: 'Telugu', label: 'Telugu', script: 'తెలుగు' },
   { id: 'Kannada', label: 'Kannada', script: 'ಕನ್ನಡ' },
   { id: 'Malayalam', label: 'Malayalam', script: 'മലയാളം' },
-  { id: 'Punjabi', label: 'Punjabi', script: 'ਪੰਜਾਬી' },
+  { id: 'Punjabi', label: 'Punjabi', script: 'ਪੰਜਾਬੀ' },
   { id: 'Urdu', label: 'Urdu', script: 'اردو' },
   { id: 'English', label: 'English', script: 'English' },
   { id: 'Spanish', label: 'Spanish', script: 'Español' },
@@ -21,11 +21,14 @@ const LANGUAGES = [
 
 export default function TranslatePage({
   onNavigateHome,
-  onFileSelect,
+  file,
+  setFile,
   isDragging,
   setIsDragging,
   config = {},
   onChangeConfig = () => {},
+  onProcess,
+  isProcessing = false,
 }) {
   const selectedTarget = config.to_language || 'Hindi';
   const selectedType = config.content_type || 'science_math';
@@ -51,8 +54,7 @@ export default function TranslatePage({
       <div className="tool-work-grid">
         {/* Left column: Language matrix, Content type, DropZone */}
         <div className="tool-action-card">
-          {/* Multi-Language Selector */}
-          <div className="format-selection-group">
+          <div className="format-selection-group" style={{ marginBottom: '16px' }}>
             <div className="language-grid">
               {LANGUAGES.map((lang) => (
                 <button
@@ -69,20 +71,51 @@ export default function TranslatePage({
           </div>
 
           <DropZone
-            file={null}
-            setFile={(f) => f && onFileSelect(f)}
+            file={file}
+            setFile={setFile}
             isDragging={isDragging}
             setIsDragging={setIsDragging}
             handleDrop={(e) => {
               e.preventDefault();
               setIsDragging(false);
-              if (e.dataTransfer.files?.[0]) onFileSelect(e.dataTransfer.files[0]);
+              if (e.dataTransfer.files?.[0]) setFile(e.dataTransfer.files[0]);
             }}
           />
 
-          <div className="tool-settings-group">
+          {file && (
+            <div style={{ marginTop: '16px' }}>
+              <button
+                type="button"
+                className="tool-execute-btn"
+                disabled={isProcessing}
+                onClick={onProcess}
+                style={{
+                  width: '100%',
+                  padding: '14px 20px',
+                  background: '#ea580c',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  cursor: isProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px rgba(234, 88, 12, 0.3)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span>{isProcessing ? 'Translating...' : `Translate into ${selectedTarget}`}</span>
+                {!isProcessing && <span>→</span>}
+              </button>
+            </div>
+          )}
+
+          <div className="tool-settings-group" style={{ marginTop: '20px' }}>
             <div className="tool-setting-row">
-              <span className="tool-setting-label">Subject type</span>
+              <span className="tool-setting-label">Document content type</span>
               <select
                 value={selectedType}
                 onChange={(e) => onChangeConfig({ ...config, content_type: e.target.value })}
@@ -97,22 +130,20 @@ export default function TranslatePage({
                   cursor: 'pointer',
                 }}
               >
-                <option value="science_math">Science &amp; Math (Formulas protected)</option>
-                <option value="law_upsc">Law &amp; Exam Notes</option>
-                <option value="general">General Text</option>
+                <option value="science_math">Science &amp; Math (Formulas preserved)</option>
+                <option value="humanities">Literature &amp; General Notes</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Right column: Interactive Anime.js Proof */}
+        {/* Right column: Interactive Before/After Proof */}
         <InteractiveProofViewer
-          title="Language Translation Test"
+          title="Translation Preview"
           beforeImg="/samples/doc_4_before.jpg"
           afterImg="/samples/doc_4_after.jpg"
-          beforeLabel="English Scanned Note"
-          afterLabel="Hindi Translated Note"
-          features={['10+ Indic Languages', 'Formulas Kept Intact', 'Accurate Terminology']}
+          beforeLabel="English Original Scan"
+          afterLabel={`${selectedTarget} Translation`}
         />
       </div>
     </div>

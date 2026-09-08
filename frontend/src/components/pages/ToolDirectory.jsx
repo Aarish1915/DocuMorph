@@ -4,13 +4,10 @@ const TOOLS = [
   {
     id: 'clean_format',
     view: 'clean',
-    tag: 'Erase Ads & Watermarks',
-    tagColor: '#2563eb',
-    tagBg: 'rgba(37, 99, 235, 0.08)',
-    iconBg: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-    iconColor: '#ffffff',
+    iconBg: 'rgba(37, 99, 235, 0.1)',
+    iconColor: '#2563eb',
     title: 'Clean & Format',
-    desc: 'Remove dark scan shadows, Telegram watermarks, and fix faint handwriting.',
+    desc: 'Erase dark shadows, Telegram ads, and watermarks.',
     accent: '#2563eb',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -21,13 +18,10 @@ const TOOLS = [
   {
     id: 'compress',
     view: 'compress',
-    tag: 'Save up to 60% Pages',
-    tagColor: '#16a34a',
-    tagBg: 'rgba(22, 163, 74, 0.08)',
-    iconBg: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-    iconColor: '#ffffff',
+    iconBg: 'rgba(22, 163, 74, 0.1)',
+    iconColor: '#16a34a',
     title: 'Compress PDF',
-    desc: 'Shrink empty margins and fit more questions on fewer printed pages.',
+    desc: 'Compact margins to fit more content on fewer pages.',
     accent: '#16a34a',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -39,13 +33,10 @@ const TOOLS = [
   {
     id: 'extract_text',
     view: 'extract',
-    tag: 'Tables to Excel & Notion',
-    tagColor: '#0284c7',
-    tagBg: 'rgba(2, 132, 199, 0.08)',
-    iconBg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-    iconColor: '#ffffff',
+    iconBg: 'rgba(2, 132, 199, 0.1)',
+    iconColor: '#0284c7',
     title: 'Extract Text',
-    desc: 'Turn uncopyable scan tables into clean text and spreadsheets.',
+    desc: 'Convert scan tables into clean Markdown and text.',
     accent: '#0284c7',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -60,13 +51,10 @@ const TOOLS = [
   {
     id: 'translate',
     view: 'translate',
-    tag: '10+ Indic Languages',
-    tagColor: '#ea580c',
-    tagBg: 'rgba(234, 88, 12, 0.08)',
-    iconBg: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
-    iconColor: '#ffffff',
+    iconBg: 'rgba(234, 88, 12, 0.1)',
+    iconColor: '#ea580c',
     title: 'Translate PDF',
-    desc: 'Translate study notes into Hindi, Tamil & more with math intact.',
+    desc: 'Translate notes into Indic languages with formulas preserved.',
     accent: '#ea580c',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -98,22 +86,11 @@ export default function ToolDirectory({ onSelectTool }) {
               }
             }}
           >
-            <div className="tool-card-top-row">
-              <div className="tool-card-icon-wrap" style={{ background: tool.iconBg, color: tool.iconColor }}>
-                {tool.icon}
-              </div>
-              <span className="tool-card-pill" style={{ color: tool.tagColor, backgroundColor: tool.tagBg }}>
-                {tool.tag}
-              </span>
+            <div className="tool-card-icon-wrap" style={{ background: tool.iconBg, color: tool.iconColor }}>
+              {tool.icon}
             </div>
-
             <h3 className="tool-card-title">{tool.title}</h3>
             <p className="tool-card-desc">{tool.desc}</p>
-
-            <div className="tool-card-action">
-              <span>Open tool</span>
-              <span className="tool-card-arrow">→</span>
-            </div>
           </div>
         ))}
       </div>

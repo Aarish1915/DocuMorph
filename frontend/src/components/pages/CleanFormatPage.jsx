@@ -4,11 +4,14 @@ import InteractiveProofViewer from '../common/InteractiveProofViewer';
 
 export default function CleanFormatPage({
   onNavigateHome,
-  onFileSelect,
+  file,
+  setFile,
   isDragging,
   setIsDragging,
   config = {},
   onChangeConfig = () => {},
+  onProcess,
+  isProcessing = false,
 }) {
   return (
     <div className="tool-page-container">
@@ -34,21 +37,52 @@ export default function CleanFormatPage({
         {/* Left column: Dropzone & Settings */}
         <div className="tool-action-card">
           <DropZone
-            file={null}
-            setFile={(f) => f && onFileSelect(f)}
+            file={file}
+            setFile={setFile}
             isDragging={isDragging}
             setIsDragging={setIsDragging}
             handleDrop={(e) => {
               e.preventDefault();
               setIsDragging(false);
-              if (e.dataTransfer.files?.[0]) onFileSelect(e.dataTransfer.files[0]);
+              if (e.dataTransfer.files?.[0]) setFile(e.dataTransfer.files[0]);
             }}
           />
 
-          {/* Dedicated Clean Controls */}
-          <div className="tool-settings-group">
+          {file && (
+            <div style={{ marginTop: '16px' }}>
+              <button
+                type="button"
+                className="tool-execute-btn"
+                disabled={isProcessing}
+                onClick={onProcess}
+                style={{
+                  width: '100%',
+                  padding: '14px 20px',
+                  background: 'var(--color-primary, #2563eb)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  cursor: isProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span>{isProcessing ? 'Processing Document...' : 'Clean Document'}</span>
+                {!isProcessing && <span>→</span>}
+              </button>
+            </div>
+          )}
+
+          {/* Clean Controls */}
+          <div className="tool-settings-group" style={{ marginTop: '20px' }}>
             <div className="tool-setting-row">
-              <span className="tool-setting-label">Remove ads &amp; watermarks</span>
+              <span className="tool-setting-label">Remove watermarks &amp; ads</span>
               <input
                 type="checkbox"
                 checked={config.clean_watermarks !== false}
@@ -58,7 +92,7 @@ export default function CleanFormatPage({
             </div>
 
             <div className="tool-setting-row">
-              <span className="tool-setting-label">Sharpen math formulas &amp; handwriting</span>
+              <span className="tool-setting-label">Sharpen handwriting &amp; formulas</span>
               <input
                 type="checkbox"
                 checked={config.fix_formulas !== false}
@@ -88,14 +122,13 @@ export default function CleanFormatPage({
           </div>
         </div>
 
-        {/* Right column: Interactive Anime.js Before/After Proof */}
+        {/* Right column: Interactive Before/After Proof */}
         <InteractiveProofViewer
-          title="Scan Cleanup Test"
+          title="Scan Cleanup Preview"
           beforeImg="/samples/doc_1_before.jpg"
           afterImg="/samples/doc_1_after.jpg"
-          beforeLabel="Faint Scan & Watermarks"
-          afterLabel="Clean White Note"
-          features={['Zero Watermarks', 'Clean White Pages', 'Formulas Kept Sharp']}
+          beforeLabel="Original Scan"
+          afterLabel="Clean Note"
         />
       </div>
     </div>

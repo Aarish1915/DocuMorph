@@ -64,10 +64,44 @@ export default function InteractiveProofViewer({
     }, 4500);
   };
 
-  const onTouchMove = (e) => {
+  const touchStartPos = useRef({ x: 0, y: 0 });
+  const isDraggingSlider = useRef(false);
+
+  const onTouchStart = (e) => {
     if (e.touches && e.touches[0]) {
-      handleMove(e.touches[0].clientX);
+      touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      isDraggingSlider.current = false;
     }
+  };
+
+  const onTouchMove = (e) => {
+    if (!e.touches || !e.touches[0]) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const deltaX = Math.abs(currentX - touchStartPos.current.x);
+    const deltaY = Math.abs(currentY - touchStartPos.current.y);
+
+    // If vertical movement dominates, allow native page scroll
+    if (!isDraggingSlider.current) {
+      if (deltaY > deltaX && deltaY > 8) {
+        return; // Don't block vertical scrolling on mobile
+      }
+      if (deltaX > deltaY && deltaX > 8) {
+        isDraggingSlider.current = true;
+        setIsInteracting(true);
+        if (idleResumeTimerRef.current) clearTimeout(idleResumeTimerRef.current);
+        if (sweepAnimRef.current && sweepAnimRef.current.pause) sweepAnimRef.current.pause();
+      }
+    }
+
+    if (isDraggingSlider.current) {
+      handleMove(currentX);
+    }
+  };
+
+  const onTouchEnd = () => {
+    isDraggingSlider.current = false;
+    endInteraction();
   };
 
   // One-click mode toggle
@@ -133,7 +167,6 @@ export default function InteractiveProofViewer({
         <div className="proof-status-indicator">
           <span className="pulse-live-dot" />
           <span className="proof-title-text">{title}</span>
-          <span className="proof-page-badge">Full A4 Page • 0% Cropped</span>
         </div>
 
         <div className="proof-controls-right">
@@ -196,9 +229,9 @@ export default function InteractiveProofViewer({
             onMouseMove={(e) => isInteracting && handleMove(e.clientX)}
             onMouseUp={endInteraction}
             onMouseLeave={() => isInteracting && endInteraction()}
-            onTouchStart={(e) => e.touches[0] && startInteraction(e.touches[0].clientX)}
+            onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
-            onTouchEnd={endInteraction}
+            onTouchEnd={onTouchEnd}
             title="Drag left or right to compare full page"
           >
             {/* Floating Badges */}
@@ -294,16 +327,6 @@ export default function InteractiveProofViewer({
           <span className="footer-arrow">➔</span>
           <span className="footer-side after">{afterLabel}</span>
         </div>
-
-        {features && features.length > 0 && (
-          <div className="proof-features-row">
-            {features.map((f, i) => (
-              <span key={i} className="proof-feature-tag">
-                ✓ {f}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

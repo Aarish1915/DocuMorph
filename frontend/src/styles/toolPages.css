@@ -611,6 +611,7 @@
   border: 1.5px solid var(--border-default);
   cursor: ew-resize;
   user-select: none;
+  touch-action: pan-y;
 }
 
 .proof-status-overlay {

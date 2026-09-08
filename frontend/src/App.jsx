@@ -138,18 +138,31 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (['clean', 'compress', 'extract', 'translate', 'home'].includes(hash)) {
-        setActiveView(hash);
-      } else if (!hash) {
-        setActiveView('home');
+      if (hash === 'processing') {
+        // Active processing screen
+      } else {
+        // Phone back pressed from processing, or navigating back
+        setStep(1);
+        setFile(null);
+        if (['clean', 'compress', 'extract', 'translate'].includes(hash)) {
+          setActiveView(hash);
+        } else {
+          setActiveView('home');
+        }
       }
     };
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleHashChange);
+    };
   }, []);
 
   const navigateView = (view) => {
     setActiveView(view);
+    setFile(null);
+    setStep(1);
     if (typeof window !== 'undefined') {
       window.location.hash = view === 'home' ? '' : `#${view}`;
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -261,7 +274,8 @@ export default function App() {
   // Navigation Handlers
   const handleBack = () => {
     if (step === 4) {
-      setStep(2);
+      setStep(1);
+      setJobStatus(null);
     } else if (file) {
       setFile(null);
       setStep(1);
@@ -272,10 +286,12 @@ export default function App() {
     }
   };
 
-  const handleProcess = async () => {
-    if (!file) return;
+  const handleProcess = async (explicitFile, explicitServiceType) => {
+    const fileToProcess = explicitFile || file;
+    const targetService = explicitServiceType || serviceType;
+    if (!fileToProcess) return;
 
-    const currentConfig = configs[serviceType] || {};
+    const currentConfig = configs[targetService] || {};
     // Clean config: if page_range is 'all', strip page_from and page_to so backend never slices full documents
     const sanitizedConfig = { ...currentConfig };
     if (sanitizedConfig.page_range !== 'custom') {
@@ -284,8 +300,8 @@ export default function App() {
     }
 
     const fd = new FormData();
-    fd.append('file', file);
-    fd.append('service_type', serviceType);
+    fd.append('file', fileToProcess);
+    fd.append('service_type', targetService);
     fd.append('config_options', JSON.stringify(sanitizedConfig));
 
     if (sanitizedConfig.spam_words) {
@@ -298,11 +314,14 @@ export default function App() {
     if (customPrompt) fd.append('custom_prompt', customPrompt);
 
     setStep(4);
+    if (typeof window !== 'undefined') {
+      window.location.hash = '#processing';
+    }
     setJobStatus({
       status: 'QUEUED',
       progress: 5,
       message: 'Uploading to server...',
-      service_type: serviceType,
+      service_type: targetService,
     });
 
     try {
@@ -428,75 +447,69 @@ export default function App() {
             handleReprocessPage={handleReprocessPage}
             onNewJob={handleNewJob}
           />
-        ) : file ? (
-          /* ── SCREEN 2: FOCUSED iLovePDF WORKSPACE WITH SMART PRESETS ── */
-          <WorkspaceScreen
-            file={file}
-            onResetFile={() => setFile(null)}
-            serviceType={serviceType}
-            setServiceType={setServiceType}
-            config={configs[serviceType] || {}}
-            onChangeConfig={(newCfg) => {
-              setConfigs((prev) => ({ ...prev, [serviceType]: newCfg }));
-            }}
-            isProcessing={isProcessing}
-            handleProcess={handleProcess}
-          />
         ) : activeView === 'clean' ? (
           /* ── DEDICATED VIEW: CLEAN & FORMAT ── */
           <CleanFormatPage
             onNavigateHome={() => navigateView('home')}
-            onFileSelect={(selectedFile) => {
-              setServiceType('clean_format');
-              setFile(selectedFile);
-              setStep(2);
-            }}
+            file={file}
+            setFile={setFile}
             isDragging={isDragging}
             setIsDragging={setIsDragging}
             config={configs.clean_format}
             onChangeConfig={(cfg) => setConfigs((prev) => ({ ...prev, clean_format: cfg }))}
+            onProcess={() => {
+              setServiceType('clean_format');
+              handleProcess(file, 'clean_format');
+            }}
+            isProcessing={isProcessing}
           />
         ) : activeView === 'compress' ? (
           /* ── DEDICATED VIEW: COMPRESS & COMPACT ── */
           <CompressPage
             onNavigateHome={() => navigateView('home')}
-            onFileSelect={(selectedFile) => {
-              setServiceType('compress');
-              setFile(selectedFile);
-              setStep(2);
-            }}
+            file={file}
+            setFile={setFile}
             isDragging={isDragging}
             setIsDragging={setIsDragging}
             config={configs.compress}
             onChangeConfig={(cfg) => setConfigs((prev) => ({ ...prev, compress: cfg }))}
+            onProcess={() => {
+              setServiceType('compress');
+              handleProcess(file, 'compress');
+            }}
+            isProcessing={isProcessing}
           />
         ) : activeView === 'extract' ? (
           /* ── DEDICATED VIEW: EXTRACT TEXT & TABLES ── */
           <ExtractTextPage
             onNavigateHome={() => navigateView('home')}
-            onFileSelect={(selectedFile) => {
-              setServiceType('extract_text');
-              setFile(selectedFile);
-              setStep(2);
-            }}
+            file={file}
+            setFile={setFile}
             isDragging={isDragging}
             setIsDragging={setIsDragging}
             config={configs.extract_text}
             onChangeConfig={(cfg) => setConfigs((prev) => ({ ...prev, extract_text: cfg }))}
+            onProcess={() => {
+              setServiceType('extract_text');
+              handleProcess(file, 'extract_text');
+            }}
+            isProcessing={isProcessing}
           />
         ) : activeView === 'translate' ? (
           /* ── DEDICATED VIEW: MULTI-LANGUAGE TRANSLATION ── */
           <TranslatePage
             onNavigateHome={() => navigateView('home')}
-            onFileSelect={(selectedFile) => {
-              setServiceType('translate');
-              setFile(selectedFile);
-              setStep(2);
-            }}
+            file={file}
+            setFile={setFile}
             isDragging={isDragging}
             setIsDragging={setIsDragging}
             config={configs.translate}
             onChangeConfig={(cfg) => setConfigs((prev) => ({ ...prev, translate: cfg }))}
+            onProcess={() => {
+              setServiceType('translate');
+              handleProcess(file, 'translate');
+            }}
+            isProcessing={isProcessing}
           />
         ) : (
           /* ── SCREEN 1: HOME HUB TOOL DIRECTORY & QUALITY SHOWCASE ── */
@@ -508,19 +521,14 @@ export default function App() {
             />
             <section className="home-showcase-section">
               <div className="home-showcase-header">
-                <span className="home-showcase-pill">Quality Comparison</span>
-                <h2 className="home-showcase-title">See the difference before you start</h2>
-                <p className="home-showcase-subtitle">
-                  Drag the slider to see watermarks, ads, and dark shadows disappear into clean notes.
-                </p>
+                <h2 className="home-showcase-title">Quality Preview</h2>
               </div>
               <InteractiveProofViewer
                 title="Live Quality Test"
                 beforeImg="/samples/doc_1_before.jpg"
                 afterImg="/samples/doc_1_after.jpg"
-                beforeLabel="Raw Scan with Telegram Ads"
-                afterLabel="Clean Printable Note"
-                features={['Zero Telegram Ads', 'Sharp Math & Formulas', 'Clean White Background']}
+                beforeLabel="Original Scan"
+                afterLabel="Cleaned Note"
               />
             </section>
           </>

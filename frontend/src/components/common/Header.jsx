@@ -19,7 +19,20 @@ export default function Header({
         {step === 1 ? (
           /* Step 1: Minimal Header */
           <div className="header-left">
-            <div className="brand-logo" onClick={onNewJob} role="button" tabIndex={0}>
+            {activeView !== 'home' && (
+              <button 
+                className="back-button" 
+                onClick={() => onNavigateView ? onNavigateView('home') : onNewJob()} 
+                aria-label="Back to all tools"
+                title="Back to All Tools"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+              </button>
+            )}
+            <div className="brand-logo" onClick={() => onNavigateView ? onNavigateView('home') : onNewJob()} role="button" tabIndex={0}>
               <div className="brand-icon">D</div>
               <span className="brand-name">DocuMorph</span>
             </div>

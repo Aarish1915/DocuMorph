@@ -1,31 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import DropZone from '../workspace/DropZone';
 import InteractiveProofViewer from '../common/InteractiveProofViewer';
 
 export default function ExtractTextPage({
   onNavigateHome,
-  onFileSelect,
+  file,
+  setFile,
   isDragging,
   setIsDragging,
   config = {},
   onChangeConfig = () => {},
+  onProcess,
+  isProcessing = false,
 }) {
-  const [copied, setCopied] = useState(false);
   const activeFormat = config.output_format || 'markdown';
-
-  const handleCopySample = () => {
-    const tableText = `| Article | Right Guaranteed | Scope |
-| :--- | :--- | :--- |
-| Art. 14 | Equality Before Law | Citizens & Foreigners |
-| Art. 19 | Six Basic Freedoms | Citizens Only |
-| Art. 21 | Protection of Life | Universal Right |`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(tableText).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 3000);
-      });
-    }
-  };
 
   return (
     <div className="tool-page-container">
@@ -48,7 +36,7 @@ export default function ExtractTextPage({
       <div className="tool-work-grid">
         {/* Left column: Format chooser, DropZone & Options */}
         <div className="tool-action-card">
-          <div className="format-selection-group">
+          <div className="format-selection-group" style={{ marginBottom: '16px' }}>
             <div className="format-pills-row">
               <div
                 className={`format-pill ${activeFormat === 'markdown' ? 'selected' : ''}`}
@@ -63,7 +51,7 @@ export default function ExtractTextPage({
                 onClick={() => onChangeConfig({ ...config, output_format: 'json' })}
               >
                 <div className="format-pill-name">JSON</div>
-                <div className="format-pill-ext">.json (Devs)</div>
+                <div className="format-pill-ext">.json (Structured)</div>
               </div>
 
               <div
@@ -77,20 +65,51 @@ export default function ExtractTextPage({
           </div>
 
           <DropZone
-            file={null}
-            setFile={(f) => f && onFileSelect(f)}
+            file={file}
+            setFile={setFile}
             isDragging={isDragging}
             setIsDragging={setIsDragging}
             handleDrop={(e) => {
               e.preventDefault();
               setIsDragging(false);
-              if (e.dataTransfer.files?.[0]) onFileSelect(e.dataTransfer.files[0]);
+              if (e.dataTransfer.files?.[0]) setFile(e.dataTransfer.files[0]);
             }}
           />
 
-          <div className="tool-settings-group">
+          {file && (
+            <div style={{ marginTop: '16px' }}>
+              <button
+                type="button"
+                className="tool-execute-btn"
+                disabled={isProcessing}
+                onClick={onProcess}
+                style={{
+                  width: '100%',
+                  padding: '14px 20px',
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  cursor: isProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.3)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span>{isProcessing ? 'Extracting...' : 'Extract Text & Tables'}</span>
+                {!isProcessing && <span>→</span>}
+              </button>
+            </div>
+          )}
+
+          <div className="tool-settings-group" style={{ marginTop: '20px' }}>
             <div className="tool-setting-row">
-              <span className="tool-setting-label">Keep table columns aligned</span>
+              <span className="tool-setting-label">Preserve table structure</span>
               <input
                 type="checkbox"
                 checked={config.preserve_tables !== false}
@@ -99,37 +118,15 @@ export default function ExtractTextPage({
               />
             </div>
           </div>
-
-          {/* 1-Click Clipboard Table Micro-Interaction */}
-          <div className="clipboard-preview-box">
-            <div className="clipboard-preview-header">
-              <span className="clipboard-preview-title">Sample Output Preview</span>
-              <button 
-                type="button"
-                className={`btn-quick-copy ${copied ? 'copied' : ''}`}
-                onClick={handleCopySample}
-              >
-                {copied ? '✓ Copied!' : 'Copy Sample Table'}
-              </button>
-            </div>
-            <pre className="clipboard-code-preview">
-{`| Article | Right Guaranteed | Scope |
-| :--- | :--- | :--- |
-| Art. 14 | Equality Before Law | Citizens & Foreigners |
-| Art. 19 | Six Basic Freedoms | Citizens Only |
-| Art. 21 | Protection of Life | Universal Right |`}
-            </pre>
-          </div>
         </div>
 
-        {/* Right column: Interactive Anime.js Proof */}
+        {/* Right column: Interactive Before/After Proof */}
         <InteractiveProofViewer
-          title="Table Extraction Test"
+          title="Table Extraction Preview"
           beforeImg="/samples/doc_3_before.jpg"
           afterImg="/samples/doc_3_after.jpg"
-          beforeLabel="Flat Scan (Uncopyable)"
+          beforeLabel="Uncopyable Scan Table"
           afterLabel="Clean Markdown Table"
-          features={['Notion & Excel Ready', 'Columns Neatly Aligned', '1-Click Copy']}
         />
       </div>
     </div>
