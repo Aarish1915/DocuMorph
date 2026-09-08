@@ -197,7 +197,7 @@ export default function InteractiveProofViewer({
                 className={`proof-mode-btn ${viewMode === 'before' ? 'active' : ''}`}
                 onClick={() => handleModeToggle('before')}
               >
-                <span className="dot red" /> Scan
+                <span className="dot red" /> {beforeLabel ? beforeLabel.split(' ')[0] : 'Before'}
               </button>
               <button
                 type="button"
@@ -211,7 +211,7 @@ export default function InteractiveProofViewer({
                 className={`proof-mode-btn ${viewMode === 'after' ? 'active' : ''}`}
                 onClick={() => handleModeToggle('after')}
               >
-                <span className="dot green" /> Clean
+                <span className="dot green" /> {afterLabel ? afterLabel.split(' ')[0] : 'After'}
               </button>
             </div>
           )}
@@ -237,10 +237,10 @@ export default function InteractiveProofViewer({
             {/* Floating Badges */}
             <div className="proof-status-overlay">
               <span className="status-chip before">
-                <span className="dot red" /> Scan (Watermarks)
+                <span className="dot red" /> {beforeLabel || 'Before'}
               </span>
               <span className="status-chip after">
-                <span className="dot green" /> Clean Note
+                <span className="dot green" /> {afterLabel || 'After'}
               </span>
             </div>
 
@@ -284,7 +284,7 @@ export default function InteractiveProofViewer({
           <div className="side-doc-card">
             <div className="side-doc-header before">
               <span className="dot red" />
-              <span className="side-doc-title">Original Scanned Page</span>
+              <span className="side-doc-title">{beforeLabel || 'Before'}</span>
             </div>
             <div className="side-doc-stage">
               <img
@@ -294,16 +294,13 @@ export default function InteractiveProofViewer({
                 draggable="false"
               />
             </div>
-            <div className="side-doc-footer before">
-              <span>❌ Ads &amp; watermarks across questions</span>
-            </div>
           </div>
 
           {/* Right: Cleaned Document */}
           <div className="side-doc-card">
             <div className="side-doc-header after">
               <span className="dot green" />
-              <span className="side-doc-title">DocuMorph Clean A4</span>
+              <span className="side-doc-title">{afterLabel || 'After'}</span>
             </div>
             <div className="side-doc-stage">
               <img
@@ -312,9 +309,6 @@ export default function InteractiveProofViewer({
                 className="proof-full-page-img"
                 draggable="false"
               />
-            </div>
-            <div className="side-doc-footer after">
-              <span>✅ 100% Ads removed • Clean white paper</span>
             </div>
           </div>
         </div>
