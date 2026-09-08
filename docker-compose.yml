@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------
+  # Frontend: React / Vite
+  # ---------------------------------------------
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5174:80"
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  # ---------------------------------------------
+  # Backend: FastAPI
+  # ---------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: uvicorn documorph.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./config.json:/app/config.json
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS}
+    restart: unless-stopped
+
+  # ---------------------------------------------
+  # Background Worker: Python Queue
+  # ---------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m documorph.worker.queue_worker
+    volumes:
+      - ./data:/app/data
+      - ./config.json:/app/config.json
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS}
+    restart: unless-stopped
+    depends_on:
+      - api

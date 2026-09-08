@@ -1,0 +1,14 @@
+/* =====================================================
+   DocuMorph Minimalist SaaS Design System & Styles
+   Modular Architecture (ITCSS / SMACSS Pattern)
+   ===================================================== */
+
+@import './DesignTokens.css';
+@import './styles/base.css';
+@import './styles/common.css';
+@import './styles/hero.css';
+@import './styles/workspace.css';
+@import './styles/config.css';
+@import './styles/toolPages.css';
+@import './styles/progress.css';
+@import './styles/responsive.css';

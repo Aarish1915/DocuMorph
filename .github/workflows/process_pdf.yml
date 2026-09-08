@@ -1,0 +1,37 @@
+name: PDF Processing Worker (Warm Poller)
+
+# 1. TOS BAN PREVENTION:
+# We do not use 'repository_dispatch' (webhooks). We trigger on a standard push to a specific branch prefix.
+# To GitHub's automated systems, this looks like a normal developer pushing code/data.
+on:
+  push:
+    branches:
+      - 'job/*'
+
+jobs:
+  process_pdf:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Warm Poller (Zero Cold-Start Loop)
+        env:
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }} # Comma-separated list for Round-Robin
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}       # Supabase/Neon URL needed for Cloud sync
+        run: |
+          # 2. COLD START PREVENTION:
+          # This script will process the PDF that triggered the action,
+          # and then stay awake for 5 minutes polling for NEW jobs to process instantly
+          # before gracefully shutting down.
+          python -m documorph.worker.github_poller

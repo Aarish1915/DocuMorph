@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "remember": {
+      "source": "rohitg00/agentmemory",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/remember/SKILL.md",
+      "computedHash": "367f8b564b58b93a02c7c4d99cfce917182b2fe44f6e8096928de25200aa745d"
+    }
+  }
+}

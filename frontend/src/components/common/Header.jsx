@@ -1,0 +1,131 @@
+import React from 'react';
+
+export default function Header({
+  step = 1,
+  serviceTitle = 'Clean & Format',
+  activeView = 'home',
+  onNavigateView,
+  onBack,
+  onNewJob,
+  onToggleHistory,
+  historyCount = 0,
+  onToggleSettings,
+}) {
+  return (
+    <header className="site-header">
+      <div className="header-inner">
+        {step === 1 ? (
+          /* Step 1: Minimal Header */
+          <div className="header-left">
+            <div className="brand-logo" onClick={onNewJob} role="button" tabIndex={0}>
+              <div className="brand-icon">D</div>
+              <span className="brand-name">DocuMorph</span>
+            </div>
+          </div>
+        ) : (
+          /* Step 2-4: Back Header */
+          <div className="header-left">
+            <button 
+              className="back-button" 
+              onClick={onBack} 
+              aria-label="Go back to previous step"
+              title="Back"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </button>
+            <div className="step-title-group">
+              <span className="service-heading">{serviceTitle}</span>
+              <span className="step-indicator-text">Step {step} of 4</span>
+            </div>
+          </div>
+        )}
+
+        {step === 1 && onNavigateView && (
+          <nav className="header-nav-tools" aria-label="Tool Navigation">
+            <button
+              className={`nav-tool-link ${activeView === 'home' ? 'active' : ''}`}
+              onClick={() => onNavigateView('home')}
+            >
+              All Tools
+            </button>
+            <button
+              className={`nav-tool-link ${activeView === 'clean' ? 'active' : ''}`}
+              onClick={() => onNavigateView('clean')}
+            >
+              <span>✨</span> Clean
+            </button>
+            <button
+              className={`nav-tool-link ${activeView === 'compress' ? 'active' : ''}`}
+              onClick={() => onNavigateView('compress')}
+            >
+              <span>📉</span> Compress
+            </button>
+            <button
+              className={`nav-tool-link ${activeView === 'extract' ? 'active' : ''}`}
+              onClick={() => onNavigateView('extract')}
+            >
+              <span>📋</span> Extract
+            </button>
+            <button
+              className={`nav-tool-link ${activeView === 'translate' ? 'active' : ''}`}
+              onClick={() => onNavigateView('translate')}
+            >
+              <span>🌐</span> Translate
+            </button>
+          </nav>
+        )}
+
+        <div className="header-right">
+          {step === 1 ? (
+            /* Badge on Step 1 */
+            <div className="privacy-badge" title="All processing is ephemeral and local. No personal data is stored.">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+              <span>No data retained</span>
+            </div>
+          ) : (
+            /* 4-dash Progress Bar on Steps 2-4 */
+            <div className="step-dash-bar" aria-label={`Step ${step} of 4`}>
+              {[1, 2, 3, 4].map((dashStep) => (
+                <div
+                  key={dashStep}
+                  className={`dash-segment ${dashStep <= step ? 'filled' : 'empty'}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Quick Action Buttons */}
+          <button 
+            className="header-action-btn" 
+            onClick={onToggleHistory}
+            title="Recent Jobs"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span className="btn-label">History</span>
+            {historyCount > 0 && <span className="history-pill">{historyCount}</span>}
+          </button>
+
+          <button 
+            className="header-icon-btn" 
+            onClick={onToggleSettings}
+            title="Settings & API Key"
+            aria-label="Settings"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}

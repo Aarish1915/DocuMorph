@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment & Secrets (NEVER push to GitHub)
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+ENV/
+
+# Data (user's local PDFs & proprietary dumps)
+data/
+archive/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Agent tooling & AI session artifacts
+graphify-out/
+.agents/
+.tempmediaStorage/
+
+# Frontend builds & node modules
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Logs
+*.log
+
+# Application Data & SQLite DBs
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+jobs.db
+uploads/
+docs/presentation/
+PROJECT_KNOWLEDGE_DEPTH/
+CODEBASE_MASTER_GUIDE/
+STATE.md
+DECISIONS.md
+MISTAKES.md
+
+# Large binaries, test PDFs & presentations
+*.pdf
+*.pptx
+*.html
+!frontend/index.html
+
+# Scratch, Temporary Previews & Test Artifacts
+scratch_*
+preview_fixed_*
+orig_*
+p1_*
+aug30_*
+old_*
+ref_*
+test_dummy.*
+test_output/
+temp_downloads/
+browser/
+*.webp
+*.webm
+*.mp4

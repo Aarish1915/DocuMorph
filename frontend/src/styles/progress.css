@@ -1,0 +1,410 @@
+/* =====================================================
+   DocuMorph Progress Card, Circular Ring & Pipeline Stages
+   ===================================================== */
+
+.progress-screen-container {
+  max-width: 620px;
+  width: 100%;
+  margin: 0 auto;
+  animation: fadeIn 0.2s ease;
+}
+
+.progress-card {
+  background-color: var(--surface-white);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: var(--shadow-card);
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.progress-title {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+
+.progress-pct {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.pbar-track {
+  width: 100%;
+  height: 6px;
+  background-color: var(--surface-subtle);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+
+.pbar-fill {
+  height: 100%;
+  background-color: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+/* ── STAGES PIPELINE ── */
+.stages {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  text-align: center;
+}
+
+.stage-bubble {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.stage.done .stage-bubble {
+  background-color: var(--color-success-bg);
+  border-color: var(--color-success-border);
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.stage-ring-wrap {
+  width: 44px;
+  height: 44px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stage-ring-icon {
+  position: relative;
+  z-index: 2;
+  font-size: 14px;
+}
+
+.stage-name {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.stage-name.active {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.stage-pct-label {
+  font-size: 11px;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* ── STATUS MESSAGE BOX ── */
+.status-msg-box {
+  margin-bottom: 24px;
+}
+
+.active-msg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--font-sm);
+  color: var(--text-main);
+  background-color: var(--surface-subtle);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-primary);
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);
+  animation: pulseDot 1.5s infinite;
+}
+
+@keyframes pulseDot {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+.complete-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background-color: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+}
+
+.success-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-success);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.success-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.success-title {
+  font-size: var(--font-base);
+  font-weight: 700;
+  color: #14532d;
+}
+
+.success-desc {
+  font-size: var(--font-xs);
+  color: #166534;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  color: var(--color-danger);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+/* ── COMPRESSION COMPARISON STAT CARD ── */
+.compression-stat-card {
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.stat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.stat-val {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.stat-val.original {
+  color: var(--text-muted);
+}
+
+.stat-val.compressed {
+  color: var(--color-primary);
+}
+
+.stat-arrow {
+  font-size: var(--font-lg);
+  color: var(--text-muted);
+}
+
+.reduction-badge {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+  border: 1px solid var(--color-success-border);
+  font-size: var(--font-sm);
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+}
+
+/* ── COMPLETE ACTIONS ── */
+.complete-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-download-result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  background-color: var(--color-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: var(--font-base);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-download-result:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.btn-new-document {
+  padding: 12px;
+  background-color: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-new-document:hover {
+  background-color: var(--surface-subtle);
+  color: var(--text-main);
+}
+
+/* ── REPROCESS BROKEN PAGE ACCORDION ── */
+.reprocess-accordion {
+  margin-top: 24px;
+  border-top: 1px solid var(--border-default);
+  padding-top: 16px;
+}
+
+.reprocess-toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.reprocess-toggle-btn:hover {
+  color: var(--text-main);
+}
+
+.reprocess-panel {
+  margin-top: 10px;
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+
+.reprocess-help {
+  display: block;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  line-height: var(--lh-sm);
+  margin-bottom: 12px;
+}
+
+.reprocess-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.reprocess-input {
+  width: 90px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+  outline: none;
+  background-color: var(--surface-white);
+  color: var(--text-main);
+}
+
+.reprocess-input:focus {
+  border-color: var(--color-primary);
+}
+
+.btn-reprocess-submit {
+  padding: 8px 16px;
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-reprocess-submit:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+/* ── HCD TELEMETRY RELIEF STRIP ── */
+.hcd-telemetry-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: 16px 0 20px 0;
+}
+
+.hcd-metric-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hcd-metric-badge.save-green {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}

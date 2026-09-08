@@ -1,0 +1,365 @@
+/* =====================================================
+   DocuMorph Responsive Design System
+   Breakpoints:
+   - Laptop / Tablet Landscape: max-width 1024px
+   - Tablet Portrait: max-width 768px
+   - Mobile Large / Landscape: max-width 640px
+   - Mobile Standard & Small: max-width 480px
+   - Accessibility / Reduced Motion
+   ===================================================== */
+
+/* ── TABLET LANDSCAPE & LAPTOP (max-width: 1024px) ── */
+@media (max-width: 1024px) {
+  .header-inner {
+    padding: 0 16px;
+  }
+
+  .main-content {
+    padding: 24px 16px 60px;
+  }
+
+  .hero-title {
+    font-size: 32px;
+  }
+
+  .home-workspace-card,
+  .showcase-preview-card,
+  .progress-screen-container {
+    max-width: 100%;
+  }
+}
+
+/* ── TABLET PORTRAIT (max-width: 768px) ── */
+@media (max-width: 768px) {
+  .site-header {
+    height: 58px;
+  }
+
+  .header-inner {
+    padding: 0 14px;
+  }
+
+  .header-left {
+    gap: 8px;
+  }
+
+  .step-title-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+  }
+
+  .service-heading {
+    font-size: 15px;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+
+  .step-indicator-text {
+    font-size: 11px;
+    line-height: 1.1;
+  }
+
+  .header-right {
+    gap: 10px;
+  }
+
+  .step-dash-bar {
+    gap: 4px;
+  }
+
+  .dash-segment {
+    width: 18px;
+    height: 3px;
+  }
+
+  .hero-section {
+    padding: 6px 12px 0;
+    margin-bottom: 28px;
+  }
+
+  .hero-title {
+    font-size: 26px;
+  }
+
+  .hero-description {
+    font-size: 14px;
+  }
+
+  .hero-trust-row {
+    gap: 8px;
+    margin: 16px 0 22px;
+  }
+
+  .trust-pill {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+
+  .home-workspace-card {
+    padding: 20px 18px;
+    border-radius: 16px;
+  }
+
+  .service-tabs-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .progress-card {
+    padding: 24px 20px;
+  }
+
+  .history-drawer {
+    width: 340px;
+  }
+
+  /* Screen 2 Workspace Responsive */
+  .workspace-layout-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .workspace-file-sidebar {
+    position: static;
+  }
+
+  .preset-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── MOBILE LARGE (max-width: 640px) ── */
+@media (max-width: 640px) {
+  .site-header {
+    height: 54px;
+  }
+
+  .header-inner {
+    padding: 0 12px;
+  }
+
+  .brand-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+  }
+
+  .brand-name {
+    font-size: 16px;
+  }
+
+  .back-button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .header-action-btn {
+    padding: 6px 8px;
+  }
+
+  .header-action-btn .btn-label {
+    display: none;
+  }
+
+  .privacy-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    gap: 4px;
+  }
+
+  .hero-identity-row {
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .identity-tag {
+    font-size: 11px;
+    padding: 3px 10px;
+  }
+
+  .hero-title {
+    font-size: 22px;
+  }
+
+  .showcase-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .showcase-toggle-pills {
+    width: 100%;
+    display: flex;
+  }
+
+  .toggle-pill {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .clean-footer-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .service-tabs-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .main-dropzone {
+    padding: 28px 16px;
+  }
+
+  .dropzone-main-text {
+    font-size: 14.5px;
+  }
+
+  .dropzone-footer-tags {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .file-ready-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .btn-change-file {
+    align-self: flex-end;
+  }
+
+  .btn-primary-process {
+    min-height: 48px;
+    font-size: 14px;
+  }
+
+  .pill-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .pill-row {
+    gap: 6px;
+  }
+
+  .range-inputs-row {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .stages {
+    margin-bottom: 20px;
+  }
+
+  .stage-bubble {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .stage-ring-wrap {
+    width: 36px;
+    height: 36px;
+  }
+
+  .stage-ring-icon {
+    font-size: 12px;
+  }
+
+  .stage-name {
+    font-size: 10px;
+  }
+
+  .stage-pct-label {
+    font-size: 10px;
+  }
+
+  .compression-stat-card {
+    padding: 12px 14px;
+  }
+
+  .stat-val {
+    font-size: 15px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+  }
+
+  .reduction-badge {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  .toast-container {
+    width: 90vw;
+    max-width: 340px;
+    bottom: 16px;
+  }
+
+  .toast-pill {
+    padding: 9px 14px;
+    font-size: 12px;
+  }
+}
+
+/* ── MOBILE STANDARD & SMALL (max-width: 480px) ── */
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 20px;
+  }
+
+  .service-tabs-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pill-row {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .pill-row .option-pill {
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: var(--radius-sm);
+  }
+
+  .pill-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Full Screen Mobile Drawer for History */
+  .history-drawer {
+    width: 100%;
+    max-width: 100vw;
+    border-left: none;
+  }
+
+  /* Settings modal on mobile */
+  .settings-modal-card {
+    padding: 18px 14px;
+    margin: 8px;
+    max-width: 95vw;
+  }
+
+  .privacy-badge span {
+    font-size: 10px;
+  }
+}
+
+/* ── ACCESSIBILITY: HIGH CONTRAST & REDUCED MOTION ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
