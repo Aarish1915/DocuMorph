@@ -62,7 +62,9 @@ MISTAKES.md
 !frontend/index.html
 
 # Scratch, Temporary Previews & Test Artifacts
+scratch/
 scratch_*
+scripts/scratch_*
 preview_fixed_*
 orig_*
 p1_*
@@ -76,3 +78,26 @@ browser/
 *.webp
 *.webm
 *.mp4
+*.png
+!frontend/src/assets/**
+!frontend/public/**
+*.jpg
+*.jpeg
+
+# Executables & Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+cloudflared*
+
+# Agent & IDE State
+.claude/
+.gemini/
+.antigravity/
+
+# Loop Local Runtime Logs
+loop-run-log.md
+loop-budget.md
+loop-constraints.md
+
