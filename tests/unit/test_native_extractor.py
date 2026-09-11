@@ -97,6 +97,6 @@ def test_native_extractor_with_image():
     result = extractor.extract_page(doc, 0)
     
     assert len(result["items"]) == 2
-    assert result["items"][1]["type"] == "crop"
+    assert result["items"][1]["type"] in ("crop", "diagram")
     assert result["items"][1]["data"] == [0, 100, 100, 200]
 

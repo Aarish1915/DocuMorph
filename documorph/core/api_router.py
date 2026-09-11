@@ -63,22 +63,50 @@ class APIRouter:
                 if k not in self.keys:
                     self.keys.append(k)
                     
+        self.key_history: dict = {}
         if not self.keys:
             logger.warning("No API Keys found in environment variables!")
         else:
             logger.info(f"APIRouter initialized with {len(self.keys)} API Keys for Round-Robin load balancing.")
+            for k in self.keys:
+                self.key_history[k] = []
 
     def get_next_key(self) -> str:
         """
-        Returns the next API key in the rotation.
+        Returns the optimal API key, pacing requests to strictly stay below Free Tier RPM limits.
+        If all keys are saturated, cleanly sleeps the required interval to prevent HTTP 429 drops.
         """
         if not self.keys:
             return None
-            
+
+        import time
+        from documorph.core.tier_manager import TierManager
+        tier_profile = TierManager().get_profile()
+        is_free_tier = TierManager().active_tier == "gemini_free"
+        max_rpm = 14 if is_free_tier else 1000
+
         with self.lock:
-            key = self.keys[self.current_index]
-            self.current_index = (self.current_index + 1) % len(self.keys)
-        return key
+            now = time.time()
+            
+            # Prune timestamps older than 60 seconds
+            for k in self.keys:
+                self.key_history[k] = [t for t in self.key_history.get(k, []) if now - t < 60.0]
+
+            # Pick the least-used key
+            best_key = min(self.keys, key=lambda k: len(self.key_history.get(k, [])))
+            usage = len(self.key_history.get(best_key, []))
+
+            # If even the least-used key has reached max_rpm in the last 60 seconds:
+            if usage >= max_rpm:
+                oldest_call = min(self.key_history[best_key])
+                wait_time = max(0.1, 60.0 - (now - oldest_call) + 0.1)
+                logger.info(f"RateLimitShield: All API keys reached {max_rpm} RPM. Pacing request for {wait_time:.2f}s...")
+                time.sleep(wait_time)
+                now = time.time()
+                self.key_history[best_key] = [t for t in self.key_history.get(best_key, []) if now - t < 60.0]
+
+            self.key_history[best_key].append(now)
+            return best_key
 
     def get_total_keys(self) -> int:
         return len(self.keys)

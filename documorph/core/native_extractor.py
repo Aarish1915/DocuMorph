@@ -75,18 +75,40 @@ class NativeExtractor:
         dominant_font = max(font_counts, key=font_counts.get) if font_counts else ""
         dominant_has_bold = "bold" in dominant_font.lower()
 
-        # 2. Extract images from raw blocks tuple if present (b[6] == 1)
+        # 2. Extract images and drawings
+        page_area = page.rect.width * page.rect.height
+
+        # 2a. Check for vector drawing diagrams (circuits, geometry, maps)
+        try:
+            drawings = page.get_drawings()
+            if drawings:
+                for d in drawings:
+                    d_rect = d.get("rect")
+                    if d_rect:
+                        dw, dh = d_rect.width, d_rect.height
+                        d_area = dw * dh
+                        if d_area >= 4000 and (d_area / max(1, page_area) < 0.85):
+                            if not self.is_header_footer(d_rect.y0, d_rect.y1, page.rect.height):
+                                if not any(c.intersects(d_rect) for c in crop_rects):
+                                    crop_rects.append(d_rect)
+                                    elements.append((d_rect.y0, "diagram", [d_rect.x0, d_rect.y0, d_rect.x1, d_rect.y1]))
+        except Exception:
+            pass
+
+        # 2b. Extract images from raw blocks tuple if present (b[6] == 1)
         try:
             raw_blocks = page.get_text("blocks")
             for b in raw_blocks:
                 if len(b) >= 7 and b[6] == 1:
                     bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
                     w, h = bx1 - bx0, by1 - by0
+                    area = w * h
                     if not self.is_header_footer(by0, by1, page.rect.height) and w >= self.min_image_width and h >= self.min_image_height:
                         img_rect = fitz.Rect(bx0, by0, bx1, by1)
                         if not any(c.intersects(img_rect) for c in crop_rects):
                             crop_rects.append(img_rect)
-                            elements.append((by0, "crop", [bx0, by0, bx1, by1]))
+                            tag = "diagram" if (area >= 4000 and area / max(1, page_area) < 0.85) else "crop"
+                            elements.append((by0, tag, [bx0, by0, bx1, by1]))
         except Exception:
             pass
 
@@ -97,12 +119,14 @@ class NativeExtractor:
             
             if block["type"] == 1:
                 width, height = x1 - x0, y1 - y0
+                area = width * height
                 # Anti-Spam Margin Bounds
                 if not self.is_header_footer(y0, y1, page.rect.height) and width >= self.min_image_width and height >= self.min_image_height:
                     img_rect = fitz.Rect(bbox)
                     if not any(c.intersects(img_rect) for c in crop_rects):
                         crop_rects.append(img_rect)
-                        elements.append((y0, "crop", bbox))
+                        tag = "diagram" if (area >= 4000 and area / max(1, page_area) < 0.85) else "crop"
+                        elements.append((y0, tag, bbox))
                 continue
                 
             # It's a text block. Let's reconstruct it and format it.
