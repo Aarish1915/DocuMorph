@@ -144,6 +144,7 @@ export default function App() {
         // Phone back pressed from processing, or navigating back
         setStep(1);
         setFile(null);
+        setJobStatus(null);
         if (['clean', 'compress', 'extract', 'translate'].includes(hash)) {
           setActiveView(hash);
         } else {
@@ -163,6 +164,7 @@ export default function App() {
     setActiveView(view);
     setFile(null);
     setStep(1);
+    setJobStatus(null);
     if (typeof window !== 'undefined') {
       window.location.hash = view === 'home' ? '' : `#${view}`;
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -172,6 +174,7 @@ export default function App() {
   // File & Drag state
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Execution & Job state
   const [jobStatus, setJobStatus] = useState(null);
@@ -187,6 +190,7 @@ export default function App() {
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
+
   const addToast = (msg, type = 'info') => {
     const id = Date.now();
     setToasts((prev) => [...prev, { id, msg, type }]);
@@ -247,7 +251,7 @@ export default function App() {
         const s = JSON.parse(e.data);
         s.id = jobId;
         setJobStatus(s);
-        if (['Completed', 'COMPLETED', 'Error', 'ERROR', 'FAILED'].includes(s.status)) {
+        if (['Completed', 'COMPLETED', 'Error', 'ERROR', 'FAILED', 'CANCELLED'].includes(s.status)) {
           evtSource.close();
           fetchHistory(baseUrl);
         }
@@ -279,7 +283,7 @@ export default function App() {
         fetch(`${url}/api/jobs`)
           .then((r) => r.json())
           .then((jobs) => {
-            const job = jobs.find((j) => j.id === activeJobId);
+            const job = Array.isArray(jobs) ? jobs.find((j) => j.id === activeJobId) : null;
             if (!job) {
               localStorage.removeItem('activeJobId');
             } else if (['QUEUED', 'PROCESSING', 'QUEUED_REPROCESS'].includes(job.status)) {
@@ -287,21 +291,12 @@ export default function App() {
               if (job.service_type) setServiceType(job.service_type);
               resumeJobStream(activeJobId, url);
             } else {
-              setJobStatus({
-                id: job.id,
-                status: job.status,
-                progress: 100,
-                message: 'Previous document result',
-                result_url: job.result_url,
-                download_url: job.download_url,
-                service_type: job.service_type,
-                output_format: job.output_format,
-                original_file_size: job.original_file_size,
-                compressed_file_size: job.compressed_file_size,
-              });
+              localStorage.removeItem('activeJobId');
             }
           })
-          .catch(() => {});
+          .catch(() => {
+            localStorage.removeItem('activeJobId');
+          });
       });
     }
 
@@ -315,9 +310,11 @@ export default function App() {
     if (step === 4) {
       setStep(1);
       setJobStatus(null);
+      localStorage.removeItem('activeJobId');
     } else if (file) {
       setFile(null);
       setStep(1);
+      setJobStatus(null);
     } else if (activeView !== 'home') {
       navigateView('home');
     } else {
@@ -329,6 +326,8 @@ export default function App() {
     const fileToProcess = explicitFile || file;
     const targetService = explicitServiceType || serviceType;
     if (!fileToProcess) return;
+
+    setIsSubmitting(true);
 
     const currentConfig = configs[targetService] || {};
     // Clean config: if page_range is 'all', strip page_from and page_to so backend never slices full documents
@@ -346,8 +345,9 @@ export default function App() {
     if (sanitizedConfig.spam_words) {
       fd.append('spam_words', sanitizedConfig.spam_words);
     }
-    if (sanitizedConfig.language_mode) {
-      fd.append('language_mode', sanitizedConfig.language_mode);
+    const langMode = sanitizedConfig.to_language || sanitizedConfig.language_mode;
+    if (langMode) {
+      fd.append('language_mode', langMode);
     }
     if (customApiKey) fd.append('custom_api_key', customApiKey);
     if (customPrompt) fd.append('custom_prompt', customPrompt);
@@ -377,7 +377,7 @@ export default function App() {
         // Laptop offline or tunnel dropped — failover to Render Cloud
         const cfg = getStoredConfig();
         if (targetUrl !== cfg.renderUrl && cfg.renderUrl) {
-          addToast('Laptop node offline. Diverting to Render Cloud...', 'info');
+          addToast('Local/Laptop node offline. Diverting to Render Cloud...', 'info');
           targetUrl = cfg.renderUrl;
           res = await fetch(`${targetUrl}/api/process`, {
             method: 'POST',
@@ -400,17 +400,23 @@ export default function App() {
         return;
       }
 
-      const nodeName = targetUrl.includes('trycloudflare') ? 'Laptop (8GB)' : 'Cloud';
+      const nodeName = (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1'))
+        ? 'Local High-Speed Engine'
+        : targetUrl.includes('trycloudflare')
+        ? 'Laptop (8GB)'
+        : 'Cloud';
       addToast(`Processing started on ${nodeName}!`, 'success');
       localStorage.setItem('activeJobId', data.job_id);
       resumeJobStream(data.job_id, targetUrl);
     } catch {
-      addToast('Cannot connect to backend server. Check Settings or launch tunnel.', 'error');
+      addToast('Cannot connect to backend server. Make sure local backend is running on port 8000.', 'error');
       setJobStatus({
         status: 'ERROR',
         progress: -1,
         message: 'Could not connect to server.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -455,9 +461,11 @@ export default function App() {
     }
   };
 
-  const isProcessing = jobStatus && !['COMPLETED', 'Completed', 'ERROR', 'FAILED'].includes(jobStatus.status);
-  const isComplete = jobStatus && ['COMPLETED', 'Completed'].includes(jobStatus.status);
-  const isError = jobStatus && ['ERROR', 'FAILED'].includes(jobStatus.status);
+  const isProcessing = Boolean(
+    isSubmitting || (jobStatus && ['QUEUED', 'PROCESSING', 'QUEUED_REPROCESS'].includes(jobStatus.status) && step === 4)
+  );
+  const isComplete = Boolean(jobStatus && ['COMPLETED', 'Completed'].includes(jobStatus.status));
+  const isError = Boolean(jobStatus && ['ERROR', 'Error', 'FAILED', 'Failed', 'CANCELLED', 'Cancelled'].includes(jobStatus.status));
   const stageIdx = jobStatus ? getPipelineStage(jobStatus.status, jobStatus.progress) : -1;
 
   const headerStep = step === 4 ? 3 : file ? 2 : 1;

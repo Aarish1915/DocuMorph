@@ -183,6 +183,11 @@ class DocuMorphOrchestrator:
             sweeper = LightningSweeper(doc)
             classifications = sweeper.sweep()
             
+            # For translation service, all pages must be processed by the AI engine to translate into target language
+            if self.service_type == "translate":
+                for p in range(len(doc)):
+                    classifications[p] = "complex"
+
             ai_pages = [p for p, c in classifications.items() if c in ("complex", "corrupted")]
             local_pages = [p for p in range(len(doc)) if p not in ai_pages]
             logger.info(f"TELEMETRY_PAGES_AI: {ai_pages}")
@@ -530,7 +535,8 @@ class DocuMorphOrchestrator:
             fix_spacing = self.config_options.get("fix_spacing", True)
 
             processed = self.spam_filter.clean_text(raw_markdown) if clean_watermarks else raw_markdown
-            processed = self.hindi_handler.process_text(processed)
+            if self.service_type != "translate":
+                processed = self.hindi_handler.process_text(processed)
             if fix_spacing:
                 processed = self.format_fixer.fix_markdown(processed)
 

@@ -108,7 +108,7 @@ class PDFCompiler:
             }}
             
             body {{
-                font-family: 'Inter', 'Noto Sans Devanagari', -apple-system, sans-serif;
+                font-family: 'Inter', 'Noto Sans Devanagari', 'Nirmala UI', system-ui, -apple-system, sans-serif;
                 font-size: {body_font_size};
                 line-height: {body_line_height};
                 color: #0f172a;
@@ -118,7 +118,7 @@ class PDFCompiler:
             }}
             
             h1, h2, h3, h4 {{
-                font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+                font-family: 'Inter', 'Noto Sans Devanagari', 'Nirmala UI', system-ui, sans-serif;
                 letter-spacing: -0.01em;
                 break-after: avoid;
                 text-align: left;

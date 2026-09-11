@@ -22,7 +22,9 @@ export function getStoredConfig() {
   };
 }
 
-let cachedActiveBase = null;
+let cachedActiveBase = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+  ? 'http://localhost:8000'
+  : null;
 let lastProbeTime = 0;
 let lastProbeResult = { node: 'unknown', url: '', online: false };
 const PROBE_TTL_MS = 25000; // Cache probe result for 25 seconds
@@ -34,6 +36,7 @@ export async function probeBackend(forceRefresh = false) {
   }
 
   const config = getStoredConfig();
+  const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
   // 1. If user explicitly forced Render
   if (config.preferred === 'render') {
@@ -55,16 +58,19 @@ export async function probeBackend(forceRefresh = false) {
   const envApi = import.meta.env.VITE_API_URL;
   const hasExternalEnvApi = envApi && !envApi.includes('localhost') && !envApi.includes('127.0.0.1');
 
-  if (!hasExternalEnvApi && typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+  if (!hasExternalEnvApi && isLocalHost) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 600);
+      const timer = setTimeout(() => controller.abort(), 2000);
       const res = await fetch('http://localhost:8000/api/settings', { signal: controller.signal });
       clearTimeout(timer);
       if (res.ok) {
         cachedActiveBase = 'http://localhost:8000';
         lastProbeTime = now;
         lastProbeResult = { node: 'local', url: cachedActiveBase, online: true };
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('documorph:backend-node', { detail: lastProbeResult }));
+        }
         return lastProbeResult;
       }
     } catch {
@@ -87,7 +93,9 @@ export async function probeBackend(forceRefresh = false) {
         cachedActiveBase = config.laptopUrl;
         lastProbeTime = now;
         lastProbeResult = { node: 'laptop', url: config.laptopUrl, online: true };
-        window.dispatchEvent(new CustomEvent('documorph:backend-node', { detail: lastProbeResult }));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('documorph:backend-node', { detail: lastProbeResult }));
+        }
         return lastProbeResult;
       }
     } catch {
@@ -121,7 +129,7 @@ export function getApiBaseSync() {
     return envApi;
   }
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return config.laptopUrl || config.renderUrl || 'http://localhost:8000';
+    return 'http://localhost:8000';
   }
   return config.laptopUrl || config.renderUrl || DEFAULT_RENDER_CLOUD;
 }
