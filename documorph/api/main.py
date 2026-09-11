@@ -40,11 +40,20 @@ async def check_rate_limit(request: Request):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https://.*\.vercel\.app$|^http://localhost:\d+$|^http://127\.0\.0\.1:\d+$",
+    allow_origin_regex=r"^https://.*\.vercel\.app$|^https://.*\.trycloudflare\.com$|^http://localhost:\d+$|^http://127\.0\.0\.1:\d+$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+async def root():
+    return {
+        "status": "online",
+        "service": "DocuMorph API Gateway",
+        "docs": "/docs",
+        "health": "/api/health"
+    }
 
 # Ensure internal directories exist with private permissions
 os.makedirs("data/uploads", exist_ok=True)
@@ -100,8 +109,7 @@ async def process_pdf(
     ignore_images: str = Form(""),
     custom_api_key: str = Form(None),
     custom_prompt: str = Form(None),
-    db: Session = Depends(get_db),
-    _=Depends(check_rate_limit)
+    db: Session = Depends(get_db)
 ):
     job_id = f"job_{uuid.uuid4().hex[:8]}"
     
@@ -230,9 +238,18 @@ async def process_pdf(
     )
     db.add(new_job)
     db.commit()
-    
-    # Web server completely disconnects from processing here. It is hyper-scalable.
-    return {"job_id": job_id}
+    # Calculate initial live queue position
+    queue_pos = db.query(Job).filter(
+        Job.status.in_(["QUEUED", "QUEUED_REPROCESS"]),
+        Job.created_at <= new_job.created_at
+    ).count()
+
+    # Web server completely disconnects from processing here. It is zero-rejection & hyper-scalable.
+    return {
+        "job_id": job_id,
+        "status": "QUEUED",
+        "queue_position": queue_pos
+    }
 
 from pydantic import BaseModel
 from typing import List

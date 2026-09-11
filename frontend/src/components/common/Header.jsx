@@ -147,19 +147,6 @@ export default function Header({
             {historyCount > 0 && <span className="history-pill">{historyCount}</span>}
           </button>
 
-          {/* Dual Failover Node Indicator */}
-          {activeNode && (
-            <button
-              type="button"
-              className="backend-node-badge"
-              onClick={onToggleSettings}
-              title={`Connected to: ${activeNode.node === 'laptop' ? 'Laptop Node (i3 · 8GB RAM)' : activeNode.node === 'local' ? 'Localhost' : 'Render Cloud Failover'}. Click to configure.`}
-            >
-              <span className={`node-dot ${activeNode.node === 'laptop' || activeNode.node === 'local' ? 'green' : 'blue'}`} />
-              <span className="btn-label">{activeNode.node === 'laptop' ? 'Laptop' : activeNode.node === 'local' ? 'Local' : 'Cloud'}</span>
-            </button>
-          )}
-
           <button 
             className="header-icon-btn" 
             onClick={onToggleSettings}

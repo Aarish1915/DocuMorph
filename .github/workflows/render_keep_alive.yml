@@ -1,0 +1,24 @@
+name: Keep Render Backend Warm
+
+on:
+  schedule:
+    # Runs every 12 minutes (Render free tier sleeps after 15 minutes)
+    - cron: '*/12 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping DocuMorph Render API
+        run: |
+          TARGET_URL="${{ secrets.RENDER_BACKEND_URL || 'https://documorph-backend.onrender.com/api/health' }}"
+          echo "Pinging: $TARGET_URL"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$TARGET_URL" || echo "000")
+          echo "HTTP Response: $RESPONSE"
+          if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "404" ] || [ "$RESPONSE" = "301" ]; then
+            echo "Render instance is active and awake!"
+          else
+            echo "Warning: Response code $RESPONSE - instance may be spinning up."
+          fi

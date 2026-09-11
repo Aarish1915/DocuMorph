@@ -27,7 +27,7 @@ const LANGUAGE_MODES = [
     badge: '🇬🇧',
     short: 'English Only',
     title: 'Only English (Law, CLAT, Bare Acts)',
-    tip: 'Clean English text, removes scanning shadows and duplicate Hindi.',
+    tip: 'Clean English text + all formulas, reasoning math & tables. Strips photocopy shadows and duplicate Hindi.',
   },
   {
     id: 'only_hindi',
