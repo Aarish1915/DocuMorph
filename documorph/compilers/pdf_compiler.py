@@ -12,8 +12,27 @@ class PDFCompiler:
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def _generate_css(self, compact_mode: str = "standard") -> str:
-        if compact_mode == "ultra_dense":
+    def _generate_css(self, compact_mode: str = "standard", is_landscape: bool = False) -> str:
+        if is_landscape:
+            page_margin = "14mm 20mm 14mm 20mm"
+            body_font_size = "15.5pt"
+            body_line_height = "1.65"
+            p_margin_bottom = "0.75em"
+            h1_font_size = "26pt"
+            h1_margin = "0 0 0.5em 0"
+            h2_font_size = "20pt"
+            h2_margin = "0.6em 0 0.35em 0"
+            h3_font_size = "16pt"
+            h3_margin = "0.5em 0 0.3em 0"
+            table_font_size = "13pt"
+            table_padding = "8px 12px"
+            table_margin = "1em 0"
+            list_margin = "0.4em 0 0.8em 0"
+            li_margin = "0.45em"
+            hr_margin = "1.2em 0"
+            blockquote_margin = "1em 0"
+            blockquote_padding = "0.8em 1.2em"
+        elif compact_mode == "ultra_dense":
             page_margin = "8mm 10mm 10mm 10mm"
             body_font_size = "9pt"
             body_line_height = "1.35"
@@ -34,42 +53,44 @@ class PDFCompiler:
             blockquote_padding = "0.3em 0.6em"
         elif compact_mode in ("compact", "balanced"):
             page_margin = "10mm 12mm 12mm 12mm"
-            body_font_size = "9.5pt"
-            body_line_height = "1.42"
-            p_margin_bottom = "0.38em"
-            h1_font_size = "14pt"
+            body_font_size = "11pt"
+            body_line_height = "1.52"
+            p_margin_bottom = "0.45em"
+            h1_font_size = "16pt"
             h1_margin = "0.65em 0 0.25em 0"
-            h2_font_size = "12pt"
+            h2_font_size = "13.5pt"
             h2_margin = "0.5em 0 0.2em 0"
-            h3_font_size = "10.5pt"
+            h3_font_size = "11.5pt"
             h3_margin = "0.4em 0 0.15em 0"
-            table_font_size = "8.5pt"
-            table_padding = "4px 7px"
-            table_margin = "0.5em 0"
-            list_margin = "0.15em 0 0.38em 0"
-            li_margin = "0.2em"
+            table_font_size = "9.5pt"
+            table_padding = "5px 8px"
+            table_margin = "0.6em 0"
+            list_margin = "0.15em 0 0.4em 0"
+            li_margin = "0.22em"
             hr_margin = "0.6em 0"
             blockquote_margin = "0.5em 0"
             blockquote_padding = "0.4em 0.8em"
         else: # standard
-            page_margin = "16mm 15mm 16mm 15mm"
-            body_font_size = "10pt"
-            body_line_height = "1.55"
-            p_margin_bottom = "0.75em"
-            h1_font_size = "16pt"
-            h1_margin = "1.1em 0 0.5em 0"
-            h2_font_size = "13pt"
-            h2_margin = "1em 0 0.4em 0"
-            h3_font_size = "11pt"
-            h3_margin = "0.8em 0 0.3em 0"
-            table_font_size = "9pt"
-            table_padding = "6px 9px"
-            table_margin = "1em 0"
-            list_margin = "0.25em 0 0.75em 0"
-            li_margin = "0.35em"
-            hr_margin = "1.2em 0"
-            blockquote_margin = "0.9em 0"
+            page_margin = "12mm 14mm 14mm 14mm"
+            body_font_size = "12pt"
+            body_line_height = "1.62"
+            p_margin_bottom = "0.65em"
+            h1_font_size = "19pt"
+            h1_margin = "0.9em 0 0.4em 0"
+            h2_font_size = "15pt"
+            h2_margin = "0.8em 0 0.3em 0"
+            h3_font_size = "12.5pt"
+            h3_margin = "0.6em 0 0.25em 0"
+            table_font_size = "10pt"
+            table_padding = "6px 10px"
+            table_margin = "0.8em 0"
+            list_margin = "0.2em 0 0.6em 0"
+            li_margin = "0.3em"
+            hr_margin = "1em 0"
+            blockquote_margin = "0.8em 0"
             blockquote_padding = "0.6em 1em"
+
+        page_size = "297mm 210mm" if is_landscape else "A4 portrait"
 
         return f"""
         <style>
@@ -151,12 +172,13 @@ class PDFCompiler:
             }}
             
             blockquote {{
-                border-left: 3.5px solid #2563eb;
-                background-color: #f8fafc;
+                border-left: 4px solid #2563eb;
+                background-color: #f0f7ff;
                 margin: {blockquote_margin};
                 padding: {blockquote_padding};
-                border-radius: 0 4px 4px 0;
-                color: #0f172a;
+                border-radius: 0 6px 6px 0;
+                color: #1e3a8a;
+                font-weight: 500;
                 break-inside: avoid;
             }}
             
@@ -231,15 +253,22 @@ class PDFCompiler:
             
             @media print {{
                 @page {{
-                    size: A4 portrait;
+                    size: {page_size};
                     margin: {page_margin};
                 }}
                 body {{
                     -webkit-print-color-adjust: exact;
                     print-color-adjust: exact;
                 }}
-                table, img, pre, h1, h2, h3, blockquote, .mermaid {{
-                    break-inside: avoid;
+                table, img, pre, h1, h2, h3, blockquote, .mermaid, .diagram-container, div:has(> img) {{
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }}
+                img {{
+                    max-height: 460px;
+                    object-fit: contain;
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
                 }}
                 h1, h2, h3 {{
                     break-after: avoid;
@@ -256,17 +285,61 @@ class PDFCompiler:
     def css(self) -> str:
         return self._generate_css("standard")
 
-    def compile(self, markdown_text: str, output_filename: str, compact_mode: str = "standard") -> str:
+    def compile(self, markdown_text: str, output_filename: str, compact_mode: str = "standard", is_landscape: bool = False) -> str:
         """
         Converts markdown to HTML, then uses Playwright to render it as a compact or standard A4 PDF.
+        Supports Presentation Slide Landscape layout when is_landscape=True.
         Finally applies PyMuPDF stream deflation to minimize file size.
         """
         import re
         markdown_text = re.sub(r'([^\n])\n(\|)', r'\1\n\n\2', markdown_text)
+        markdown_text = re.sub(r'\$?\\rightarrow\$?', '→', markdown_text)
         
         html_content = markdown.markdown(markdown_text, extensions=['tables', 'fenced_code'])
-        dynamic_css = self._generate_css(compact_mode)
+
+        # Resolve local relative image paths to Base64 Data URIs (bypasses Chromium about:blank file:// sandbox block)
+        def _resolve_img_src(match):
+            src = match.group(1)
+            if not src.startswith("http") and not src.startswith("data:"):
+                candidates = [
+                    os.path.abspath(os.path.join(self.output_dir, src)),
+                    os.path.abspath(os.path.join("data/output", src)),
+                    os.path.abspath(src)
+                ]
+                for cand in candidates:
+                    if os.path.exists(cand) and os.path.isfile(cand):
+                        try:
+                            import base64
+                            with open(cand, "rb") as img_f:
+                                b64 = base64.b64encode(img_f.read()).decode("utf-8")
+                            ext = os.path.splitext(cand)[1].lower().replace(".", "")
+                            mime = "image/png" if ext == "png" else ("image/jpeg" if ext in ("jpg", "jpeg") else "image/png")
+                            return f'src="data:{mime};base64,{b64}"'
+                        except Exception as e:
+                            logger.warning(f"Failed to encode image {cand} to base64: {e}")
+            return match.group(0)
+
+        html_content = re.sub(r'src=["\']([^"\']+)["\']', _resolve_img_src, html_content)
+        dynamic_css = self._generate_css(compact_mode, is_landscape=is_landscape)
         
+        mermaid_script = ""
+        if "language-mermaid" in markdown_text:
+            mermaid_script = """
+            <script type="module">
+                import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                
+                document.querySelectorAll('pre code.language-mermaid').forEach(block => {
+                    const pre = block.parentElement;
+                    const div = document.createElement('div');
+                    div.className = 'mermaid';
+                    div.textContent = block.textContent;
+                    pre.parentNode.replaceChild(div, pre);
+                });
+                
+                mermaid.initialize({ startOnLoad: true });
+            </script>
+            """
+
         full_html = f"""
         <!DOCTYPE html>
         <html>
@@ -303,20 +376,7 @@ class PDFCompiler:
         </head>
         <body>
             {html_content}
-            
-            <script type="module">
-                import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-                
-                document.querySelectorAll('pre code.language-mermaid').forEach(block => {{
-                    const pre = block.parentElement;
-                    const div = document.createElement('div');
-                    div.className = 'mermaid';
-                    div.textContent = block.textContent;
-                    pre.parentNode.replaceChild(div, pre);
-                }});
-                
-                mermaid.initialize({{ startOnLoad: true }});
-            </script>
+            {mermaid_script}
         </body>
         </html>
         """
@@ -326,33 +386,49 @@ class PDFCompiler:
         else:
             output_path = os.path.join(self.output_dir, output_filename)
 
-        if compact_mode == "ultra_dense":
-            margins = {"top": "8mm", "right": "10mm", "bottom": "12mm", "left": "10mm"}
-        elif compact_mode in ("compact", "balanced"):
-            margins = {"top": "10mm", "right": "12mm", "bottom": "14mm", "left": "12mm"}
+        if is_landscape:
+            margins = {"top": "14mm", "right": "20mm", "bottom": "14mm", "left": "20mm"}
+            pdf_opts = {
+                "path": output_path,
+                "format": "A4",
+                "landscape": True,
+                "margin": margins,
+                "display_header_footer": True,
+                "header_template": '<div></div>',
+                "footer_template": '<div style="font-size:9pt;font-family:Inter,sans-serif;color:#64748b;text-align:right;width:100%;padding-right:20mm;margin-bottom:4mm;">DocuMorph Clean Slide | Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>',
+                "print_background": True
+            }
         else:
-            margins = {"top": "15mm", "right": "15mm", "bottom": "18mm", "left": "15mm"}
+            if compact_mode == "ultra_dense":
+                margins = {"top": "8mm", "right": "10mm", "bottom": "12mm", "left": "10mm"}
+            elif compact_mode in ("compact", "balanced"):
+                margins = {"top": "10mm", "right": "12mm", "bottom": "14mm", "left": "12mm"}
+            else:
+                margins = {"top": "15mm", "right": "15mm", "bottom": "18mm", "left": "15mm"}
+            pdf_opts = {
+                "path": output_path,
+                "format": "A4",
+                "landscape": False,
+                "margin": margins,
+                "display_header_footer": True,
+                "header_template": '<div></div>',
+                "footer_template": '<div style="font-size:8pt;font-family:Inter,sans-serif;color:#64748b;text-align:center;width:100%;margin-bottom:4mm;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>',
+                "print_background": True
+            }
         
         # Render to PDF via Playwright Chromium
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
-            page.set_content(full_html, wait_until="networkidle")
+            page.set_default_timeout(20000)
+            page.set_content(full_html, wait_until="domcontentloaded")
             
             try:
-                page.wait_for_function("window.mathjax_is_done === true", timeout=10000)
+                page.wait_for_function("window.mathjax_is_done === true", timeout=8000)
             except Exception as e:
-                print(f"MathJax timeout or no math present: {e}")
+                pass
             
-            page.pdf(
-                path=output_path,
-                format="A4",
-                margin=margins,
-                display_header_footer=True,
-                header_template='<div></div>',
-                footer_template='<div style="font-size:8pt;font-family:Inter,sans-serif;color:#64748b;text-align:center;width:100%;margin-bottom:4mm;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>',
-                print_background=True
-            )
+            page.pdf(**pdf_opts)
             browser.close()
 
         # PyMuPDF Stream Deflation: optimize byte size as well as space

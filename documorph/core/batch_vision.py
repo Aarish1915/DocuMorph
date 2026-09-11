@@ -36,7 +36,8 @@ class BatchVisionEngine:
         custom_api_key: str = None, 
         custom_prompt: str = None, 
         ignore_images: str = "",
-        language_mode: str = "auto"
+        language_mode: str = "auto",
+        service_type: str = "clean_format"
     ):
         self.tier_manager = TierManager()
         self.profile = self.tier_manager.get_profile()
@@ -44,6 +45,7 @@ class BatchVisionEngine:
         self.custom_prompt = custom_prompt
         self.ignore_images = ignore_images
         self.language_mode = language_mode
+        self.service_type = service_type or "clean_format"
         
         self.backend = "gemini" # Currently hardcoded to gemini sdk, could be abstracted
         # Initialize APIRouter
@@ -100,6 +102,10 @@ You are an expert OCR and document structure AI. Your job is to extract text, ta
      `* Champawat`
      `* Udham Singh Nagar`
    - For Himalayan divisions and peaks: extract every division with its length (e.g. `* Punjab Himalaya (560 km) - Indus to Sutlej River`) and every peak with elevation (e.g. `* Nanga Parbat (8,126 m)`, `* Nanda Devi (7,817 m)`, `* Mt. Everest (8,848.86 m)`, `* Kanchenjunga (8,598 m)`, `* Namcha Barwa (7,756 m)`). NEVER leave orphan numbers like `(8,126 .)`!
+   - For visual scientific diagrams, physics illustrations, circuits, ray optics, mechanics setups, chemical structures, or anatomical drawings:
+     Detect the visual diagram region and insert an explicit figure tag with its normalized bounding box coordinates (integers 0 to 1000) on the page image:
+     `[Figure: <short description> | bbox: [ymin, xmin, ymax, xmax]]`
+     at the exact sentence, question, or paragraph where that figure belongs contextually. DO NOT write meta commentary—only insert `[Figure: ... | bbox: [ymin, xmin, ymax, xmax]]`.
    - For comparison charts or ordered values (e.g. `SPEED IN DIFFERENT MEDIA`: `VACUUM > GAS > LIQUID > SOLID`): ALWAYS structure the data into an HTML table (`<table>` with `<th>` and `<td>`).
    - For river confluences / Panch Prayag: format as an HTML `<table>` with columns `Prayag` and `Confluence / Rivers`.
 9. **SPAM & PROMOTIONAL FEE DELETION**: Silently DELETE all coaching center promotional banners, watermarks, and fees (e.g. "LexRise Academy", "Bihar APO Pre", "Judiciary Pre", "Foundation Batch", "UK APO F: 4444/-", "Jharkhand APO Mains-6999/-", "Raj APO Pre : 2999/-", "7599457405", "@VRLEXA"). NEVER turn an advertisement fee into a document heading!
@@ -117,19 +123,22 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 pass
                 
         # Inject Strict Language Isolation or Multi-Language Translation (Prevent duplicate bilingual output)
-        if self.language_mode and self.language_mode not in ("auto", "Auto-Detect"):
-            mode_clean = self.language_mode.lower().strip()
-            if any(x in mode_clean for x in ["math+hindi", "hindi+math", "math + hindi", "hindi + math"]):
+        if self.service_type == "translate":
+            target_lang = self.language_mode or "Hindi"
+            prompt += f"\n\nSTRICT TRANSLATION REQUIREMENT ({target_lang.upper()}): Translate all narrative text, explanations, headings, and questions fluently into {target_lang}. CRITICAL FORMULA & CODE SHIELD: Retain 100% of mathematical equations ($...$, $$...$$), formulas, fractions, variable symbols, and code blocks completely UNTOUCHED, in original LaTeX format, and uncorrupted. NEVER omit passages or delete text because of language—translate all content into {target_lang}."
+        elif self.language_mode and self.language_mode not in ("auto", "Auto-Detect"):
+            mode_clean = self.language_mode.lower().strip().replace("-", " ").replace("_", " ")
+            if any(x in mode_clean for x in ["math+hindi", "hindi+math", "math + hindi", "hindi + math", "hi+math", "math+hi"]):
                 prompt += "\n\nSTRICT LANGUAGE REQUIREMENT (HINDI + MATH): The user requested HINDI + MATH. Extract all Devanagari Hindi explanations and all mathematical equations/formulas perfectly. Omit parallel English paragraphs."
             elif any(x in mode_clean for x in ["en+math", "english+math", "math+en", "english + math"]):
                 prompt += "\n\nSTRICT LANGUAGE REQUIREMENT (ENGLISH + MATH): The user requested ENGLISH + MATH. Extract all English explanations and all mathematical equations/formulas perfectly. Omit parallel Hindi paragraphs."
-            elif mode_clean in ("math", "only math", "math only", "math_only"):
+            elif mode_clean in ("math", "only math", "math only"):
                 prompt += "\n\nSTRICT LANGUAGE REQUIREMENT: Extract ONLY mathematical equations, formulas, and numeric calculations. Omit normal narrative passages."
-            elif mode_clean in ("only english", "english_only", "en", "english"):
+            elif mode_clean in ("only english", "english only", "en", "english"):
                 prompt += "\n\nSTRICT LANGUAGE REQUIREMENT (ENGLISH ONLY): The user requested ONLY ENGLISH. If the document is bilingual (English and Hindi side-by-side or separated by slashes '/'), extract ONLY the English text. DO NOT translate the parallel Hindi text into English to create duplicates! Each concept must appear only once in English. Omit Hindi text completely, EXCEPT if an image contains a mnemonic trick that only exists in Hindi, preserve the trick words."
-            elif mode_clean in ("only hindi", "hindi_only", "hi", "hindi"):
+            elif mode_clean in ("only hindi", "hindi only", "hi", "hindi"):
                 prompt += "\n\nSTRICT LANGUAGE REQUIREMENT (HINDI ONLY): The user requested ONLY HINDI. Output 100% pure Devanagari Hindi for all text, headings, and explanations. DO NOT include English parentheticals or English translations when the Hindi equivalent is already present. Omit parallel English text completely. Retain only essential mathematical equations and standard metric units (e.g. km, m/s)."
-            elif mode_clean in ("bilingual", "hi-en", "both"):
+            elif mode_clean in ("bilingual", "hi en", "both"):
                 prompt += "\n\nLANGUAGE: Retain both languages cleanly formatted without squashing."
             else:
                 # Generalized target language translation (Marathi, Gujarati, Bengali, Tamil, Telugu, Kannada, Malayalam, Punjabi, Urdu, Spanish, French, German)

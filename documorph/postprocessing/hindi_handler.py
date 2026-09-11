@@ -59,12 +59,22 @@ class HindiHandler:
         
         if self.mode == "en":
             if has_hindi:
-                parts = re.split(r'\s*/\s*', content)
+                # 1. Protect all math blocks ($...$ or $$...$$) with placeholders before cleaning
+                math_blocks = []
+                def save_math(m):
+                    math_blocks.append(m.group(0))
+                    return f"__MATH_HOLD_{len(math_blocks)-1}__"
+                content_safe = re.sub(r'(\$\$[\s\S]*?\$\$|\$[^$\n]+\$)', save_math, content)
+
+                parts = re.split(r'\s*[/|]\s*', content_safe)
                 en_parts = []
                 for p in parts:
                     p_stripped = self.devanagari_pattern.sub('', p).strip()
-                    # Only accept as valid English if it contains at least 2 consecutive Latin letters or a word
-                    if re.search(r'[a-zA-Z]{2,}', p_stripped):
+                    # Check for genuine English words excluding the placeholder itself
+                    clean_for_latin = re.sub(r'__MATH_HOLD_\d+__', '', p_stripped)
+                    if re.search(r'[a-zA-Z]{2,}', clean_for_latin):
+                        en_parts.append(p_stripped)
+                    elif not en_parts and (re.search(r'[a-zA-Z0-9]', clean_for_latin) or '__MATH_HOLD_' in p_stripped):
                         en_parts.append(p_stripped)
                         
                 if en_parts:
@@ -80,6 +90,9 @@ class HindiHandler:
                     res = re.sub(r'\s+', ' ', res).strip()
                     if res.count('*') % 2 != 0:
                         res = re.sub(r'\*+', '', res).strip()
+                    # Restore math placeholders
+                    for idx, mb in enumerate(math_blocks):
+                        res = res.replace(f"__MATH_HOLD_{idx}__", mb)
                     return f"{prefix}{res}".strip() if res else ""
                 else:
                     # ZERO DATA LOSS GUARD:
@@ -150,6 +163,22 @@ class HindiHandler:
                     return s
                 return ""
                 
+        elif self.mode == "math":
+            # Extract ONLY mathematical equations, formulas, numeric expressions, and problem symbols
+            has_latex = bool(re.search(r'(\$\$[\s\S]*?\$\$|\$[^$\n]+\$)', content))
+            if has_latex:
+                return s
+            # Pure arithmetic / equations: e.g. "F = m * a", "2x + 3y = 7"
+            is_numeric_math = bool(re.match(r'^[0-9+\-*/=^().,\s%<>≤≥√∑∫π]+$', content))
+            if is_numeric_math and len(content.strip()) > 1:
+                return s
+            # Short variable equation without narrative sentences (words with 4+ letters)
+            clean_for_words = re.sub(r'\\[a-zA-Z]+', '', content)
+            words = re.findall(r'[a-zA-Z\u0900-\u097F]{4,}', clean_for_words)
+            if not words and bool(re.search(r'[0-9=+\-*/^]', content)):
+                return s
+            return ""
+
         return s
 
     def process_text(self, text: str) -> str:

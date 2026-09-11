@@ -10,6 +10,7 @@ import concurrent.futures
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 import fitz
+import re
 
 from documorph.core.crop_sweeper import LightningSweeper
 from documorph.core.native_extractor import NativeExtractor
@@ -20,7 +21,14 @@ from documorph.postprocessing.spam_filter import SpamFilter
 from documorph.postprocessing.hindi_handler import HindiHandler
 from documorph.postprocessing.format_fixer import FormatFixer
 from documorph.compilers.pdf_compiler import PDFCompiler
-from documorph.core.database import SessionLocal, PageResult
+from documorph.core.database import SessionLocal, PageResult, PageResultVersion, SpamCorpusEntity
+from documorph.core.diagram_extractor import DiagramExtractor
+from documorph.services import (
+    CleanFormatServiceHandler,
+    CompressServiceHandler,
+    ExtractTextServiceHandler,
+    TranslateServiceHandler,
+)
 
 # --- Logging Setup ---
 LOG_DIR = Path("data/logs")
@@ -40,6 +48,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger("documorph")
 
+def _save_whitened_image(pix, target_path: Path) -> None:
+    """Save pixmap to PNG, converting gray photocopy artifacts (RGB > 225) to clean #FFFFFF."""
+    try:
+        from PIL import Image
+        import numpy as np
+        import io
+        img_data = pix.tobytes("png")
+        with Image.open(io.BytesIO(img_data)) as pil_img:
+            pil_img = pil_img.convert("RGB")
+            arr = np.array(pil_img)
+            mask = (arr[:, :, 0] > 225) & (arr[:, :, 1] > 225) & (arr[:, :, 2] > 225)
+            arr[mask] = [255, 255, 255]
+            Image.fromarray(arr).save(str(target_path), "PNG", optimize=True)
+    except Exception as e:
+        logger.warning(f"Auto-whitening failed, saving direct pixmap: {e}")
+        pix.save(str(target_path))
+
+
 class DocuMorphOrchestrator:
     def __init__(
         self, 
@@ -51,10 +77,13 @@ class DocuMorphOrchestrator:
         spam_words: str = "",
         ignore_images: str = "",
         custom_api_key: str = None,
-        custom_prompt: str = None
+        custom_prompt: str = None,
+        output_dir: str = None
     ):
         load_dotenv(find_dotenv(), override=True)
         self.job_id = job_id
+        self.output_dir = output_dir or "data/output/needs_review"
+        os.makedirs(self.output_dir, exist_ok=True)
         self.service_type = service_type or "clean_format"
         if isinstance(config_options, str):
             try:
@@ -85,63 +114,30 @@ class DocuMorphOrchestrator:
             custom_api_key=custom_api_key,
             custom_prompt=custom_prompt,
             ignore_images=ignore_images,
-            language_mode=language_mode
+            language_mode=language_mode,
+            service_type=self.service_type
         )
         
         self.spam_filter = SpamFilter(custom_spam_words=spam_words)
         self.hindi_handler = HindiHandler(mode=self.target_lang)
         self.format_fixer = FormatFixer()
-        self.pdf_compiler = PDFCompiler()
-        
-        self.output_dir = "data/output/needs_review"
-        os.makedirs(self.output_dir, exist_ok=True)
+        self.pdf_compiler = PDFCompiler(output_dir=self.output_dir)
+        self.diagram_extractor = DiagramExtractor()
+
+        # Decoupled Feature Service Handlers (Strategy Pattern)
+        self.services = {
+            "clean_format": CleanFormatServiceHandler(self),
+            "compress": CompressServiceHandler(self),
+            "extract_text": ExtractTextServiceHandler(self),
+            "translate": TranslateServiceHandler(self),
+        }
         
     def _report(self, status: str, pct: int):
         logger.info(f"Progress: {pct}% - {status}")
         self.progress_callback(status, pct)
 
     def _process_compression(self, doc, file_path: str, timestamp: int, base_name: str) -> str:
-        self._report("Compressing PDF...", 25)
-        remove_images = self.config_options.get("images") == "remove"
-        strip_metadata = self.config_options.get("strip_metadata", True)
-        remove_duplicates = self.config_options.get("remove_duplicates", True)
-
-        output_path = os.path.join(self.output_dir, f"COMPRESSED_{timestamp}_{base_name}.pdf")
-
-        if strip_metadata:
-            try:
-                doc.set_metadata({})
-            except Exception as e:
-                logger.warning(f"Could not clear metadata: {e}")
-
-        if remove_images:
-            self._report("Stripping images from PDF...", 40)
-            for page in doc:
-                try:
-                    for img in page.get_images():
-                        try:
-                            page.delete_image(img[0])
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-
-        self._report("Optimizing and deflating streams...", 70)
-        doc.save(
-            output_path,
-            garbage=4 if remove_duplicates else 3,
-            deflate=True,
-            clean=True,
-            deflate_images=True,
-            deflate_fonts=True
-        )
-
-        orig_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
-        comp_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
-        saved_pct = round(((orig_size - comp_size) / max(1, orig_size)) * 100, 1) if orig_size > 0 else 0
-        logger.info(f"PDF Compressed: {orig_size} bytes -> {comp_size} bytes (-{saved_pct}%)")
-        self._report(f"Compression Complete (-{saved_pct}%)", 100)
-        return output_path
+        return self.services["compress"].process_bytes_only(doc, self.config_options, file_path, timestamp, base_name)
 
     def process_file(self, file_path: str) -> str:
         start_time = time.time()
@@ -149,11 +145,20 @@ class DocuMorphOrchestrator:
         file_name = Path(file_path).name
         base_name = file_name.replace(".pdf", "")
         
-        self._report("Initializing Document...", 5)
-        
         try:
             doc = fitz.open(file_path)
             total_pages_count = len(doc)
+            
+            # Detect if source document is a landscape presentation slide deck (e.g. 16:9 lecture slides)
+            self.is_landscape = False
+            if total_pages_count > 0:
+                p0 = doc[0]
+                if (p0.rect.width / max(1.0, p0.rect.height)) > 1.20:
+                    self.is_landscape = True
+                    logger.info(f"Detected landscape presentation slide deck (aspect ratio: {p0.rect.width/p0.rect.height:.2f})")
+            
+            # Pre-compute image xref frequency across document to detect repeated template watermarks and logos
+            xref_frequency = self.diagram_extractor.compute_xref_frequency(doc)
             
             # 0. PAGE RANGE SLICING (Optional - ONLY when explicitly set to 'custom')
             p_from_val = self.config_options.get("page_from")
@@ -219,11 +224,22 @@ class DocuMorphOrchestrator:
                         pix = page.get_pixmap(matrix=mat)
                         img_path = os.path.join(temp_dir, f"full_{page_num}.png")
                         pix.save(img_path)
+                        
+                        # Extract any standalone diagrams or sub-images on this scanned/complex page
+                        try:
+                            scanned_diagrams = self.diagram_extractor.extract_page_diagrams(
+                                page, page_num, xref_frequency, total_pages_count, str(self.job_id or timestamp)
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed extracting diagrams for scanned page {page_num}: {e}")
+                            scanned_diagrams = []
+
                         # Mark this page to be processed in the full-page batch
                         crops_to_batch.append({
                             "type": "full_page", 
                             "page_num": page_num, 
-                            "path": img_path
+                            "path": img_path,
+                            "scanned_diagrams": scanned_diagrams
                         })
                     else:
                         # Clean page: Local extract + targeted crops
@@ -232,6 +248,23 @@ class DocuMorphOrchestrator:
                         for idx, item in enumerate(page_data.get("items", [])):
                             if item["type"] == "text":
                                 page_md_blocks.append(item["data"])
+                            elif item["type"] == "diagram":
+                                bbox = item["data"]
+                                rect = fitz.Rect(bbox[0], bbox[1], bbox[2], bbox[3])
+                                mat = fitz.Matrix(2.5, 2.5) # 300 DPI high-fidelity
+                                pix = page.get_pixmap(matrix=mat, clip=rect)
+                                images_dir = Path("data/output/images")
+                                images_dir.mkdir(parents=True, exist_ok=True)
+                                diagram_filename = f"{self.job_id or timestamp}_diagram_{page_num}_{idx}.png"
+                                diagram_path = images_dir / diagram_filename
+                                self.diagram_extractor.save_whitened_image(pix, diagram_path)
+
+                                rel_img_path = f"images/{diagram_filename}"
+                                page_md_blocks.append(
+                                    f'\n\n<div class="diagram-container" align="center" style="margin: 14px 0; break-inside: avoid; page-break-inside: avoid;">\n'
+                                    f'  <img src="{rel_img_path}" alt="Document Diagram" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
+                                    f'</div>\n\n'
+                                )
                             elif item["type"] == "crop":
                                 bbox = item["data"]
                                 rect = fitz.Rect(bbox[0], bbox[1], bbox[2], bbox[3])
@@ -300,6 +333,92 @@ class DocuMorphOrchestrator:
                                 pnum = c["page_num"]
                                 
                                 if c["type"] == "full_page":
+                                    extracted_text = ai_results.get(j, f"<!-- AI Extraction Failed for {c['path']} -->")
+                                    page_obj = doc[pnum]
+                                    images_dir = Path("data/output/images")
+                                    images_dir.mkdir(parents=True, exist_ok=True)
+                                    
+                                    # 1. First, search for Vision-detected diagram bounding boxes:
+                                    # [Figure: <desc> | bbox: [ymin, xmin, ymax, xmax]] or [चित्र: <desc> | bbox: [...]]
+                                    bbox_pattern = r'\[(?:Figure|Diagram|चित्र|डायग्राम):\s*([^\|\]]+?)\s*\|\s*bbox:\s*\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]\s*\]'
+                                    bbox_matches = list(re.finditer(bbox_pattern, extracted_text, re.IGNORECASE))
+                                    
+                                    # Process matches in reverse to preserve string indices during replacement
+                                    for m_idx, m in enumerate(reversed(bbox_matches)):
+                                        desc = m.group(1).strip()
+                                        ymin, xmin, ymax, xmax = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))
+                                        
+                                        # Clamp to 0..1000
+                                        ymin = max(0, min(1000, ymin))
+                                        ymax = max(0, min(1000, ymax))
+                                        xmin = max(0, min(1000, xmin))
+                                        xmax = max(0, min(1000, xmax))
+                                        
+                                        box_w = xmax - xmin
+                                        box_h = ymax - ymin
+                                        
+                                        # Validate dimensions (ignore tiny noise or full-page captures)
+                                        if box_w >= 40 and box_h >= 40 and (box_w * box_h) < 850000:
+                                            pw, ph = page_obj.rect.width, page_obj.rect.height
+                                            # Subtle 1.5% margin padding around diagram
+                                            pad_x = 0.015 * pw
+                                            pad_y = 0.015 * ph
+                                            rx0 = max(0, (xmin * pw / 1000.0) - pad_x)
+                                            ry0 = max(0, (ymin * ph / 1000.0) - pad_y)
+                                            rx1 = min(pw, (xmax * pw / 1000.0) + pad_x)
+                                            ry1 = min(ph, (ymax * ph / 1000.0) + pad_y)
+                                            
+                                            crop_rect = fitz.Rect(rx0, ry0, rx1, ry1)
+                                            diag_pix = page_obj.get_pixmap(matrix=fitz.Matrix(2.5, 2.5), clip=crop_rect)
+                                            diag_fname = f"{self.job_id or timestamp}_vdiag_{pnum}_{m_idx}.png"
+                                            diag_path = images_dir / diag_fname
+                                            self.diagram_extractor.save_whitened_image(diag_pix, diag_path)
+                                            
+                                            rel_path = f"images/{diag_fname}"
+                                            diag_html = (
+                                                f'\n\n<div class="diagram-container" align="center" style="margin: 16px 0; break-inside: avoid; page-break-inside: avoid;">\n'
+                                                f'  <img src="{rel_path}" alt="{desc}" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
+                                                f'  <div class="figure-caption" style="font-size: 10.5pt; color: #475569; font-weight: 600; margin-top: 6px;">Figure: {desc}</div>\n'
+                                                f'</div>\n\n'
+                                            )
+                                            extracted_text = extracted_text[:m.start()] + diag_html + extracted_text[m.end():]
+                                    
+                                    # 2. Next, inject any PDF XObject diagrams if available
+                                    diags = c.get("scanned_diagrams", [])
+                                    if diags:
+                                        diags.sort(key=lambda d: d.get("y_rel", 0.5))
+                                        for diag_item in diags:
+                                            diag_html = (
+                                                f'\n\n<div class="diagram-container" align="center" style="margin: 14px 0; break-inside: avoid; page-break-inside: avoid;">\n'
+                                                f'  <img src="{diag_item["rel_path"]}" alt="Figure Diagram" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
+                                                f'</div>\n\n'
+                                            )
+                                            placeholder_match = re.search(r'(\[(?:Diagram|Figure|Image|चित्र|डायग्राम)[^\]]*\]|\((?:Figure|Fig\.|चित्र)[^\)]*\))', extracted_text, re.IGNORECASE)
+                                            if placeholder_match:
+                                                extracted_text = extracted_text[:placeholder_match.start()] + diag_html + extracted_text[placeholder_match.end():]
+                                            else:
+                                                y_rel = diag_item.get("y_rel", 0.5)
+                                                target_char_idx = int(y_rel * len(extracted_text))
+                                                split_pos = extracted_text.find('\n\n', target_char_idx)
+                                                if split_pos == -1:
+                                                    split_pos = extracted_text.rfind('\n\n', 0, target_char_idx)
+                                                if split_pos != -1:
+                                                    extracted_text = extracted_text[:split_pos] + diag_html + extracted_text[split_pos:]
+                                                else:
+                                                    extracted_text = extracted_text + diag_html
+                                    
+                                    # 3. Clean up or style any residual unreplaced [Figure: <desc>] tags
+                                    # Never leak raw bracket tags into text or slice words
+                                    def _replace_residual_tag(match):
+                                        tag_text = match.group(0)
+                                        # Extract the description inside the brackets
+                                        inner = re.sub(r'^\[(?:Figure|Diagram|Image|चित्र|डायग्राम):\s*|\s*\]$', '', tag_text, flags=re.IGNORECASE).strip()
+                                        if len(inner) > 3 and not inner.lower().startswith("bbox"):
+                                            return f'\n\n<div class="diagram-callout" style="margin: 12px 0; padding: 10px 14px; background: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 6px; font-size: 11pt; color: #1e3a8a;">📌 <strong>Illustration:</strong> {inner}</div>\n\n'
+                                        return ''
+                                    
+                                    extracted_text = re.sub(r'\[(?:Figure|Diagram|Image|चित्र|डायग्राम)[^\]]*\]', _replace_residual_tag, extracted_text, flags=re.IGNORECASE)
+                                    extracted_text = re.sub(r'\((?:Figure|Fig\.|\u091a\u093f\u0924\u094d\u0930)[^\)]*\)', '', extracted_text)
                                     final_markdown_pages[pnum] = [extracted_text]
                                 else:
                                     b_idx = c["block_idx"]
@@ -356,17 +475,46 @@ class DocuMorphOrchestrator:
             ordered_pages = [polished_pages[p] for p in range(len(final_markdown_pages))]
             raw_markdown = "\n\n---\n\n".join(ordered_pages)
 
-            # Persist PageResult records for review & selective page reprocessing
+            # Persist PageResult records & version audit trails for review & selective page reprocessing
             if self.job_id:
                 try:
+                    import difflib
                     db = SessionLocal()
                     for p_idx, p_text in polished_pages.items():
+                        page_num = p_idx + 1
                         pr = db.query(PageResult).filter(
                             PageResult.job_id == self.job_id,
-                            PageResult.page_number == p_idx + 1
+                            PageResult.page_number == page_num
                         ).first()
+
+                        prev_text = pr.raw_markdown if pr and pr.raw_markdown else ""
+                        diff_summary = ""
+                        if prev_text and prev_text != p_text:
+                            diff_lines = list(difflib.unified_diff(
+                                prev_text.splitlines(keepends=True),
+                                p_text.splitlines(keepends=True),
+                                fromfile=f"page_{page_num}_v_prev",
+                                tofile=f"page_{page_num}_v_new"
+                            ))
+                            diff_summary = "".join(diff_lines[:50])
+
+                        v_count = db.query(PageResultVersion).filter(
+                            PageResultVersion.job_id == self.job_id,
+                            PageResultVersion.page_number == page_num
+                        ).count()
+
+                        pv = PageResultVersion(
+                            job_id=self.job_id,
+                            page_number=page_num,
+                            version_number=v_count + 1,
+                            prompt_used=str(getattr(self.vision_engine, 'custom_prompt', "") or ""),
+                            raw_markdown=p_text,
+                            diff_summary=diff_summary
+                        )
+                        db.add(pv)
+
                         if not pr:
-                            pr = PageResult(job_id=self.job_id, page_number=p_idx + 1)
+                            pr = PageResult(job_id=self.job_id, page_number=page_num)
                             db.add(pr)
                         pr.raw_markdown = p_text
                         pr.status = "COMPLETED"
@@ -386,58 +534,28 @@ class DocuMorphOrchestrator:
             if fix_spacing:
                 processed = self.format_fixer.fix_markdown(processed)
 
-            # 6. OUTPUT COMPILATION BASED ON SERVICE TYPE
+            # 6. OUTPUT COMPILATION BASED ON SERVICE TYPE (Strategy Pattern Delegation)
             output_result_path = None
             if self.service_type == "extract_text":
-                out_fmt = str(self.config_options.get("output_format", "markdown")).lower()
-                if "raw" in out_fmt or "txt" in out_fmt:
-                    import re
-                    plain_text = re.sub(r'#+\s*', '', processed)
-                    plain_text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', plain_text)
-                    plain_text = re.sub(r'<!--.*?-->', '', plain_text)
-                    txt_path = os.path.join(self.output_dir, f"EXTRACTED_{timestamp}_{base_name}.txt")
-                    with open(txt_path, "w", encoding="utf-8") as f:
-                        f.write(plain_text.strip())
-                    output_result_path = txt_path
-                    self._report("Text Extraction Complete (.txt)", 95)
-                elif "json" in out_fmt:
-                    json_data = {
-                        "file_name": file_name,
-                        "service_type": "extract_text",
-                        "total_pages": len(ordered_pages),
-                        "pages": [
-                            {"page_number": idx + 1, "content": p_content}
-                            for idx, p_content in enumerate(ordered_pages)
-                        ]
-                    }
-                    json_path = os.path.join(self.output_dir, f"EXTRACTED_{timestamp}_{base_name}.json")
-                    with open(json_path, "w", encoding="utf-8") as f:
-                        json.dump(json_data, f, indent=2, ensure_ascii=False)
-                    output_result_path = json_path
-                    self._report("Text Extraction Complete (.json)", 95)
-                else:
-                    md_path = os.path.join(self.output_dir, f"EXTRACTED_{timestamp}_{base_name}.md")
-                    with open(md_path, "w", encoding="utf-8") as f:
-                        f.write(processed.strip())
-                    output_result_path = md_path
-                    self._report("Text Extraction Complete (.md)", 95)
-
-            elif self.service_type == "translate" and "md" in str(self.config_options.get("output_format", "")).lower():
-                md_path = os.path.join(self.output_dir, f"TRANSLATED_{timestamp}_{base_name}.md")
-                with open(md_path, "w", encoding="utf-8") as f:
-                    f.write(processed.strip())
-                output_result_path = md_path
-                self._report("Translation Complete (.md)", 95)
-
+                output_result_path = self.services["extract_text"].process(
+                    doc, self.config_options, temp_dir, base_name, timestamp,
+                    processed_markdown=processed, ordered_pages=ordered_pages, file_name=file_name
+                )
+            elif self.service_type == "translate":
+                output_result_path = self.services["translate"].process(
+                    doc, self.config_options, temp_dir, base_name, timestamp,
+                    processed_markdown=processed
+                )
+            elif self.service_type == "compress":
+                output_result_path = self.services["compress"].process(
+                    doc, self.config_options, temp_dir, base_name, timestamp,
+                    processed_markdown=processed, file_path=file_path
+                )
             else:
-                self._report("Compiling Final PDF...", 90)
-                final_pdf_path = os.path.join(self.output_dir, f"FINAL_{timestamp}_{base_name}.pdf")
-                compact_mode = "standard"
-                if self.service_type == "compress":
-                    quality = self.config_options.get("quality", "balanced")
-                    compact_mode = "ultra_dense" if quality in ("max", "ultra_dense") else "compact"
-                self.pdf_compiler.compile(processed, final_pdf_path, compact_mode=compact_mode)
-                output_result_path = final_pdf_path
+                output_result_path = self.services["clean_format"].process(
+                    doc, self.config_options, temp_dir, base_name, timestamp,
+                    processed_markdown=processed
+                )
 
             # Telemetry compilation (excluding network retries/dropouts from pure compute)
             total_wall_time = round(time.time() - start_time, 2)
@@ -472,11 +590,32 @@ class DocuMorphOrchestrator:
                 with open("data/telemetry_latest.json", "w", encoding="utf-8") as tf:
                     json.dump(telemetry, tf, indent=2)
                 
+                orig_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+                output_size = os.path.getsize(output_result_path) if (output_result_path and os.path.exists(output_result_path)) else 0
+                compaction_pct = round(((orig_size - output_size) / max(1, orig_size)) * 100, 1) if orig_size > 0 and output_size > 0 else 0
+
                 # Automatically generate the Markdown Analysis Report for the user
                 md_report_path = os.path.join(self.output_dir, f"REPORT_{timestamp}_{base_name}.md")
-                report_content = f"""# 📊 Ground Reality & Telemetry Report
+                report_content = f"""# 📊 Ground Reality & Telemetry Report: {file_name}
+**Service Type:** `{self.service_type}` | **Language Mode:** `{self.target_lang}`  
+**Generated:** {time.strftime('%Y-%m-%d %H:%M:%S')}  
 
-## 1. Processing Data for {file_name}
+---
+
+## 1. Performance & Telemetry
+| Metric | Value |
+| :--- | :--- |
+| **Original Pages** | {total_pages_count} |
+| **Processed Pages** | {len(ordered_pages)} |
+| **Original File Size** | {orig_size / 1024:.1f} KB |
+| **Output File Size** | {output_size / 1024:.1f} KB |
+| **Physical Space / Data Compaction** | {compaction_pct}% |
+| **Processing Latency** | {total_wall_time:.2f} seconds |
+| **Status** | ✅ SUCCESS |
+
+---
+
+## 2. Processing Breakdown
 | Metric | Value |
 | :--- | :--- |
 | **Total Pages** | {total_pages_count} |
@@ -495,8 +634,9 @@ class DocuMorphOrchestrator:
 * **Output Tokens (Markdown Text):** {telemetry['tokens_output']} tokens
 * **Total Cost Equivalent:** {(telemetry['tokens_total'] / 1000000) * 0.15:.4f} USD (Estimated)
 
-## 2. Timing Calculations (Pure Compute)
-* **Total Compute Time:** {pure_compute_time} Seconds
+## 3. Timing Calculations
+* **Total Wall Time:** {total_wall_time:.2f} Seconds
+* **Pure Compute Time:** {pure_compute_time} Seconds
 * *(Network dropouts and retry delays have been successfully excluded from this time)*
 """
                 with open(md_report_path, "w", encoding="utf-8") as rf:

@@ -116,6 +116,11 @@ class FormatFixer:
         # 14. Ensure blank line before markdown tables so table extension parses them
         text = re.sub(r'([^\n\s])\n(\|)', r'\1\n\n\2', text)
 
+        # 15. Fix glued punctuation and adjacent bilingual scripts (English and Devanagari)
+        text = re.sub(r'([.!?])([\u0900-\u097F])', r'\1 \2', text)
+        text = re.sub(r'([a-zA-Z])([\u0900-\u097F])', r'\1 \2', text)
+        text = re.sub(r'([\u0900-\u097F])([a-zA-Z])', r'\1 \2', text)
+
         return text.strip('\r\n')
 
 
