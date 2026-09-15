@@ -4,7 +4,7 @@ services:
     env: python
     region: frankfurt
     plan: free
-    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt && playwright install chromium"
     startCommand: "bash start.sh"
     envVars:
       - key: PYTHON_VERSION
