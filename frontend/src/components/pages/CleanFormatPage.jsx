@@ -16,17 +16,25 @@ export default function CleanFormatPage({
 }) {
   return (
     <div className="tool-page-container">
-      {/* Top back breadcrumb */}
-      <div className="tool-page-breadcrumb">
-        <button className="breadcrumb-back-btn" onClick={onNavigateHome}>
+      {/* Top back breadcrumb (Accessible semantic breadcrumb - Issue 8) */}
+      <nav aria-label="Breadcrumb" className="tool-page-breadcrumb">
+        <a
+          href="#tools"
+          onClick={(e) => {
+            e.preventDefault();
+            onNavigateHome();
+          }}
+          className="breadcrumb-back-btn"
+          style={{ textDecoration: 'none' }}
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="15 18 9 12 15 6" />
           </svg>
           <span>All Tools</span>
-        </button>
-        <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-current">Clean &amp; Format</span>
-      </div>
+        </a>
+        <span className="breadcrumb-separator" aria-hidden="true">/</span>
+        <span className="breadcrumb-current" aria-current="page">Clean &amp; Format</span>
+      </nav>
 
       {/* Header */}
       <div className="tool-page-header">
@@ -86,29 +94,29 @@ export default function CleanFormatPage({
             onChange={(mode) => onChangeConfig({ ...config, language_mode: mode })}
           />
 
-          {/* Clean Controls */}
+          {/* Clean Controls (Gestalt Proximity & Accessible Labels - Issues 5 & 9) */}
           <div className="tool-settings-group" style={{ marginTop: '16px' }}>
-            <div className="tool-setting-row">
-              <span className="tool-setting-label">Remove watermarks &amp; ads</span>
+            <label className="tool-setting-row" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="checkbox"
                 checked={config.clean_watermarks !== false}
                 onChange={(e) => onChangeConfig({ ...config, clean_watermarks: e.target.checked })}
-                style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer' }}
+                style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer', flexShrink: 0 }}
               />
-            </div>
+              <span className="tool-setting-label">Remove watermarks &amp; ads</span>
+            </label>
 
-            <div className="tool-setting-row">
-              <span className="tool-setting-label">Sharpen handwriting &amp; formulas</span>
+            <label className="tool-setting-row" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="checkbox"
                 checked={config.fix_formulas !== false}
                 onChange={(e) => onChangeConfig({ ...config, fix_formulas: e.target.checked })}
-                style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer' }}
+                style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer', flexShrink: 0 }}
               />
-            </div>
+              <span className="tool-setting-label">Sharpen handwriting &amp; formulas</span>
+            </label>
 
-            <div className="tool-setting-row">
+            <div className="tool-setting-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <span className="tool-setting-label">Custom words to remove</span>
               <input
                 type="text"

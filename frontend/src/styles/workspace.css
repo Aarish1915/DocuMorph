@@ -147,6 +147,11 @@
 
 .browse-link {
   color: var(--color-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.main-dropzone:hover .browse-link {
   text-decoration: underline;
 }
 

@@ -3,42 +3,42 @@ import React, { useState } from 'react';
 const LANGUAGE_MODES = [
   {
     id: 'auto',
-    badge: '🌐+📐',
-    short: 'Dual + Math',
+    badge: '🌐',
+    short: 'Bilingual',
     title: 'Dual (Hindi + English) + Formulas',
     tip: 'Keeps both languages side-by-side with all math formulas.',
   },
   {
     id: 'en+math',
-    badge: '🇬🇧+📐',
-    short: 'En + Math',
+    badge: '🇬🇧',
+    short: 'English',
     title: 'English + Maths (JEE / NEET / STEM)',
     tip: 'English notes + formulas. Omits duplicate Hindi translations to save paper.',
   },
   {
     id: 'math+hindi',
-    badge: '🇮🇳+📐',
-    short: 'Hi + Math',
+    badge: '🇮🇳',
+    short: 'Hindi',
     title: 'Hindi + Maths (हिंदी + गणित)',
     tip: 'Devanagari Hindi + formulas. Omits duplicate English paragraphs.',
   },
   {
     id: 'only_english',
-    badge: '🇬🇧',
-    short: 'English Only',
+    badge: '🔤',
+    short: 'Eng Only',
     title: 'Only English (Law, CLAT, Bare Acts)',
     tip: 'Clean English text + all formulas, reasoning math & tables. Strips photocopy shadows and duplicate Hindi.',
   },
   {
     id: 'only_hindi',
-    badge: '🇮🇳',
-    short: 'Hindi Only',
+    badge: 'अ',
+    short: 'हिंदी Only',
     title: 'Only Hindi (केवल हिंदी)',
     tip: 'Pure Hindi notes without parallel English text.',
   },
   {
     id: 'only_math',
-    badge: '📐',
+    badge: '∑',
     short: 'Math Only',
     title: 'Only Maths & Formulas',
     tip: 'Extracts formulas, equations and problem sets only.',
@@ -85,6 +85,8 @@ export default function StudentExamLanguageSelector({
           type="button"
           className={`compact-info-btn ${showTip ? 'open' : ''}`}
           onClick={() => setShowTip(!showTip)}
+          aria-expanded={showTip}
+          aria-label="Toggle language filtering guidance"
           title="Why filter languages? Click to learn"
         >
           💡 Tip

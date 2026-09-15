@@ -21,7 +21,7 @@ const TOOLS = [
     iconBg: 'rgba(22, 163, 74, 0.1)',
     iconColor: '#16a34a',
     title: 'Compress PDF',
-    desc: 'Compact margins to fit more content on fewer pages.',
+    desc: 'Compact margins to fit more notes on fewer pages.',
     accent: '#16a34a',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -36,7 +36,7 @@ const TOOLS = [
     iconBg: 'rgba(2, 132, 199, 0.1)',
     iconColor: '#0284c7',
     title: 'Extract Text',
-    desc: 'Convert scan tables into clean Markdown and text.',
+    desc: 'Convert tables and scanned pages into clean text.',
     accent: '#0284c7',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -54,7 +54,7 @@ const TOOLS = [
     iconBg: 'rgba(234, 88, 12, 0.1)',
     iconColor: '#ea580c',
     title: 'Translate PDF',
-    desc: 'Translate notes into Indic languages with formulas preserved.',
+    desc: 'Translate notes into Indic languages with math intact.',
     accent: '#ea580c',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -68,7 +68,8 @@ const TOOLS = [
 
 export default function ToolDirectory({ onSelectTool }) {
   return (
-    <section className="tool-directory-section" aria-label="DocuMorph Tools">
+    <section className="tool-directory-section" aria-labelledby="tools-directory-heading">
+      <h2 id="tools-directory-heading" className="sr-only">Core Transformation Tools</h2>
       <div className="tool-grid">
         {TOOLS.map((tool) => (
           <div

@@ -54,9 +54,9 @@ export default function DropZone({
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
             </div>
-            <h3 className="dropzone-main-text">
+            <h2 className="dropzone-main-text">
               Drop your PDF here, or <span className="browse-link">browse files</span>
-            </h3>
+            </h2>
             <p className="dropzone-sub-text">
               PDF documents up to 50MB
             </p>

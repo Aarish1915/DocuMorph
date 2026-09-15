@@ -165,18 +165,24 @@ export default function InteractiveProofViewer({
       {/* Top Bar with Mode Controls */}
       <div className="proof-viewer-top-bar">
         <div className="proof-status-indicator">
-          <span className="pulse-live-dot" />
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--color-primary, #2563eb)' }}>
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
           <span className="proof-title-text">{title}</span>
         </div>
 
         <div className="proof-controls-right">
           {/* Comparison Mode: Split Slider vs Side-by-Side */}
-          <div className="proof-display-mode-switch">
+          <div className="proof-display-mode-switch" role="radiogroup" aria-label="Comparison View Mode">
             <button
               type="button"
               className={`proof-mode-btn ${displayMode === 'split' ? 'active' : ''}`}
               onClick={() => setDisplayMode('split')}
               title="Interactive Draggable Split Slider"
+              aria-checked={displayMode === 'split'}
+              role="radio"
             >
               <span>⚡</span> Split Slider
             </button>
@@ -185,33 +191,42 @@ export default function InteractiveProofViewer({
               className={`proof-mode-btn ${displayMode === 'side' ? 'active' : ''}`}
               onClick={() => setDisplayMode('side')}
               title="View Both Full Pages Side by Side"
+              aria-checked={displayMode === 'side'}
+              role="radio"
             >
               <span>⊞</span> Side-by-Side
             </button>
           </div>
 
           {displayMode === 'split' && (
-            <div className="proof-mode-tabs-bar">
+            <div className="proof-preset-bar" role="group" aria-label="Slider Position Presets">
               <button
                 type="button"
-                className={`proof-mode-btn ${viewMode === 'before' ? 'active' : ''}`}
+                className={`proof-preset-chip ${viewMode === 'before' ? 'selected' : ''}`}
                 onClick={() => handleModeToggle('before')}
+                title="Show full original scan"
               >
                 <span className="dot red" /> {beforeLabel ? beforeLabel.split(' ')[0] : 'Before'}
               </button>
               <button
                 type="button"
-                className={`proof-mode-btn ${viewMode === 'split' ? 'active' : ''}`}
+                className={`proof-preset-chip ${viewMode === 'split' ? 'selected' : ''}`}
                 onClick={() => handleModeToggle('split')}
+                title="Reset split position to 50/50"
               >
-                <span>50/50</span>
+                50/50
               </button>
               <button
                 type="button"
-                className={`proof-mode-btn ${viewMode === 'after' ? 'active' : ''}`}
+                className={`proof-preset-chip proof-preset-chip--highlight ${viewMode === 'after' ? 'selected' : ''}`}
                 onClick={() => handleModeToggle('after')}
+                title="Show full cleaned document"
+                aria-pressed={viewMode === 'after'}
               >
-                <span className="dot green" /> {afterLabel ? afterLabel.split(' ')[0] : 'After'}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginRight: '2px' }}>
+                  <path d="M12 2l2.4 7.2L21.6 12l-7.2 2.8L12 22l-2.4-7.2L2.4 12l7.2-2.8L12 2z"/>
+                </svg>
+                {afterLabel ? afterLabel.split(' ')[0] : 'Clean'}
               </button>
             </div>
           )}

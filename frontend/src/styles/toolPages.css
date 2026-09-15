@@ -246,8 +246,18 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.tool-setting-row input[type="checkbox"] {
+  order: -1;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary, #2563eb);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .tool-setting-row:last-child {
@@ -258,6 +268,7 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--text-main);
+  flex-grow: 1;
 }
 
 .tool-setting-row select,
@@ -616,9 +627,9 @@
 
 .proof-status-overlay {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
+  top: 14px;
+  left: 14px;
+  right: 14px;
   display: flex;
   justify-content: space-between;
   z-index: 15;
@@ -626,26 +637,76 @@
 }
 
 .status-chip {
-  font-size: 10px;
-  font-weight: 750;
-  padding: 4px 10px;
-  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-full, 9999px);
   backdrop-filter: blur(8px);
-  background: rgba(15, 23, 42, 0.75);
+  background: rgba(15, 23, 42, 0.82);
   color: #ffffff;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
 
 .status-chip .dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
 }
 .status-chip.before .dot.red { background: #ef4444; }
 .status-chip.after .dot.green { background: #22c55e; }
+
+/* Preset secondary chips for Issue 9 */
+.proof-preset-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px;
+  background: var(--surface-subtle, #f1f5f9);
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--border-default, #e2e8f0);
+}
+
+.proof-preset-chip {
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-xs, 4px);
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.proof-preset-chip:hover {
+  color: var(--text-main, #0f172a);
+}
+
+.proof-preset-chip.selected {
+  background: var(--surface-white, #ffffff);
+  color: var(--text-main, #0f172a);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.proof-preset-chip--highlight {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #059669;
+  font-weight: 700;
+}
+
+.proof-preset-chip--highlight.selected {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(16, 185, 129, 0.35);
+}
 
 .proof-layer {
   position: absolute;

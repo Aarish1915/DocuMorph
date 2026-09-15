@@ -19,16 +19,24 @@ export default function ExtractTextPage({
   return (
     <div className="tool-page-container">
       {/* Top back breadcrumb */}
-      <div className="tool-page-breadcrumb">
-        <button className="breadcrumb-back-btn" onClick={onNavigateHome}>
+      <nav aria-label="Breadcrumb" className="tool-page-breadcrumb">
+        <a
+          href="#tools"
+          onClick={(e) => {
+            e.preventDefault();
+            onNavigateHome();
+          }}
+          className="breadcrumb-back-btn"
+          style={{ textDecoration: 'none' }}
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="15 18 9 12 15 6" />
           </svg>
           <span>All Tools</span>
-        </button>
-        <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-current">Extract Text</span>
-      </div>
+        </a>
+        <span className="breadcrumb-separator" aria-hidden="true">/</span>
+        <span className="breadcrumb-current" aria-current="page">Extract Text</span>
+      </nav>
 
       <div className="tool-page-header">
         <h1 className="tool-page-title">Extract Text</h1>
@@ -115,15 +123,15 @@ export default function ExtractTextPage({
           />
 
           <div className="tool-settings-group" style={{ marginTop: '16px' }}>
-            <div className="tool-setting-row">
-              <span className="tool-setting-label">Preserve table structure</span>
+            <label className="tool-setting-row" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="checkbox"
                 checked={config.preserve_tables !== false}
                 onChange={(e) => onChangeConfig({ ...config, preserve_tables: e.target.checked })}
-                style={{ width: '18px', height: '18px', accentColor: '#0284c7', cursor: 'pointer' }}
+                style={{ width: '18px', height: '18px', accentColor: '#0284c7', cursor: 'pointer', flexShrink: 0 }}
               />
-            </div>
+              <span className="tool-setting-label">Preserve table structure</span>
+            </label>
           </div>
         </div>
 
