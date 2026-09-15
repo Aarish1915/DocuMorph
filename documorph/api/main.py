@@ -76,10 +76,29 @@ def cleanup_old_files(max_age_seconds: int = 7200):
                     except Exception:
                         pass
 
+import threading
+import logging
+
+logger = logging.getLogger("documorph.api")
+_embedded_worker_thread = None
+
 @app.on_event("startup")
 def on_startup():
+    global _embedded_worker_thread
     init_db()
     cleanup_old_files()
+    
+    # Auto-spawn queue worker in background daemon thread if not running standalone
+    if _embedded_worker_thread is None or not _embedded_worker_thread.is_alive():
+        if os.getenv("DISABLE_EMBEDDED_WORKER", "false").lower() != "true":
+            from documorph.worker.queue_worker import run_worker
+            _embedded_worker_thread = threading.Thread(
+                target=run_worker, 
+                daemon=True, 
+                name="DocuMorph-EmbeddedWorker"
+            )
+            _embedded_worker_thread.start()
+            logger.info("Embedded DocuMorph Queue Worker started automatically in background daemon thread.")
 
 @app.get("/api/health")
 async def health_check():
