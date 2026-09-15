@@ -1,7 +1,10 @@
 import os
+import logging
 from playwright.sync_api import sync_playwright
 import markdown
 import fitz
+
+logger = logging.getLogger("documorph.pdf_compiler")
 
 class PDFCompiler:
     """
@@ -294,8 +297,88 @@ class PDFCompiler:
         import re
         markdown_text = re.sub(r'([^\n])\n(\|)', r'\1\n\n\2', markdown_text)
         markdown_text = re.sub(r'\$?\\rightarrow\$?', '→', markdown_text)
-        
-        html_content = markdown.markdown(markdown_text, extensions=['tables', 'fenced_code'])
+        markdown_text = re.sub(r'(?m)^([+\-])\s+(?=(?:\\|\$|[a-zA-Z0-9_]+\s*\\))', r'\\\1 ', markdown_text)
+
+        # -------------------------------------------------------------
+        # DOCUMORPH MATH SHIELD & DEVANAGARI SIPHON ENGINE
+        # Protects LaTeX subscripts (_), multi-line operators (+, -), and
+        # extracts any Devanagari sentences erroneously trapped inside math mode.
+        # -------------------------------------------------------------
+        # 1. Reconcile mismatched delimiters like "$expr $$" -> "$$expr$$"
+        markdown_text = re.sub(r'(?<!\$)\$([^$\n]+)\$\$(?!\$)', r'$$\1$$', markdown_text)
+
+        # 2. Extract Devanagari prose erroneously trapped inside $$ ... $$ blocks
+        def _clean_math_block(match):
+            block = match.group(1)
+            has_devanagari = bool(re.search(r'[\u0900-\u097F]', block))
+            if not has_devanagari:
+                block_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', block)
+                return f"\n\n$${block_clean.strip()}$$\n\n"
+
+            lines = block.split('\n')
+            segments = []
+            curr_math = []
+            for l in lines:
+                l_strip = l.strip()
+                if not l_strip:
+                    continue
+                deva_count = len(re.findall(r'[\u0900-\u097F]', l_strip))
+                if deva_count > 3:
+                    if curr_math:
+                        m_clean = "\n".join(curr_math).strip()
+                        m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
+                        if m_clean:
+                            segments.append(f"$${m_clean}$$")
+                        curr_math = []
+                    segments.append(l_strip)
+                else:
+                    curr_math.append(l_strip)
+
+            if curr_math:
+                m_clean = "\n".join(curr_math).strip()
+                m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
+                if m_clean:
+                    segments.append(f"$${m_clean}$$")
+
+            return "\n\n" + "\n\n".join(segments) + "\n\n"
+
+        markdown_text = re.sub(r'\$\$(.*?)\$\$', _clean_math_block, markdown_text, flags=re.DOTALL)
+
+        # 3. Clean up orphan $$ delimiters if total count is odd
+        if len(re.findall(r'\$\$', markdown_text)) % 2 != 0:
+            markdown_text = re.sub(r'(?m)^\s*\$\$\s*$', '', markdown_text, count=1)
+
+        # 4. Shield all math blocks into safe token placeholders before Markdown parsing
+        math_store = {}
+        math_counter = 0
+
+        def _shield_display_math(m):
+            nonlocal math_counter
+            token = f"@@DOCUMORPH_DISPLAY_MATH_{math_counter}@@"
+            content = m.group(1).strip()
+            math_store[token] = f'<div class="math-display" style="text-align: center; margin: 0.9em 0; overflow-x: auto; break-inside: avoid; page-break-inside: avoid;">$${content}$$</div>'
+            math_counter += 1
+            return f"\n\n{token}\n\n"
+
+        shielded_text = re.sub(r'\$\$(.*?)\$\$', _shield_display_math, markdown_text, flags=re.DOTALL)
+
+        def _shield_inline_math(m):
+            nonlocal math_counter
+            token = f"@@DOCUMORPH_INLINE_MATH_{math_counter}@@"
+            content = m.group(1).strip()
+            math_store[token] = f'<span class="math-inline">${content}$</span>'
+            math_counter += 1
+            return token
+
+        shielded_text = re.sub(r'(?<!\\)\$([^$\n]+?)(?<!\\)\$', _shield_inline_math, shielded_text)
+
+        # 5. Compile markdown safely
+        html_content = markdown.markdown(shielded_text, extensions=['tables', 'fenced_code'])
+
+        # 6. Unshield math tokens
+        for token, math_html in math_store.items():
+            html_content = html_content.replace(f"<p>{token}</p>", math_html)
+            html_content = html_content.replace(token, math_html)
 
         # Resolve local relative image paths to Base64 Data URIs (bypasses Chromium about:blank file:// sandbox block)
         def _resolve_img_src(match):
@@ -420,11 +503,15 @@ class PDFCompiler:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
-            page.set_default_timeout(20000)
-            page.set_content(full_html, wait_until="domcontentloaded")
-            
+            page.set_default_timeout(30000)
             try:
-                page.wait_for_function("window.mathjax_is_done === true", timeout=8000)
+                page.set_content(full_html, wait_until="commit")
+                page.wait_for_load_state("domcontentloaded", timeout=8000)
+            except Exception as set_ex:
+                logger.debug(f"Fast load state fallback: {set_ex}")
+
+            try:
+                page.wait_for_function("window.mathjax_is_done === true", timeout=6000)
             except Exception as e:
                 pass
             

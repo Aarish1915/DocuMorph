@@ -37,7 +37,10 @@ class FormatFixer:
         text = re.sub(r'\\circ\s*F', '°F', text)
         text = re.sub(r'\\circ', '°', text)  # generic degree
 
-        # 3. Fix broken bullet points (e.g., "*Item" -> "* Item")
+        # 3. Fix broken bullet points (e.g., "*Item" -> "* Item") while protecting negative math operators
+        # If a line starts with "- " or "+ " followed by a LaTeX command or equation (e.g. "- \frac{...}", "- L \frac{...}"),
+        # escape the leading hyphen (\- ) so Markdown never interprets it as a bullet list!
+        text = re.sub(r'(?m)^([+\-])\s+(?=(?:\\|\$|[a-zA-Z0-9_]+\s*\\))', r'\\\1 ', text)
         text = re.sub(r'^(\*|-)([\w])', r'\1 \2', text, flags=re.MULTILINE)
 
         # 4. Fix broken headers (e.g., "##Header" -> "## Header")
@@ -90,7 +93,8 @@ class FormatFixer:
         text = re.sub(r'(?m)^\s*[*+\-•]?\s*\(\s*\d+[\s.]*\)\s*$', '', text)
 
         # 11. Split run-on inline bullet points onto new lines (e.g. "* Action 1 * Action 2")
-        text = re.sub(r'([^\n\s])[^\S\r\n]+[*+\-]\s+([A-Za-z0-9\u0900-\u097F])', r'\1\n* \2', text)
+        # CRITICAL: Match only '*' and '•'. NEVER match '-' or '+' which are mathematical operators (e.g. e = - L \frac{dI}{dt})
+        text = re.sub(r'([^\n\s])[^\S\r\n]+[*•]\s+([A-Za-z0-9\u0900-\u097F])', r'\1\n* \2', text)
 
         # 11.b. Ensure blank line before transitioning from a regular paragraph to a list (preserving sub-bullet indentation)
         lines = text.split('\n')
@@ -99,8 +103,11 @@ class FormatFixer:
             if i > 0:
                 prev = lines[i-1].strip()
                 curr = line.lstrip()
-                is_curr_list = bool(re.match(r'^(?:[*+\-]\s+|\d+\.\s+)', curr))
-                is_prev_list = bool(re.match(r'^(?:[*+\-]\s+|\d+\.\s+)', prev))
+                # A line is a list item if it starts with '* ', '• ', or a digit list
+                # For '-' or '+', it is ONLY a list item if it does NOT contain mathematical syntax (=, \, $, ^)
+                has_math = bool(re.search(r'[=\\$\^]', curr))
+                is_curr_list = bool(re.match(r'^(?:[*•]\s+|\d+\.\s+)', curr)) or (bool(re.match(r'^(?:[+\-]\s+)', curr)) and not has_math)
+                is_prev_list = bool(re.match(r'^(?:[*•]\s+|\d+\.\s+)', prev)) or (bool(re.match(r'^(?:[+\-]\s+)', prev)) and not bool(re.search(r'[=\\$\^]', prev)))
                 is_prev_header = prev.startswith('#') or prev.startswith('>')
                 if is_curr_list and prev and not is_prev_list and not is_prev_header:
                     spaced_lines.append('')
@@ -110,8 +117,86 @@ class FormatFixer:
         # 12. Deduplicate duplicate bilingual titles if any slipped through (e.g. "## Heading | Heading")
         text = re.sub(r'(?m)^(#+\s*)(.*?)\s*\|\s*\2\s*$', r'\1\2', text)
 
-        # 13. Ensure block math equations ($$) are properly centered/spaced on their own lines
-        text = re.sub(r'(?<!\n)\s*\$\$(.*?)\$\$\s*(?!\n)', r'\n\n$$\1$$\n\n', text, flags=re.DOTALL)
+        # 13. Math Sanitizer & Delimiter Reconciliation:
+        # Fix mismatched inline/display math delimiters like "$e = ... $$" -> "$$e = ...$$"
+        text = re.sub(r'(?<!\$)\$([^$\n]+)\$\$(?!\$)', r'$$\1$$', text)
+
+        # Reconcile Devanagari text erroneously trapped inside $$ ... $$ blocks
+        def _clean_display_math(match):
+            block = match.group(1)
+            # Check if block contains Devanagari characters
+            has_devanagari = bool(re.search(r'[\u0900-\u097F]', block))
+            if not has_devanagari:
+                # Remove nested $ ... $ inside $$ ... $$
+                block_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', block)
+                return f"\n\n$${block_clean.strip()}$$\n\n"
+
+            # Block has Devanagari text! Split line by line to separate prose from pure math
+            lines = block.split('\n')
+            segments = []
+            curr_math = []
+
+            for l in lines:
+                l_strip = l.strip()
+                if not l_strip:
+                    continue
+                deva_count = len(re.findall(r'[\u0900-\u097F]', l_strip))
+                if deva_count > 3:
+                    # This line is prose (e.g. "लेकिन परिनालिका के अंदर चुंबकीय क्षेत्र,")
+                    if curr_math:
+                        m_clean = "\n".join(curr_math).strip()
+                        m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
+                        if m_clean:
+                            segments.append(f"$${m_clean}$$")
+                        curr_math = []
+                    segments.append(l_strip)
+                else:
+                    curr_math.append(l_strip)
+
+            if curr_math:
+                m_clean = "\n".join(curr_math).strip()
+                m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
+                if m_clean:
+                    segments.append(f"$${m_clean}$$")
+
+            return "\n\n" + "\n\n".join(segments) + "\n\n"
+
+        text = re.sub(r'\$\$(.*?)\$\$', _clean_display_math, text, flags=re.DOTALL)
+
+        # Clean up orphan $$ delimiters on lines by themselves if total $$ count is odd
+        total_double_dollars = len(re.findall(r'\$\$', text))
+        if total_double_dollars % 2 != 0:
+            text = re.sub(r'(?m)^\s*\$\$\s*$', '', text, count=1)
+
+        # Auto-wrap bare/naked LaTeX equations outside delimiters (e.g. \frac{dI}{dt} = 40, \Rightarrow N_2\phi_2 = MI_1)
+        latex_starters = (
+            r'\\(?:Rightarrow|rightarrow|Leftarrow|leftarrow|Leftrightarrow|iff|implies|frac|dfrac|'
+            r'sum|prod|int|iint|iiint|oint|sqrt|partial|nabla|alpha|beta|gamma|delta|epsilon|theta|'
+            r'lambda|mu|pi|rho|sigma|tau|phi|Phi|psi|omega|Omega|vec|mathbf|mathrm|text|bm)\b'
+        )
+        t_lines = text.split('\n')
+        wrapped_lines = []
+        in_block_math = False
+        for tl in t_lines:
+            ts = tl.strip()
+            if '$$' in ts:
+                c_dd = ts.count('$$')
+                if c_dd % 2 != 0:
+                    in_block_math = not in_block_math
+                wrapped_lines.append(tl)
+                continue
+
+            if not in_block_math and ts:
+                starts_with_latex = bool(re.match(r'^(?:' + latex_starters + r')', ts))
+                is_latex_eqn = bool(re.match(r'^[A-Za-z0-9_\\^]+\s*=\s*(?:[A-Za-z0-9_\\^+\-*/()]+|' + latex_starters + r')', ts)) and ('\\' in ts)
+                if (starts_with_latex or is_latex_eqn) and not ts.startswith('$') and not ts.endswith('$'):
+                    wrapped_lines.append(f"$${ts}$$")
+                    continue
+            wrapped_lines.append(tl)
+        text = '\n'.join(wrapped_lines)
+
+        # Ensure block math equations ($$) have clean blank line spacing
+        text = re.sub(r'(?<!\n)\n\s*\$\$(.*?)\$\$\s*\n(?!\n)', r'\n\n$$\1$$\n\n', text, flags=re.DOTALL)
 
         # 14. Ensure blank line before markdown tables so table extension parses them
         text = re.sub(r'([^\n\s])\n(\|)', r'\1\n\n\2', text)

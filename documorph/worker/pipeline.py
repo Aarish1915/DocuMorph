@@ -365,14 +365,42 @@ class DocuMorphOrchestrator:
                                         # Validate dimensions (ignore tiny noise or full-page captures)
                                         if box_w >= 40 and box_h >= 40 and (box_w * box_h) < 850000:
                                             pw, ph = page_obj.rect.width, page_obj.rect.height
-                                            # Subtle 1.5% margin padding around diagram
-                                            pad_x = 0.015 * pw
-                                            pad_y = 0.015 * ph
-                                            rx0 = max(0, (xmin * pw / 1000.0) - pad_x)
-                                            ry0 = max(0, (ymin * ph / 1000.0) - pad_y)
+                                            # Generous adaptive margin padding: 4.5% height, 3.5% width
+                                            # Ensures terminals, arrows, coil turns, and captions are never clipped
+                                            pad_x = max(18.0, 0.035 * pw)
+                                            pad_y = max(28.0, 0.045 * ph)
+                                            rx0 = max(0.0, (xmin * pw / 1000.0) - pad_x)
+                                            ry0 = max(0.0, (ymin * ph / 1000.0) - pad_y)
                                             rx1 = min(pw, (xmax * pw / 1000.0) + pad_x)
                                             ry1 = min(ph, (ymax * ph / 1000.0) + pad_y)
-                                            
+
+                                            # Intelligent Whitespace Gutter Snapping:
+                                            # Snaps to natural blank lines to avoid slicing through adjacent text paragraphs
+                                            try:
+                                                cand_rect = fitz.Rect(rx0, ry0, rx1, ry1)
+                                                cand_pix = page_obj.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), clip=cand_rect)
+                                                if cand_pix.width > 15 and cand_pix.height > 15:
+                                                    import numpy as np
+                                                    cand_arr = np.frombuffer(cand_pix.samples, dtype=np.uint8).reshape(cand_pix.height, cand_pix.width, cand_pix.n)
+                                                    gray = cand_arr[:, :, 0]
+                                                    is_ink = (gray < 235)
+
+                                                    # Search for horizontal whitespace gutter near top (within first 25% of height)
+                                                    top_window = min(int(cand_pix.height * 0.25), 45)
+                                                    for dy in range(top_window):
+                                                        if np.mean(is_ink[dy, :]) == 0:
+                                                            ry0 = ry0 + (dy / 1.5)
+                                                            break
+
+                                                    # Search for horizontal whitespace gutter near bottom (within last 25% of height)
+                                                    bot_window = min(int(cand_pix.height * 0.25), 45)
+                                                    for dy in range(cand_pix.height - 1, cand_pix.height - bot_window, -1):
+                                                        if np.mean(is_ink[dy, :]) == 0:
+                                                            ry1 = ry0 + (dy / 1.5)
+                                                            break
+                                            except Exception as snap_ex:
+                                                logger.debug(f"Whitespace snapping skipped: {snap_ex}")
+
                                             crop_rect = fitz.Rect(rx0, ry0, rx1, ry1)
                                             diag_pix = page_obj.get_pixmap(matrix=fitz.Matrix(2.5, 2.5), clip=crop_rect)
                                             diag_fname = f"{self.job_id or timestamp}_vdiag_{pnum}_{m_idx}.png"
