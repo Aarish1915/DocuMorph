@@ -8,17 +8,22 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up user for HuggingFace (must run as non-root on port 7860)
+# Configure shared Playwright browser cache accessible by any user
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# Copy requirements and install Python dependencies + Playwright system libraries
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && python -m playwright install --with-deps chromium \
+    && chmod -R 777 /ms-playwright
+
+# Set up user for HuggingFace / non-root environments (must run as non-root on port 7860)
 RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH
 
 WORKDIR $HOME/app
-
-# Copy requirements and install Python dependencies
-COPY --chown=user:user requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy frontend code and build it
 COPY --chown=user:user frontend/package*.json ./frontend/

@@ -1,4 +1,6 @@
 import os
+import sys
+import subprocess
 import logging
 from playwright.sync_api import sync_playwright
 import markdown
@@ -499,9 +501,23 @@ class PDFCompiler:
                 "print_background": True
             }
         
-        # Render to PDF via Playwright Chromium
+        # Render to PDF via Playwright Chromium (with automatic self-healing on missing browser)
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            try:
+                browser = p.chromium.launch(headless=True)
+            except Exception as launch_err:
+                err_msg = str(launch_err)
+                if "Executable doesn't exist" in err_msg or "playwright install" in err_msg:
+                    logger.warning("Playwright Chromium executable missing in environment. Running auto-install...")
+                    try:
+                        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                        browser = p.chromium.launch(headless=True)
+                    except Exception as install_err:
+                        logger.error(f"Failed to auto-install Playwright chromium: {install_err}")
+                        raise launch_err
+                else:
+                    raise launch_err
+
             page = browser.new_page()
             page.set_default_timeout(30000)
             try:
@@ -512,7 +528,7 @@ class PDFCompiler:
 
             try:
                 page.wait_for_function("window.mathjax_is_done === true", timeout=6000)
-            except Exception as e:
+            except Exception:
                 pass
             
             page.pdf(**pdf_opts)
