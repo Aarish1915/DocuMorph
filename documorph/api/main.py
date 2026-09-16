@@ -40,13 +40,14 @@ async def check_rate_limit(request: Request):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https://.*\.vercel\.app$|^https://.*\.trycloudflare\.com$|^http://localhost:\d+$|^http://127\.0\.0\.1:\d+$",
+    allow_origin_regex=r"^https://.*\.vercel\.app$|^https://.*\.trycloudflare\.com$|^https://.*\.onrender\.com$|^http://localhost:\d+$|^http://127\.0\.0\.1:\d+$",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {
         "status": "online",
@@ -77,8 +78,8 @@ def cleanup_old_files(max_age_seconds: int = 7200):
                         pass
 
 import threading
-import threading
 import logging
+import sys
 from collections import deque
 import datetime
 try:
@@ -86,12 +87,21 @@ try:
 except ImportError:
     psutil = None
 
+# Ensure stdout logger is active and formatted
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler) for h in root_logger.handlers):
+    stdout_h = logging.StreamHandler(sys.stdout)
+    stdout_h.setLevel(logging.INFO)
+    stdout_h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] [%(name)s] %(message)s"))
+    root_logger.addHandler(stdout_h)
+
 logger = logging.getLogger("documorph.api")
 _server_start_time = time.time()
 _embedded_worker_thread = None
 
 # --- In-Memory Observability Ring Buffer ---
-_recent_logs = deque(maxlen=60)
+_recent_logs = deque(maxlen=80)
 
 class InMemoryLogHandler(logging.Handler):
     def emit(self, record):
@@ -127,8 +137,12 @@ def on_startup():
             )
             _embedded_worker_thread.start()
             logger.info("Embedded DocuMorph Queue Worker started automatically in background daemon thread.")
+            try:
+                sys.stdout.flush()
+            except Exception:
+                pass
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
     worker_alive = _embedded_worker_thread is not None and _embedded_worker_thread.is_alive()
     return {
@@ -172,8 +186,11 @@ async def get_admin_status(db: Session = Depends(get_db)):
         queued_count = processing_count = completed_count = error_count = 0
 
     # API Keys & Worker
-    from documorph.core.api_router import api_router
-    active_keys_count = api_router.get_total_keys() if hasattr(api_router, 'get_total_keys') else 1
+    from documorph.core.api_router import APIRouter
+    try:
+        active_keys_count = APIRouter().get_total_keys()
+    except Exception:
+        active_keys_count = 1
     worker_alive = _embedded_worker_thread is not None and _embedded_worker_thread.is_alive()
 
     # Vault Records count
@@ -579,7 +596,23 @@ async def download_file(job_id: str, db: Session = Depends(get_db)):
     }
     media_type = media_types.get(ext, "application/octet-stream")
     filename = os.path.basename(file_rel)
-    return FileResponse(file_rel, media_type=media_type, filename=filename)
+    return FileResponse(
+        file_rel, 
+        media_type=media_type, 
+        filename=filename,
+        content_disposition_type="attachment",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+
+@app.post("/api/admin/clear-memory")
+async def manual_clear_memory():
+    """Immediately triggers gc.collect() and glibc malloc_trim(0) to release RAM to the OS."""
+    from documorph.worker.queue_worker import reclaim_system_memory
+    reclaim_system_memory()
+    return {"status": "ok", "message": "RAM cleared and glibc heap trimmed to OS"}
 
 @app.get("/api/jobs")
 async def get_recent_jobs(db: Session = Depends(get_db)):

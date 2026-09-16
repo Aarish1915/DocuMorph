@@ -98,7 +98,6 @@ export default function Sidebar({
                           href={downloadHref}
                           download
                           className="item-download-link"
-                          target="_blank"
                           rel="noopener noreferrer"
                         >
                           Download ↗

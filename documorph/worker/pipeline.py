@@ -742,6 +742,12 @@ class DocuMorphOrchestrator:
                     pass
             # Force garbage collection to free PyMuPDF C-bindings and image buffers
             gc.collect()
+            try:
+                import ctypes
+                libc = ctypes.CDLL("libc.so.6")
+                libc.malloc_trim(0)
+            except Exception:
+                pass
 
 def main():
     if len(sys.argv) > 1:

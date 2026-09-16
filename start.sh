@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+export PYTHONUNBUFFERED=1
 
 # Initialize directory structure and SQLite database
 mkdir -p data data/uploads data/output data/output/needs_review

@@ -346,7 +346,7 @@ export default function AdminDashboardModal({ isOpen, onClose }) {
                   />
                   <div>
                     <strong>Force Render Cloud (24/7 Failover)</strong>
-                    <p>Always routes through <code>{config.renderUrl || 'https://documorph-backend.onrender.com'}</code>.</p>
+                    <p>Always routes through <code>{config.renderUrl || 'https://documorph-v1.onrender.com'}</code>.</p>
                   </div>
                 </label>
 

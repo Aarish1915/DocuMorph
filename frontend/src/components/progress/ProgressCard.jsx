@@ -32,6 +32,20 @@ export default function ProgressCard({
   const [showReprocess, setShowReprocess] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
+  const [downloading, setDownloading] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+
+  // Detect iOS / mobile Web Share capability for direct phone saving
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function') {
+      try {
+        const dummyFile = new File([''], 'doc.pdf', { type: 'application/pdf' });
+        setCanShare(navigator.canShare({ files: [dummyFile] }));
+      } catch (e) {
+        setCanShare(false);
+      }
+    }
+  }, []);
 
   // Live timer for active jobs
   useEffect(() => {
@@ -94,6 +108,73 @@ export default function ProgressCard({
   const downloadUrl = jobStatus.download_url 
     ? `${API_BASE}${jobStatus.download_url}`
     : `${API_BASE}${jobStatus.result_url}`;
+
+  const getTargetFilename = () => {
+    if (serviceType === 'compress') return 'compressed_document.pdf';
+    if (outputFormat === 'txt') return 'extracted_text.txt';
+    if (outputFormat === 'json') return 'extracted_data.json';
+    if (outputFormat === 'md') return 'extracted_document.md';
+    return 'cleaned_document.pdf';
+  };
+
+  const handleDownload = async (e) => {
+    if (e) e.preventDefault();
+    if (!downloadUrl) return;
+
+    try {
+      setDownloading(true);
+      const res = await fetch(downloadUrl);
+      if (!res.ok) throw new Error('Download failed');
+      const blob = await res.blob();
+      const filename = getTargetFilename();
+
+      // Same-origin blob URL download trigger:
+      // In iOS Safari, cross-origin <a> links ignore the download attribute and open a viewer tab.
+      // But triggering a click on a same-origin blob: URL forces iOS Safari to show the native
+      // "Do you want to download 'filename'?" prompt and saves directly into phone local Downloads!
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.style.display = 'none';
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      }, 10000);
+    } catch (err) {
+      console.warn('Direct blob download fallback:', err);
+      window.location.href = downloadUrl;
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (!downloadUrl) return;
+    try {
+      setDownloading(true);
+      const res = await fetch(downloadUrl);
+      if (!res.ok) throw new Error('Share fetch failed');
+      const blob = await res.blob();
+      const filename = getTargetFilename();
+      const file = new File([blob], filename, { type: blob.type || 'application/pdf' });
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: filename,
+        });
+      } else {
+        await handleDownload();
+      }
+    } catch (err) {
+      console.warn('Native share cancelled or failed:', err);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="progress-screen-container">
@@ -249,20 +330,37 @@ export default function ProgressCard({
         {/* Completion Actions */}
         {isComplete && (
           <div className="complete-actions">
-            <a
-              href={downloadUrl}
-              download
+            <button
+              type="button"
+              onClick={handleDownload}
               className="btn-download-result"
-              target="_blank"
-              rel="noopener noreferrer"
+              disabled={downloading}
+              style={{ border: 'none', cursor: downloading ? 'wait' : 'pointer' }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              <span>{getDownloadButtonLabel()}</span>
-            </a>
+              <span>{downloading ? 'Preparing Download...' : getDownloadButtonLabel()}</span>
+            </button>
+
+            {canShare && (
+              <button
+                type="button"
+                onClick={handleNativeShare}
+                className="btn-share-result"
+                disabled={downloading}
+                title="Save directly to phone or share via AirDrop / WhatsApp"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                  <polyline points="16 6 12 2 8 6"/>
+                  <line x1="12" y1="2" x2="12" y2="15"/>
+                </svg>
+                <span>📱 Save to iPhone / Share</span>
+              </button>
+            )}
 
             <button 
               type="button" 

@@ -10,7 +10,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("DocuMorphKeepAlive")
 
-DEFAULT_URL = "https://documorph-backend.onrender.com/api/health"
+DEFAULT_URL = "https://documorph-v1.onrender.com/api/health"
 PING_INTERVAL_SECONDS = 600  # Ping every 10 minutes (Render sleeps at 15 minutes)
 
 def keep_alive(target_url: str):

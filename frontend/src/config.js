@@ -3,7 +3,7 @@
 // Fallback: Cloud Backend on Render (Always-on 24/7 failover)
 
 const DEFAULT_LAPTOP_TUNNEL = '';
-const DEFAULT_RENDER_CLOUD = import.meta.env.VITE_API_URL || import.meta.env.VITE_RENDER_URL || 'https://documorph-backend.onrender.com';
+const DEFAULT_RENDER_CLOUD = import.meta.env.VITE_API_URL || import.meta.env.VITE_RENDER_URL || 'https://documorph-v1.onrender.com';
 
 export function getStoredConfig() {
   if (typeof window === 'undefined') {

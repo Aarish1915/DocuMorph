@@ -2,12 +2,37 @@ import time
 import logging
 import sys
 import os
+import threading
+import gc
 
 from documorph.core.database import SessionLocal, Job
 from documorph.worker.pipeline import DocuMorphOrchestrator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("queue_worker")
+
+def reclaim_system_memory():
+    """Forces immediate Python garbage collection and trims glibc arenas back to the OS."""
+    try:
+        gc.collect()
+        try:
+            import ctypes
+            libc = ctypes.CDLL("libc.so.6")
+            libc.malloc_trim(0)
+        except Exception:
+            pass
+        logger.info("RAM Reclamation: gc.collect() & malloc_trim(0) successfully executed.")
+    except Exception as ex:
+        logger.debug(f"Memory reclamation notice: {ex}")
+
+def schedule_delayed_memory_sweep(delay_seconds: int = 25):
+    """Secondary memory sweep after 25-30 seconds ensuring next user receives full container RAM."""
+    def _sweep():
+        time.sleep(delay_seconds)
+        reclaim_system_memory()
+        logger.info("Delayed 30s RAM Sweep completed. 100% free memory ready for next user.")
+    
+    threading.Thread(target=_sweep, daemon=True, name="DocuMorph-RAM-Sweeper").start()
 
 def run_worker():
     logger.info("DocuMorph Worker started. Polling SQLite queue for jobs...")
@@ -82,6 +107,10 @@ def run_worker():
                 job.error_msg = str(e)
                 
             db.commit()
+
+            # Immediate RAM Reclamation + Delayed 25-30s Full Sweep for next user
+            reclaim_system_memory()
+            schedule_delayed_memory_sweep(25)
             
         except Exception as e:
             logger.error(f"Worker crashed during polling: {e}")

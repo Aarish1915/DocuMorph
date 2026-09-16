@@ -21,7 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt \
 RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:$PATH
+    PATH=/home/user/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1
 
 WORKDIR $HOME/app
 
