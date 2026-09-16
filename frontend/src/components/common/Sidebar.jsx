@@ -6,6 +6,7 @@ export default function Sidebar({
   onClose,
   jobHistory = [],
   loading = false,
+  onReprocess,
 }) {
   if (!isOpen) return null;
 
@@ -93,16 +94,41 @@ export default function Sidebar({
                         {isSuccess ? 'Completed' : job.status}
                       </span>
 
-                      {isSuccess && downloadHref && (
-                        <a
-                          href={downloadHref}
-                          download
-                          className="item-download-link"
-                          rel="noopener noreferrer"
-                        >
-                          Download ↗
-                        </a>
-                      )}
+                      <div className="item-actions-group" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {onReprocess && (
+                          <button
+                            type="button"
+                            className="item-reprocess-btn"
+                            onClick={() => onReprocess(job.id)}
+                            title="Re-queue this document for reprocessing"
+                            style={{
+                              background: 'none',
+                              border: '1px solid var(--border-subtle, rgba(255,255,255,0.15))',
+                              borderRadius: 'var(--radius-xs, 4px)',
+                              padding: '4px 8px',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              color: 'var(--text-secondary, #94a3b8)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <span>🔄</span> Reprocess
+                          </button>
+                        )}
+
+                        {isSuccess && downloadHref && (
+                          <a
+                            href={downloadHref}
+                            download
+                            className="item-download-link"
+                            rel="noopener noreferrer"
+                          >
+                            Download ↗
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

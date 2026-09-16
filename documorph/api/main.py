@@ -640,7 +640,50 @@ async def get_recent_jobs(db: Session = Depends(get_db)):
         "created_at": j.created_at.isoformat()
     } for j in jobs]
 
+@app.post("/api/reprocess/{job_id}")
+async def reprocess_job(job_id: str, db: Session = Depends(get_db)):
+    """
+    Phase D: Re-queue a completed job for reprocessing.
+    Requires the original file to still be on disk (data/uploads/).
+    Creates a new QUEUED_REPROCESS job record so the worker picks it up atomically.
+    """
+    orig_job = db.query(Job).filter(Job.id == job_id).first()
+    if not orig_job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if orig_job.status not in ("COMPLETED", "FAILED"):
+        raise HTTPException(status_code=400, detail=f"Job is currently '{orig_job.status}' — wait for it to finish first")
+    if not orig_job.file_path or not os.path.exists(orig_job.file_path):
+        raise HTTPException(status_code=409, detail="Original upload file no longer on disk (expired/pruned). Please re-upload.")
+
+    new_job = Job(
+        file_path=orig_job.file_path,
+        file_hash=orig_job.file_hash,
+        status="QUEUED_REPROCESS",
+        service_type=orig_job.service_type,
+        config_options=orig_job.config_options,
+        output_format=orig_job.output_format,
+        language_mode=orig_job.language_mode,
+        spam_words=orig_job.spam_words,
+        ignore_images=orig_job.ignore_images,
+        custom_api_key=orig_job.custom_api_key,
+        custom_prompt=orig_job.custom_prompt,
+        original_file_size=orig_job.original_file_size,
+        progress_pct=0,
+        progress_msg="Re-queued for reprocessing...",
+    )
+    db.add(new_job)
+    db.commit()
+    db.refresh(new_job)
+    logger.info(f"Reprocess: spawned job {new_job.id} from {job_id}")
+    return {
+        "status": "QUEUED_REPROCESS",
+        "new_job_id": new_job.id,
+        "original_job_id": job_id,
+        "message": "Job re-queued. Poll /api/status/{new_job_id} for progress."
+    }
+
 # HuggingFace Support: Mount the React frontend if it exists. MUST BE AT THE BOTTOM!
+
 if os.path.exists("frontend/dist"):
     app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
     

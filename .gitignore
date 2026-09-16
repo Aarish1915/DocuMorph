@@ -54,6 +54,14 @@ CODEBASE_MASTER_GUIDE/
 STATE.md
 DECISIONS.md
 MISTAKES.md
+AGENTS.md
+ARCHITECTURE.md
+LOOP.md
+COMPARISON_IMAGE_AUDIT_REPORT.md
+PRODUCTION_CLOUD_PLAN.md
+skills-lock.json
+scripts/
+tests/
 
 # Large binaries, test PDFs & presentations
 *.pdf

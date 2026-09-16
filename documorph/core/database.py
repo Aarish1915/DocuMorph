@@ -22,20 +22,28 @@ logger = logging.getLogger("documorph.database")
 os.makedirs("data", exist_ok=True)
 
 # 1. Determine Database Engine: Neon Postgres in production, SQLite WAL in local/CI
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = (
+    os.getenv("DATABASE_URL")
+    or os.getenv("NEON")
+    or os.getenv("neon")
+    or os.getenv("NEON_DATABASE_URL")
+    or os.getenv("NEON_URL")
+)
 
 if DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.strip().strip("'").strip('"')
     # Normalize legacy Heroku/Render postgres:// scheme to postgresql://
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
-    logger.info("Connecting to PostgreSQL database...")
+    logger.info("Connecting to PostgreSQL database (Neon Serverless)...")
     engine = create_engine(
         DATABASE_URL,
-        pool_size=10,
-        max_overflow=20,
+        pool_size=5,
+        max_overflow=10,
         pool_pre_ping=True,
-        pool_recycle=1800
+        pool_recycle=300,
+        connect_args={"connect_timeout": 15}
     )
 else:
     DB_PATH = "sqlite:///data/documorph_queue.db?timeout=30"

@@ -91,9 +91,21 @@ export default function App() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Advanced settings & Admin Dashboard
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
+  // Advanced settings & Admin Dashboard (Route Segregation)
+  const [showSettings, setShowSettings] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '');
+      return hash === 'settings' || window.location.pathname === '/settings';
+    }
+    return false;
+  });
+  const [showAdmin, setShowAdmin] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '');
+      return hash === 'admin' || window.location.pathname === '/admin';
+    }
+    return false;
+  });
   const [customApiKey, setCustomApiKey] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
   const [toasts, setToasts] = useState([]);
@@ -156,10 +168,15 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (hash === 'processing') {
+      if (hash === 'admin') {
+        setShowAdmin(true);
+      } else if (hash === 'settings') {
+        setShowSettings(true);
+      } else if (hash === 'processing') {
         // Active processing screen
       } else {
-        // Phone back pressed from processing, or navigating back
+        setShowAdmin(false);
+        setShowSettings(false);
         setStep(1);
         setFile(null);
         setJobStatus(null);
@@ -170,6 +187,7 @@ export default function App() {
         }
       }
     };
+
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('popstate', handleHashChange);
     return () => {
@@ -575,6 +593,35 @@ export default function App() {
     }
   };
 
+  const handleReprocess = async (jobId) => {
+    try {
+      const activeBackend = await probeBackend();
+      const targetUrl = activeBackend.url || API_BASE;
+      const res = await fetch(`${targetUrl}/api/reprocess/${jobId}`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast(data.detail || 'Reprocess request failed', 'error');
+        return;
+      }
+      setShowHistory(false);
+      setStep(4);
+      const newJobId = data.new_job_id;
+      setJobStatus({
+        id: newJobId,
+        status: 'QUEUED_REPROCESS',
+        progress: 0,
+        message: 'Re-queued for reprocessing...',
+      });
+      localStorage.setItem('activeJobId', newJobId);
+      addToast('Document re-queued for rapid reprocessing!', 'success');
+      resumeJobStream(newJobId, targetUrl);
+    } catch {
+      addToast('Failed to connect to backend for reprocessing.', 'error');
+    }
+  };
+
   const isProcessing = Boolean(
     isSubmitting || (jobStatus && ['QUEUED', 'PROCESSING', 'QUEUED_REPROCESS'].includes(jobStatus.status) && step === 4)
   );
@@ -582,14 +629,12 @@ export default function App() {
   const isError = Boolean(jobStatus && ['ERROR', 'Error', 'FAILED', 'Failed', 'CANCELLED', 'Cancelled'].includes(jobStatus.status));
   const stageIdx = jobStatus ? getPipelineStage(jobStatus.status, jobStatus.progress) : -1;
 
-  const headerStep = step === 4 ? 3 : file ? 2 : 1;
-
   return (
-    <div className="app-root">
-      {/* ── HEADER ── */}
+    <div className="app-layout">
+      {/* ── UNIFIED MINIMAL HEADER ── */}
       <Header
-        step={headerStep}
-        serviceTitle={getServiceTitle()}
+        step={step}
+        serviceTitle={getServiceTitle(serviceType)}
         activeView={activeView}
         onNavigateView={navigateView}
         onBack={handleBack}
@@ -604,17 +649,27 @@ export default function App() {
       {/* ── ADVANCED SETTINGS MODAL ── */}
       <SettingsModal
         isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
+        onClose={() => {
+          setShowSettings(false);
+          if (typeof window !== 'undefined' && window.location.hash === '#settings') {
+            window.location.hash = '';
+          }
+        }}
         customApiKey={customApiKey}
         setCustomApiKey={setCustomApiKey}
         customPrompt={customPrompt}
         setCustomPrompt={setCustomPrompt}
       />
 
-      {/* ── DEVELOPER ADMIN & QUALITY VAULT MODAL ── */}
+      {/* ── DEVELOPER ADMIN & QUALITY VAULT MODAL (Protected Owner Access) ── */}
       <AdminDashboardModal
         isOpen={showAdmin}
-        onClose={() => setShowAdmin(false)}
+        onClose={() => {
+          setShowAdmin(false);
+          if (typeof window !== 'undefined' && window.location.hash === '#admin') {
+            window.location.hash = '';
+          }
+        }}
       />
 
       {/* ── HISTORY DRAWER ── */}
@@ -623,6 +678,7 @@ export default function App() {
         onClose={() => setShowHistory(false)}
         jobHistory={jobHistory}
         loading={historyLoading}
+        onReprocess={handleReprocess}
       />
 
       {/* ── UNIFIED PSYCHOLOGY-DRIVEN WORKSPACE & DEDICATED TOOL PAGES ── */}
@@ -727,14 +783,7 @@ export default function App() {
 
       {/* ── MINIMAL FOOTER ── */}
       <footer className="site-footer">
-        <span>DocuMorph • 100% Private. Files are never stored.</span>
-        <button 
-          className="admin-trigger-btn"
-          onClick={() => setShowAdmin(true)}
-          title="Admin & Developer Dashboard (Ctrl+Shift+A)"
-        >
-          ⚙️ Admin Hub
-        </button>
+        <span>DocuMorph • 100% Private & Secure Processing. Files are never stored.</span>
       </footer>
 
       {/* ── TOAST CONTAINER ── */}

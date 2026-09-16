@@ -11,6 +11,24 @@ from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 import fitz
 import re
+try:
+    import psutil as _psutil
+    _PSUTIL_OK = True
+except ImportError:
+    _psutil = None
+    _PSUTIL_OK = False
+
+_RAM_GUARD_MB = 380  # Trigger emergency GC if RSS exceeds this on free-tier
+
+def _maybe_gc(force: bool = False) -> None:
+    """Collect garbage and (on Linux) trim glibc heap if RAM guard is breached."""
+    if force or (_PSUTIL_OK and _psutil.Process().memory_info().rss / 1_048_576 > _RAM_GUARD_MB):
+        gc.collect()
+        try:
+            import ctypes
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass
 
 from documorph.core.crop_sweeper import LightningSweeper
 from documorph.core.native_extractor import NativeExtractor
@@ -232,6 +250,7 @@ class DocuMorphOrchestrator:
                         pix = page.get_pixmap(matrix=mat)
                         img_path = os.path.join(temp_dir, f"full_{page_num}.jpg")
                         pix.save(img_path)
+                        pix = None  # Phase C: release pixmap memory immediately
                         
                         # Extract any standalone diagrams or sub-images on this scanned/complex page
                         try:
@@ -272,6 +291,7 @@ class DocuMorphOrchestrator:
                                     diagram_filename = f"{self.job_id or timestamp}_diagram_{page_num}_{idx}.png"
                                     diagram_path = images_dir / diagram_filename
                                     self.diagram_extractor.save_whitened_image(pix, diagram_path)
+                                    pix = None  # Phase C: release pixmap memory immediately
 
                                     rel_img_path = f"images/{diagram_filename}"
                                     page_md_blocks.append(
@@ -289,6 +309,7 @@ class DocuMorphOrchestrator:
                                     pix = page.get_pixmap(matrix=mat, clip=rect)
                                     crop_path = os.path.join(temp_dir, f"crop_{page_num}_{idx}.png")
                                     pix.save(crop_path)
+                                    pix = None  # Phase C: release pixmap memory immediately
                                     crops_to_batch.append({
                                         "type": "crop",
                                         "page_num": page_num,
@@ -300,6 +321,11 @@ class DocuMorphOrchestrator:
                                     logger.warning(f"Failed saving crop on page {page_num} #{idx}: {c_ex}")
                         
                         final_markdown_pages[page_num] = page_md_blocks
+
+                    # Phase C: periodic GC every 10 pages to prevent fragmentation on free-tier
+                    if (page_num + 1) % 10 == 0:
+                        _maybe_gc()
+                        logger.debug(f"GC pass after page {page_num + 1}")
 
                 # 3. NATIVE MULTI-PART BATCHING
                 if crops_to_batch:
@@ -423,6 +449,7 @@ class DocuMorphOrchestrator:
                                             diag_fname = f"{self.job_id or timestamp}_vdiag_{pnum}_{m_idx}.png"
                                             diag_path = images_dir / diag_fname
                                             self.diagram_extractor.save_whitened_image(diag_pix, diag_path)
+                                            diag_pix = None  # Phase C: release pixmap immediately
                                             
                                             rel_path = f"images/{diag_fname}"
                                             diag_html = (
