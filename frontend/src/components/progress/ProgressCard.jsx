@@ -37,13 +37,13 @@ export default function ProgressCard({
 
   // Detect iOS / mobile Web Share capability for direct phone saving
   useEffect(() => {
-    if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function') {
-      try {
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && typeof File === 'function') {
         const dummyFile = new File([''], 'doc.pdf', { type: 'application/pdf' });
-        setCanShare(navigator.canShare({ files: [dummyFile] }));
-      } catch (e) {
-        setCanShare(false);
+        setCanShare(Boolean(navigator.canShare({ files: [dummyFile] })));
       }
+    } catch (e) {
+      setCanShare(false);
     }
   }, []);
 

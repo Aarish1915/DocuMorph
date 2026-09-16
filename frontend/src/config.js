@@ -14,6 +14,7 @@ export function getStoredConfig() {
     };
   }
 
+  const envCloudUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_RENDER_URL || DEFAULT_RENDER_CLOUD;
   const storedRender = localStorage.getItem('documorph_render_url');
   // Auto-migrate stale/defunct backend URL from previous test sessions
   let finalRenderUrl = storedRender;
