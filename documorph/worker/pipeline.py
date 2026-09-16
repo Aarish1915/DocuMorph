@@ -677,6 +677,37 @@ class DocuMorphOrchestrator:
                     rf.write(report_content)
                 logger.info(f"Saved Markdown Telemetry Report to {md_report_path}")
 
+                # -------------------------------------------------------------
+                # DOCUMORPH QUALITY AUDIT VAULT
+                # Archives inputs, custom prompts, raw & clean markdown, and
+                # metrics so developers can review student jobs and refine prompts.
+                # -------------------------------------------------------------
+                try:
+                    vault_dir = os.path.join("data", "audit_vault")
+                    os.makedirs(vault_dir, exist_ok=True)
+                    audit_record_path = os.path.join(vault_dir, f"AUDIT_{timestamp}_{self.job_id or 'anon'}.json")
+                    audit_entry = {
+                        "job_id": self.job_id or f"job_{timestamp}",
+                        "timestamp": timestamp,
+                        "datetime_iso": datetime.datetime.utcnow().isoformat(),
+                        "file_name": os.path.basename(file_path),
+                        "service_type": self.service_type,
+                        "language_mode": self.language_mode,
+                        "custom_prompt": self.custom_prompt,
+                        "custom_api_key_used": bool(self.custom_api_key),
+                        "config_options": self.config_options,
+                        "total_pages": total_pages_count,
+                        "output_file": output_result_path,
+                        "telemetry": telemetry,
+                        "final_markdown_preview": processed_markdown[:8000] if 'processed_markdown' in locals() else "",
+                        "final_markdown": processed_markdown if 'processed_markdown' in locals() else ""
+                    }
+                    with open(audit_record_path, "w", encoding="utf-8") as af:
+                        json.dump(audit_entry, af, indent=2, ensure_ascii=False)
+                    logger.info(f"Quality Audit Vault archived job to {audit_record_path}")
+                except Exception as ve:
+                    logger.debug(f"Audit vault archiving error: {ve}")
+
             except Exception as te:
                 logger.warning(f"Could not save telemetry files: {te}")
 

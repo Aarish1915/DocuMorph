@@ -77,10 +77,38 @@ def cleanup_old_files(max_age_seconds: int = 7200):
                         pass
 
 import threading
+import threading
 import logging
+from collections import deque
+import datetime
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 logger = logging.getLogger("documorph.api")
+_server_start_time = time.time()
 _embedded_worker_thread = None
+
+# --- In-Memory Observability Ring Buffer ---
+_recent_logs = deque(maxlen=60)
+
+class InMemoryLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            _recent_logs.append({
+                "timestamp": record.created,
+                "time_str": datetime.datetime.fromtimestamp(record.created).strftime("%H:%M:%S"),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage()
+            })
+        except Exception:
+            pass
+
+_mem_handler = InMemoryLogHandler()
+_mem_handler.setLevel(logging.INFO)
+logging.getLogger().addHandler(_mem_handler)
 
 @app.on_event("startup")
 def on_startup():
@@ -102,7 +130,125 @@ def on_startup():
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "timestamp": time.time(), "worker": "active"}
+    worker_alive = _embedded_worker_thread is not None and _embedded_worker_thread.is_alive()
+    return {
+        "status": "ok", 
+        "timestamp": time.time(), 
+        "worker": "active" if worker_alive else "stopped"
+    }
+
+@app.get("/api/admin/status")
+async def get_admin_status(db: Session = Depends(get_db)):
+    """
+    Developer & Admin Telemetry Endpoint:
+    Provides live RAM, CPU, Queue Metrics, and in-memory log buffer for real-time monitoring.
+    """
+    now = time.time()
+    uptime_sec = int(now - _server_start_time)
+    
+    # Memory metrics
+    mem_info = {"ram_used_mb": 0, "ram_total_mb": 512, "ram_pct": 0, "cpu_pct": 0}
+    if psutil:
+        try:
+            proc = psutil.Process()
+            rss_mb = proc.memory_info().rss / (1024 * 1024)
+            vm = psutil.virtual_memory()
+            mem_info = {
+                "ram_used_mb": round(rss_mb, 1),
+                "ram_total_mb": round(vm.total / (1024 * 1024), 1),
+                "ram_pct": round(vm.percent, 1),
+                "cpu_pct": round(psutil.cpu_percent(interval=0), 1)
+            }
+        except Exception:
+            pass
+
+    # Queue Metrics from SQLite
+    try:
+        queued_count = db.query(Job).filter(Job.status.in_(["QUEUED", "QUEUED_REPROCESS"])).count()
+        processing_count = db.query(Job).filter(Job.status == "PROCESSING").count()
+        completed_count = db.query(Job).filter(Job.status == "COMPLETED").count()
+        error_count = db.query(Job).filter(Job.status == "ERROR").count()
+    except Exception:
+        queued_count = processing_count = completed_count = error_count = 0
+
+    # API Keys & Worker
+    from documorph.core.api_router import api_router
+    active_keys_count = api_router.get_total_keys() if hasattr(api_router, 'get_total_keys') else 1
+    worker_alive = _embedded_worker_thread is not None and _embedded_worker_thread.is_alive()
+
+    # Vault Records count
+    vault_dir = os.path.join("data", "audit_vault")
+    vault_count = len(os.listdir(vault_dir)) if os.path.exists(vault_dir) else 0
+
+    return {
+        "status": "ok",
+        "uptime_seconds": uptime_sec,
+        "uptime_formatted": str(datetime.timedelta(seconds=uptime_sec)),
+        "memory": mem_info,
+        "queue": {
+            "queued": queued_count,
+            "processing": processing_count,
+            "completed": completed_count,
+            "failed": error_count,
+            "total_audit_records": vault_count
+        },
+        "worker": "active" if worker_alive else "idle",
+        "api_keys_active": active_keys_count,
+        "recent_logs": list(_recent_logs)
+    }
+
+@app.get("/api/admin/audits")
+async def get_audit_vault_records():
+    """
+    Quality Audit Vault Endpoint:
+    Returns the 25 most recent job records so developers can inspect student inputs, prompts, and outputs.
+    """
+    vault_dir = os.path.join("data", "audit_vault")
+    if not os.path.exists(vault_dir):
+        return {"audits": []}
+    
+    files = sorted(
+        [os.path.join(vault_dir, f) for f in os.listdir(vault_dir) if f.endswith(".json")],
+        key=os.path.getmtime,
+        reverse=True
+    )[:25]
+    
+    records = []
+    for fp in files:
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                records.append({
+                    "job_id": d.get("job_id"),
+                    "timestamp": d.get("timestamp"),
+                    "datetime_iso": d.get("datetime_iso"),
+                    "file_name": d.get("file_name"),
+                    "service_type": d.get("service_type"),
+                    "language_mode": d.get("language_mode"),
+                    "custom_prompt": d.get("custom_prompt"),
+                    "total_pages": d.get("total_pages"),
+                    "output_file": d.get("output_file"),
+                    "markdown_preview": d.get("final_markdown_preview", "")[:400]
+                })
+        except Exception:
+            pass
+    return {"audits": records}
+
+@app.get("/api/admin/audits/{job_id}")
+async def get_audit_vault_detail(job_id: str):
+    """
+    Returns full raw & final markdown for a specific audited document.
+    """
+    vault_dir = os.path.join("data", "audit_vault")
+    if not os.path.exists(vault_dir):
+        raise HTTPException(status_code=404, detail="Audit vault empty")
+    
+    for fname in os.listdir(vault_dir):
+        if job_id in fname and fname.endswith(".json"):
+            fp = os.path.join(vault_dir, fname)
+            with open(fp, "r", encoding="utf-8") as f:
+                return json.load(f)
+    raise HTTPException(status_code=404, detail="Audit record not found")
 
 @app.post("/api/settings")
 async def update_settings(settings: dict):
