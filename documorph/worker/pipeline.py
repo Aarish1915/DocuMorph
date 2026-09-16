@@ -223,11 +223,11 @@ class DocuMorphOrchestrator:
                     page = doc[page_num]
                     
                     if cls == "complex" or cls == "corrupted":
-                        # Full page image for Native Multi-Part
-                        zoom = 2.0
+                        # Fast native JPEG render at 1.4x (~100 DPI), perfectly matching Vision AI input specs
+                        zoom = 1.4
                         mat = fitz.Matrix(zoom, zoom)
                         pix = page.get_pixmap(matrix=mat)
-                        img_path = os.path.join(temp_dir, f"full_{page_num}.png")
+                        img_path = os.path.join(temp_dir, f"full_{page_num}.jpg")
                         pix.save(img_path)
                         
                         # Extract any standalone diagrams or sub-images on this scanned/complex page

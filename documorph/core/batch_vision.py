@@ -170,20 +170,20 @@ Output the raw markdown for each image in the exact order they appear. If multip
         contents = [prompt]
         for img_path in image_paths:
             try:
-                # Token Reduction:
-                # - Full-page images: 15% reduction (scale 0.85) to preserve table text & formula clarity
-                # - Targeted crops: 30% reduction (scale 0.70)
-                # Keep RGB — grayscale destroys table header colors
-                is_full = os.path.basename(img_path).startswith("full_")
-                scale = 0.85 if is_full else 0.70
-                with Image.open(img_path) as img:
-                    new_width = max(1, int(img.width * scale))
-                    new_height = max(1, int(img.height * scale))
-                    resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                    
-                    img_byte_arr = io.BytesIO()
-                    resized_img.save(img_byte_arr, format='JPEG', quality=80)
-                    image_bytes = img_byte_arr.getvalue()
+                # Fast-path: If image is already an optimized JPEG from PyMuPDF, read directly to avoid slow PIL LANCZOS CPU churn
+                if img_path.lower().endswith((".jpg", ".jpeg")):
+                    with open(img_path, "rb") as f:
+                        image_bytes = f.read()
+                else:
+                    is_full = os.path.basename(img_path).startswith("full_")
+                    scale = 0.85 if is_full else 0.70
+                    with Image.open(img_path) as img:
+                        new_width = max(1, int(img.width * scale))
+                        new_height = max(1, int(img.height * scale))
+                        resized_img = img.resize((new_width, new_height), Image.Resampling.BILINEAR)
+                        img_byte_arr = io.BytesIO()
+                        resized_img.save(img_byte_arr, format='JPEG', quality=80)
+                        image_bytes = img_byte_arr.getvalue()
                     
                 mime = "image/jpeg"
                 contents.append(types.Part.from_bytes(data=image_bytes, mime_type=mime))
