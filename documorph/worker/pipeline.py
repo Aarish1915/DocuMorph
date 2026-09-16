@@ -216,6 +216,9 @@ class DocuMorphOrchestrator:
                 self._report("Local Extraction & Cropping...", 20)
                 # 2. LOCAL EXTRACTION & CROPS
                 for page_num in range(len(doc)):
+                    prep_pct = 12 + int(((page_num + 1) / max(1, total_pages_count)) * 26)
+                    self._report(f"Scanning & Profiling Layout: Page {page_num + 1}/{total_pages_count}...", prep_pct)
+
                     if page_num in cached_pages:
                         final_markdown_pages[page_num] = cached_pages[page_num]
                         continue
@@ -248,42 +251,53 @@ class DocuMorphOrchestrator:
                         })
                     else:
                         # Clean page: Local extract + targeted crops
-                        page_data = self.native_extractor.extract_page(doc, page_num)
+                        try:
+                            page_data = self.native_extractor.extract_page(doc, page_num)
+                        except Exception as n_ex:
+                            logger.warning(f"Native extraction error on page {page_num}: {n_ex}")
+                            page_data = {"items": [{"type": "text", "data": page.get_text("text")}]}
+
                         page_md_blocks = []
                         for idx, item in enumerate(page_data.get("items", [])):
                             if item["type"] == "text":
                                 page_md_blocks.append(item["data"])
                             elif item["type"] == "diagram":
-                                bbox = item["data"]
-                                rect = fitz.Rect(bbox[0], bbox[1], bbox[2], bbox[3])
-                                mat = fitz.Matrix(2.5, 2.5) # 300 DPI high-fidelity
-                                pix = page.get_pixmap(matrix=mat, clip=rect)
-                                images_dir = Path("data/output/images")
-                                images_dir.mkdir(parents=True, exist_ok=True)
-                                diagram_filename = f"{self.job_id or timestamp}_diagram_{page_num}_{idx}.png"
-                                diagram_path = images_dir / diagram_filename
-                                self.diagram_extractor.save_whitened_image(pix, diagram_path)
+                                try:
+                                    bbox = item["data"]
+                                    rect = fitz.Rect(bbox[0], bbox[1], bbox[2], bbox[3])
+                                    mat = fitz.Matrix(2.5, 2.5) # 300 DPI high-fidelity
+                                    pix = page.get_pixmap(matrix=mat, clip=rect)
+                                    images_dir = Path("data/output/images")
+                                    images_dir.mkdir(parents=True, exist_ok=True)
+                                    diagram_filename = f"{self.job_id or timestamp}_diagram_{page_num}_{idx}.png"
+                                    diagram_path = images_dir / diagram_filename
+                                    self.diagram_extractor.save_whitened_image(pix, diagram_path)
 
-                                rel_img_path = f"images/{diagram_filename}"
-                                page_md_blocks.append(
-                                    f'\n\n<div class="diagram-container" align="center" style="margin: 14px 0; break-inside: avoid; page-break-inside: avoid;">\n'
-                                    f'  <img src="{rel_img_path}" alt="Document Diagram" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
-                                    f'</div>\n\n'
-                                )
+                                    rel_img_path = f"images/{diagram_filename}"
+                                    page_md_blocks.append(
+                                        f'\n\n<div class="diagram-container" align="center" style="margin: 14px 0; break-inside: avoid; page-break-inside: avoid;">\n'
+                                        f'  <img src="{rel_img_path}" alt="Document Diagram" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
+                                        f'</div>\n\n'
+                                    )
+                                except Exception as d_ex:
+                                    logger.warning(f"Failed saving diagram crop on page {page_num} #{idx}: {d_ex}")
                             elif item["type"] == "crop":
-                                bbox = item["data"]
-                                rect = fitz.Rect(bbox[0], bbox[1], bbox[2], bbox[3])
-                                mat = fitz.Matrix(2.0, 2.0)
-                                pix = page.get_pixmap(matrix=mat, clip=rect)
-                                crop_path = os.path.join(temp_dir, f"crop_{page_num}_{idx}.png")
-                                pix.save(crop_path)
-                                crops_to_batch.append({
-                                    "type": "crop",
-                                    "page_num": page_num,
-                                    "path": crop_path,
-                                    "block_idx": len(page_md_blocks) # Save where to inject
-                                })
-                                page_md_blocks.append(f"<!-- CROP_PLACEHOLDER_{page_num}_{idx} -->")
+                                try:
+                                    bbox = item["data"]
+                                    rect = fitz.Rect(bbox[0], bbox[1], bbox[2], bbox[3])
+                                    mat = fitz.Matrix(2.0, 2.0)
+                                    pix = page.get_pixmap(matrix=mat, clip=rect)
+                                    crop_path = os.path.join(temp_dir, f"crop_{page_num}_{idx}.png")
+                                    pix.save(crop_path)
+                                    crops_to_batch.append({
+                                        "type": "crop",
+                                        "page_num": page_num,
+                                        "path": crop_path,
+                                        "block_idx": len(page_md_blocks) # Save where to inject
+                                    })
+                                    page_md_blocks.append(f"<!-- CROP_PLACEHOLDER_{page_num}_{idx} -->")
+                                except Exception as c_ex:
+                                    logger.warning(f"Failed saving crop on page {page_num} #{idx}: {c_ex}")
                         
                         final_markdown_pages[page_num] = page_md_blocks
 

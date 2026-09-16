@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './DesignTokens.css';
 import './index.css';
 import { API_BASE, probeBackend, getStoredConfig } from './config';
@@ -252,30 +252,124 @@ export default function App() {
     }
   };
 
+  // Active stream and polling reference for lifecycle management
+  const activeStreamRef = useRef({ evtSource: null, pollTimer: null, jobId: null });
+
+  const stopActiveStream = () => {
+    if (activeStreamRef.current.evtSource) {
+      try { activeStreamRef.current.evtSource.close(); } catch {}
+      activeStreamRef.current.evtSource = null;
+    }
+    if (activeStreamRef.current.pollTimer) {
+      clearInterval(activeStreamRef.current.pollTimer);
+      activeStreamRef.current.pollTimer = null;
+    }
+    activeStreamRef.current.jobId = null;
+  };
+
   const resumeJobStream = async (jobId, overrideUrl) => {
+    stopActiveStream();
+    activeStreamRef.current.jobId = jobId;
+
     let baseUrl = overrideUrl;
     if (!baseUrl) {
       const node = await probeBackend();
       baseUrl = node.url || API_BASE;
     }
 
-    const evtSource = new EventSource(`${baseUrl}/api/progress/${jobId}`);
-    evtSource.onmessage = (e) => {
-      try {
-        const s = JSON.parse(e.data);
-        s.id = jobId;
-        setJobStatus(s);
-        if (['Completed', 'COMPLETED', 'Error', 'ERROR', 'FAILED', 'CANCELLED'].includes(s.status)) {
-          evtSource.close();
-          fetchHistory(baseUrl);
+    const handleTerminalState = (s) => {
+      stopActiveStream();
+      fetchHistory(baseUrl);
+    };
+
+    // Resilient REST Polling Fallback (for mobile sleeps, network jitter, proxy drops)
+    const startPollingFallback = () => {
+      if (activeStreamRef.current.pollTimer) return;
+
+      const pollOnce = async () => {
+        if (activeStreamRef.current.jobId !== jobId) return;
+        try {
+          // 1. Try dedicated fast REST polling endpoint
+          const res = await fetch(`${baseUrl}/api/progress_poll/${jobId}`);
+          if (res.ok) {
+            const data = await res.json();
+            data.id = jobId;
+            setJobStatus(data);
+            if (['Completed', 'COMPLETED', 'Error', 'ERROR', 'FAILED', 'CANCELLED'].includes(data.status)) {
+              handleTerminalState(data);
+              return;
+            }
+          } else if (res.status === 404) {
+            // 2. Fallback to recent jobs check
+            const jobsRes = await fetch(`${baseUrl}/api/jobs`);
+            if (jobsRes.ok) {
+              const jobs = await jobsRes.json();
+              const found = Array.isArray(jobs) ? jobs.find((j) => j.id === jobId) : null;
+              if (found) {
+                const s = {
+                  id: jobId,
+                  status: found.status,
+                  progress: found.progress_pct,
+                  message: found.progress_msg,
+                  result_url: found.result_url,
+                  download_url: found.result_url ? `/api/download/${found.id}` : null,
+                  service_type: found.service_type,
+                  output_format: found.output_format,
+                  original_file_size: found.original_file_size,
+                  compressed_file_size: found.compressed_file_size,
+                };
+                setJobStatus(s);
+                if (['Completed', 'COMPLETED', 'Error', 'ERROR', 'FAILED', 'CANCELLED'].includes(found.status)) {
+                  handleTerminalState(s);
+                  return;
+                }
+              }
+            }
+          }
+        } catch {
+          // Retry on next timer cycle
         }
-      } catch (err) {
-        console.error('Error parsing SSE event:', err);
-      }
+      };
+
+      pollOnce();
+      activeStreamRef.current.pollTimer = setInterval(pollOnce, 2000);
     };
-    evtSource.onerror = () => {
-      evtSource.close();
-    };
+
+    try {
+      const evtSource = new EventSource(`${baseUrl}/api/progress/${jobId}`);
+      activeStreamRef.current.evtSource = evtSource;
+
+      // Watchdog: If no SSE event received within 5 seconds, activate parallel polling fallback
+      let lastEventTime = Date.now();
+      const watchdog = setTimeout(() => {
+        if (Date.now() - lastEventTime >= 4800 && activeStreamRef.current.jobId === jobId) {
+          startPollingFallback();
+        }
+      }, 5000);
+
+      evtSource.onmessage = (e) => {
+        lastEventTime = Date.now();
+        clearTimeout(watchdog);
+        try {
+          const s = JSON.parse(e.data);
+          s.id = jobId;
+          setJobStatus(s);
+          if (['Completed', 'COMPLETED', 'Error', 'ERROR', 'FAILED', 'CANCELLED'].includes(s.status)) {
+            handleTerminalState(s);
+          }
+        } catch (err) {
+          console.error('Error parsing SSE event:', err);
+        }
+      };
+
+      evtSource.onerror = () => {
+        try { evtSource.close(); } catch {}
+        activeStreamRef.current.evtSource = null;
+        startPollingFallback();
+      };
+    } catch {
+      startPollingFallback();
+    }
   };
 
   // Probe backend node on mount & restore active jobs
@@ -314,13 +408,32 @@ export default function App() {
       });
     }
 
+    // Auto-resume & poll when mobile device wakes up or user tabs back to app
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const activeId = localStorage.getItem('activeJobId');
+        if (activeId) {
+          probeBackend().then((nodeInfo) => {
+            const url = nodeInfo?.url || API_BASE;
+            resumeJobStream(activeId, url);
+          });
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
     return () => {
       window.removeEventListener('documorph:backend-node', handleNodeChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      stopActiveStream();
     };
   }, []);
 
   // Navigation Handlers
   const handleBack = () => {
+    stopActiveStream();
     if (step === 4) {
       setStep(1);
       setJobStatus(null);
@@ -435,6 +548,7 @@ export default function App() {
   };
 
   const handleNewJob = () => {
+    stopActiveStream();
     localStorage.removeItem('activeJobId');
     setJobStatus(null);
     setFile(null);

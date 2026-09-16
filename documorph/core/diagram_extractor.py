@@ -39,7 +39,7 @@ class DiagramExtractor:
                 arr = np.array(pil_img)
                 mask = (arr[:, :, 0] > 225) & (arr[:, :, 1] > 225) & (arr[:, :, 2] > 225)
                 arr[mask] = [255, 255, 255]
-                Image.fromarray(arr).save(str(target_path), "PNG", optimize=True)
+                Image.fromarray(arr).save(str(target_path), "PNG")
         except Exception as e:
             logger.warning(f"Whitening failed, saving raw pixmap: {e}")
             pix.save(str(target_path))

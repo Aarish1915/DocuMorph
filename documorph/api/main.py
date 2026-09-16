@@ -450,11 +450,56 @@ async def reprocess_pages(req: ReprocessRequest, db: Session = Depends(get_db)):
     
     return {"status": "success", "message": f"Queued {len(req.pages)} pages for rapid reprocessing."}
 
+@app.get("/api/progress_poll/{job_id}")
+async def poll_progress(job_id: str, db: Session = Depends(get_db)):
+    """
+    Dedicated REST Polling Fallback:
+    Provides resilient, non-streaming job status checks for mobile devices
+    and proxy firewalls where Server-Sent Events (SSE) get blocked or buffered.
+    """
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    if job.status == "QUEUED":
+        queue_position = db.query(Job).filter(
+            Job.status == "QUEUED",
+            Job.created_at <= job.created_at
+        ).count()
+        display_msg = f"Waiting in queue... (Position: #{queue_position})"
+    else:
+        display_msg = job.progress_msg or job.status
+
+    status_dict = {
+        "id": job.id,
+        "status": job.status,
+        "progress": job.progress_pct,
+        "message": display_msg,
+        "service_type": job.service_type,
+        "output_format": job.output_format,
+        "original_file_size": job.original_file_size,
+        "compressed_file_size": job.compressed_file_size,
+    }
+    if job.result_url:
+        status_dict["result_url"] = job.result_url
+        status_dict["download_url"] = f"/api/download/{job.id}"
+    if job.error_msg:
+        status_dict["message"] = job.error_msg
+        
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        content=status_dict,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache"
+        }
+    )
+
 @app.get("/api/progress/{job_id}")
 async def stream_progress(job_id: str):
     async def event_generator():
-        # Using a distinct session for the generator loop to avoid cross-thread issues
         from documorph.core.database import SessionLocal
+        last_keepalive = time.time()
         while True:
             db = SessionLocal()
             try:
@@ -464,7 +509,6 @@ async def stream_progress(job_id: str):
                     break
                 
                 if job.status == "QUEUED":
-                    # Calculate live queue position
                     queue_position = db.query(Job).filter(
                         Job.status == "QUEUED",
                         Job.created_at <= job.created_at
@@ -495,10 +539,23 @@ async def stream_progress(job_id: str):
                     break
             finally:
                 db.close()
+
+            # SSE Keep-Alive Comment Ping every 15 seconds to prevent proxy idle drop
+            if time.time() - last_keepalive > 15:
+                yield ": keepalive\n\n"
+                last_keepalive = time.time()
                 
             await asyncio.sleep(1)
             
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(), 
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @app.get("/api/download/{job_id}")
 async def download_file(job_id: str, db: Session = Depends(get_db)):
