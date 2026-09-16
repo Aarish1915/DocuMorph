@@ -14,10 +14,19 @@ export function getStoredConfig() {
     };
   }
 
-  const envCloudUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_RENDER_URL || DEFAULT_RENDER_CLOUD;
+  const storedRender = localStorage.getItem('documorph_render_url');
+  // Auto-migrate stale/defunct backend URL from previous test sessions
+  let finalRenderUrl = storedRender;
+  if (!storedRender || storedRender.includes('documorph-backend.onrender.com')) {
+    finalRenderUrl = envCloudUrl;
+    try {
+      localStorage.setItem('documorph_render_url', envCloudUrl);
+    } catch (e) {}
+  }
+
   return {
     laptopUrl: localStorage.getItem('documorph_tunnel_url') || import.meta.env.VITE_TUNNEL_URL || '',
-    renderUrl: localStorage.getItem('documorph_render_url') || envCloudUrl,
+    renderUrl: finalRenderUrl,
     preferred: localStorage.getItem('documorph_backend_pref') || 'auto', // 'auto' | 'laptop' | 'render'
   };
 }
