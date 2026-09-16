@@ -110,7 +110,14 @@ class DiagramExtractor:
                     and h >= 80
                 ):
                     d_mat = fitz.Matrix(2.5, 2.5) # 300 DPI high-fidelity crop
-                    diag_pix = page.get_pixmap(matrix=d_mat, clip=rect)
+                    # Generous 8pt safety padding so diagram labels, circuit terminals, and arrows are never clipped
+                    padded_rect = fitz.Rect(
+                        max(0, rect.x0 - 8),
+                        max(0, rect.y0 - 8),
+                        min(page.rect.width, rect.x1 + 8),
+                        min(page.rect.height, rect.y1 + 8)
+                    )
+                    diag_pix = page.get_pixmap(matrix=d_mat, clip=padded_rect)
                     diag_filename = f"{job_prefix}_scanned_diag_{page_num}_{xref}_{r_idx}.png"
                     diag_path = self.images_dir / diag_filename
                     self.save_whitened_image(diag_pix, diag_path)

@@ -352,6 +352,43 @@
   .privacy-badge span {
     font-size: 10px;
   }
+
+  /* Progress Card and Reassurance Card Mobile Hardening */
+  .progress-card {
+    padding: 20px 14px;
+    border-radius: 14px;
+  }
+
+  .reassurance-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .reassurance-tip-text {
+    font-size: 11.5px;
+  }
+
+  .reprocess-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reprocess-input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .btn-reprocess-submit {
+    width: 100%;
+  }
+
+  /* Site Footer on mobile */
+  .site-footer {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+    padding: 20px 12px;
+  }
 }
 
 /* ── ACCESSIBILITY: HIGH CONTRAST & REDUCED MOTION ── */

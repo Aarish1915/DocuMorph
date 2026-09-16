@@ -1,6 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CircularRing from './CircularRing';
 import { API_BASE } from '../../config';
+
+const COMPILING_TIPS = [
+  "📐 Typesetting mathematical formulas with MathJax...",
+  "🖼️ Assembling high-resolution vector diagrams...",
+  "📄 Formatting clean A4 print geometry...",
+  "✨ Compiling print-ready PDF pages with Playwright...",
+  "🗜️ Optimizing byte streams to ensure compact file size...",
+  "⏳ Large 30–50 page documents take ~30–45s to typeset with precision. Almost ready!",
+];
 
 function formatBytes(bytes) {
   if (!bytes || bytes === 0) return '0 B';
@@ -21,6 +30,30 @@ export default function ProgressCard({
 }) {
   const [reprocessPageNum, setReprocessPageNum] = useState('');
   const [showReprocess, setShowReprocess] = useState(false);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const [tipIndex, setTipIndex] = useState(0);
+
+  // Live timer for active jobs
+  useEffect(() => {
+    let timer;
+    if (jobStatus && !isComplete && !isError) {
+      timer = setInterval(() => {
+        setElapsedSec((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [jobStatus, isComplete, isError]);
+
+  // Rotate reassuring tips during final compile stage
+  useEffect(() => {
+    let tipInterval;
+    if (jobStatus && jobStatus.progress >= 80 && !isComplete && !isError) {
+      tipInterval = setInterval(() => {
+        setTipIndex((prev) => (prev + 1) % COMPILING_TIPS.length);
+      }, 3500);
+    }
+    return () => clearInterval(tipInterval);
+  }, [jobStatus, isComplete, isError]);
 
   if (!jobStatus) return null;
 
@@ -80,7 +113,7 @@ export default function ProgressCard({
         {!isComplete && !isError && (
           <div className="pbar-track">
             <div 
-              className="pbar-fill" 
+              className={`pbar-fill ${jobStatus.progress >= 80 ? 'pbar-fill--pulsing' : ''}`} 
               style={{ width: `${Math.max(5, jobStatus.progress)}%` }} 
             />
           </div>
@@ -142,6 +175,22 @@ export default function ProgressCard({
             </div>
           )}
         </div>
+
+        {/* Final Typesetting Reassurance Card */}
+        {!isComplete && !isError && jobStatus.progress >= 80 && (
+          <div className="compiling-reassurance-card">
+            <div className="reassurance-header">
+              <div className="reassurance-left">
+                <span className="reassurance-spinner"></span>
+                <span className="reassurance-title">Typesetting Engine Active</span>
+              </div>
+              <span className="reassurance-timer">⏱️ {Math.floor(elapsedSec / 60)}:{(elapsedSec % 60).toString().padStart(2, '0')}</span>
+            </div>
+            <div className="reassurance-tip-text">
+              {COMPILING_TIPS[tipIndex % COMPILING_TIPS.length]}
+            </div>
+          </div>
+        )}
 
         {/* Compression Statistics Badge */}
         {isComplete && serviceType === 'compress' && origSize > 0 && compSize > 0 && (

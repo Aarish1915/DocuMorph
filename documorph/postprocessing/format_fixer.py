@@ -68,16 +68,23 @@ class FormatFixer:
         # Any remaining bare \text not followed by { is invalid LaTeX and causes MathJax "Missing argument for \text"
         text = re.sub(r'\\text\b(?!\s*\{)', '', text)
         
-        # Ensure balanced braces inside inline math $ ... $
+        # 8.b. Chemical & Physical Formula Subscript Sanitizer:
+        # Fixes broken formulas like \text{C}6\text{H}{12}\text{O}6 -> \text{C}_6\text{H}_{12}\text{O}_6
+        # 1. Fix element followed by {digits} without underscore: \text{H}{12} -> \text{H}_{12}
+        text = re.sub(r'(\\text\{[A-Z][a-z]?\})\s*\{(\d+)\}', r'\1_{\2}', text)
+        text = re.sub(r'(?<![a-zA-Z0-9_\\])([A-Z][a-z]?)\{(\d+)\}', r'\1_{\2}', text)
+        # 2. Fix \text{Element}digits without underscore: \text{C}6 -> \text{C}_6, \text{O}6 -> \text{O}_6
+        text = re.sub(r'(\\text\{[A-Z][a-z]?\})\s*(\d+)', r'\1_{\2}', text)
+        # 3. Fix unclosed/asymmetric parenthesis before math ending with $: (\text{C}_6...$ -> ($\text{C}_6...$)
+        text = re.sub(r'\(([\\a-zA-Z0-9_{}^]+)\$', r'($\1$)', text)
+
+        # 8.c. Ensure balanced braces inside inline math $ ... $
         def fix_inline_math(match):
             m = match.group(0)
-            # If math has unclosed { (more { than })
             diff = m.count('{') - m.count('}')
             if diff > 0:
-                # Add missing closing braces before closing $
                 m = m[:-1] + ('}' * diff) + '$'
             elif diff < 0:
-                # Extra closing braces: strip from end
                 for _ in range(abs(diff)):
                     m = re.sub(r'\}(?=[^}]*\$)', '', m, count=1)
             return m

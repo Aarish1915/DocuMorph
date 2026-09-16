@@ -133,30 +133,6 @@ export default function Header({
             )}
           </button>
 
-          {/* Active Backend Engine Status Indicator */}
-          {activeNode && (
-            <button
-              type="button"
-              className="backend-node-badge"
-              onClick={onToggleSettings}
-              title={`Backend: ${activeNode.node === 'local' ? 'Local High-Speed Engine (Port 8000)' : 'Render Cloud Failover Active'}. Click to configure.`}
-              aria-label={`Backend connection: ${activeNode.node === 'local' ? 'Local Engine' : 'Cloud Active'}`}
-            >
-              {activeNode.node === 'local' ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ color: '#16a34a' }}>
-                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                  <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                  <line x1="6" y1="18" x2="6.01" y2="18"></line>
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ color: '#2563eb' }}>
-                  <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
-                </svg>
-              )}
-              <span className="btn-label">{activeNode.node === 'local' ? 'Local' : 'Cloud Active'}</span>
-            </button>
-          )}
 
           {/* Quick Action Utility Group */}
           <button 

@@ -6,6 +6,7 @@ import { API_BASE, probeBackend, getStoredConfig } from './config';
 import Header from './components/common/Header';
 import Sidebar from './components/common/Sidebar';
 import SettingsModal from './components/common/SettingsModal';
+import AdminDashboardModal from './components/admin/AdminDashboardModal';
 import ToastContainer from './components/common/ToastContainer';
 import HeroSection from './components/hero/HeroSection';
 import WorkspaceScreen from './components/workspace/WorkspaceScreen';
@@ -182,11 +183,24 @@ export default function App() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Advanced settings
+  // Advanced settings & Admin Dashboard
   const [showSettings, setShowSettings] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [customApiKey, setCustomApiKey] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
   const [activeNode, setActiveNode] = useState(null);
+
+  // Global Developer Admin Shortcut (Ctrl+Shift+A or Cmd+Shift+A)
+  useEffect(() => {
+    const handleAdminKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setShowAdmin((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleAdminKey);
+    return () => window.removeEventListener('keydown', handleAdminKey);
+  }, []);
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
@@ -498,6 +512,12 @@ export default function App() {
         setCustomPrompt={setCustomPrompt}
       />
 
+      {/* ── DEVELOPER ADMIN & QUALITY VAULT MODAL ── */}
+      <AdminDashboardModal
+        isOpen={showAdmin}
+        onClose={() => setShowAdmin(false)}
+      />
+
       {/* ── HISTORY DRAWER ── */}
       <Sidebar
         isOpen={showHistory}
@@ -609,6 +629,13 @@ export default function App() {
       {/* ── MINIMAL FOOTER ── */}
       <footer className="site-footer">
         <span>DocuMorph • 100% Private. Files are never stored.</span>
+        <button 
+          className="admin-trigger-btn"
+          onClick={() => setShowAdmin(true)}
+          title="Admin & Developer Dashboard (Ctrl+Shift+A)"
+        >
+          ⚙️ Admin Hub
+        </button>
       </footer>
 
       {/* ── TOAST CONTAINER ── */}
