@@ -120,8 +120,13 @@ _mem_handler = InMemoryLogHandler()
 _mem_handler.setLevel(logging.INFO)
 logging.getLogger().addHandler(_mem_handler)
 
-@app.on_event("startup")
-def on_startup():
+from contextlib import asynccontextmanager
+from documorph.api.admin_router import admin_router
+
+app.include_router(admin_router)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global _embedded_worker_thread
     init_db()
     cleanup_old_files()
@@ -141,6 +146,9 @@ def on_startup():
                 sys.stdout.flush()
             except Exception:
                 pass
+    yield
+
+app.router.lifespan_context = lifespan
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():

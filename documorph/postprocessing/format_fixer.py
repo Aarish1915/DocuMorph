@@ -77,6 +77,14 @@ class FormatFixer:
         text = re.sub(r'(\\text\{[A-Z][a-z]?\})\s*(\d+)', r'\1_{\2}', text)
         # 3. Fix unclosed/asymmetric parenthesis before math ending with $: (\text{C}_6...$ -> ($\text{C}_6...$)
         text = re.sub(r'\(([\\a-zA-Z0-9_{}^]+)\$', r'($\1$)', text)
+        # 4. Chemical reaction & equilibrium arrows inside math: -> to \rightarrow, <=> to \rightleftharpoons
+        def _fix_chem_arrows(match):
+            m = match.group(0)
+            m = re.sub(r'(?<=\s|<)(?:<==>|<=>|<-->)(?=\s|>|\$)', r'\\rightleftharpoons ', m)
+            m = re.sub(r'(?<=\s)(?:-->|->)(?=\s|\$)', r'\\rightarrow ', m)
+            return m
+        text = re.sub(r'\$[^$\n]+\$', _fix_chem_arrows, text)
+        text = re.sub(r'\$\$(.*?)\$\$', _fix_chem_arrows, text, flags=re.DOTALL)
 
         # 8.c. Ensure balanced braces inside inline math $ ... $
         def fix_inline_math(match):

@@ -379,15 +379,16 @@ class DocuMorphOrchestrator:
                                         # Validate dimensions (ignore tiny noise or full-page captures)
                                         if box_w >= 40 and box_h >= 40 and (box_w * box_h) < 850000:
                                             pw, ph = page_obj.rect.width, page_obj.rect.height
-                                            # Generous adaptive margin padding: 4.5% height, 3.5% width
+                                            # Generous adaptive margin padding: 5.5% height, 4.0% width
                                             # Ensures terminals, arrows, coil turns, and captions are never clipped
-                                            pad_x = max(18.0, 0.035 * pw)
-                                            pad_y = max(28.0, 0.045 * ph)
+                                            pad_x = max(24.0, 0.040 * pw)
+                                            pad_y = max(36.0, 0.055 * ph)
                                             rx0 = max(0.0, (xmin * pw / 1000.0) - pad_x)
                                             ry0 = max(0.0, (ymin * ph / 1000.0) - pad_y)
                                             rx1 = min(pw, (xmax * pw / 1000.0) + pad_x)
                                             ry1 = min(ph, (ymax * ph / 1000.0) + pad_y)
 
+                                            orig_ry0 = ry0
                                             # Intelligent Whitespace Gutter Snapping:
                                             # Snaps to natural blank lines to avoid slicing through adjacent text paragraphs
                                             try:
@@ -400,17 +401,19 @@ class DocuMorphOrchestrator:
                                                     is_ink = (gray < 235)
 
                                                     # Search for horizontal whitespace gutter near top (within first 25% of height)
-                                                    top_window = min(int(cand_pix.height * 0.25), 45)
+                                                    # Allow up to 0.5% dust/scanner noise
+                                                    top_window = min(int(cand_pix.height * 0.25), 50)
                                                     for dy in range(top_window):
-                                                        if np.mean(is_ink[dy, :]) == 0:
-                                                            ry0 = ry0 + (dy / 1.5)
+                                                        if np.mean(is_ink[dy, :]) <= 0.005:
+                                                            ry0 = orig_ry0 + (dy / 1.5)
                                                             break
 
                                                     # Search for horizontal whitespace gutter near bottom (within last 25% of height)
-                                                    bot_window = min(int(cand_pix.height * 0.25), 45)
+                                                    # CRITICAL BUG FIX: Reference unshifted orig_ry0, NOT modified ry0
+                                                    bot_window = min(int(cand_pix.height * 0.25), 50)
                                                     for dy in range(cand_pix.height - 1, cand_pix.height - bot_window, -1):
-                                                        if np.mean(is_ink[dy, :]) == 0:
-                                                            ry1 = ry0 + (dy / 1.5)
+                                                        if np.mean(is_ink[dy, :]) <= 0.005:
+                                                            ry1 = orig_ry0 + (dy / 1.5)
                                                             break
                                             except Exception as snap_ex:
                                                 logger.debug(f"Whitespace snapping skipped: {snap_ex}")

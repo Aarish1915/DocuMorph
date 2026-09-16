@@ -5,7 +5,7 @@ import os
 import threading
 import gc
 
-from documorph.core.database import SessionLocal, Job
+from documorph.core.database import SessionLocal, Job, claim_next_job
 from documorph.worker.pipeline import DocuMorphOrchestrator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -35,13 +35,13 @@ def schedule_delayed_memory_sweep(delay_seconds: int = 25):
     threading.Thread(target=_sweep, daemon=True, name="DocuMorph-RAM-Sweeper").start()
 
 def run_worker():
-    logger.info("DocuMorph Worker started. Polling SQLite queue for jobs...")
+    logger.info("DocuMorph Worker started. Polling database queue for jobs...")
     
     while True:
         db = SessionLocal()
         try:
-            # Find the oldest queued job
-            job = db.query(Job).filter(Job.status.in_(["QUEUED", "QUEUED_REPROCESS"])).order_by(Job.created_at.asc()).first()
+            # Atomically claim the next job (SKIP LOCKED on Postgres, FIFO on SQLite)
+            job = claim_next_job(db)
             
             if not job:
                 # No jobs, sleep and poll again
@@ -50,9 +50,6 @@ def run_worker():
                 continue
                 
             logger.info(f"Picked up job {job.id} for file {job.file_path}")
-            job.status = "PROCESSING"
-            job.progress_msg = "Initializing..."
-            db.commit()
             
             job_id = job.id
             file_path = job.file_path

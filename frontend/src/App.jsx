@@ -189,17 +189,7 @@ export default function App() {
     }
   };
 
-  // Global Developer Admin Shortcut (Ctrl+Shift+A or Cmd+Shift+A)
-  useEffect(() => {
-    const handleAdminKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-        e.preventDefault();
-        setShowAdmin((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleAdminKey);
-    return () => window.removeEventListener('keydown', handleAdminKey);
-  }, []);
+
 
   const addToast = (msg, type = 'info') => {
     const id = Date.now();
