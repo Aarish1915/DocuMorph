@@ -2,7 +2,6 @@
 // Primary: Local Laptop via Cloudflare Tunnel (High-Speed, 8GB RAM, unmetered OCR)
 // Fallback: Cloud Backend on Render (Always-on 24/7 failover)
 
-const DEFAULT_LAPTOP_TUNNEL = '';
 const DEFAULT_RENDER_CLOUD = import.meta.env.VITE_API_URL || import.meta.env.VITE_RENDER_URL || 'https://documorph-v1.onrender.com';
 
 export function getStoredConfig() {
@@ -22,7 +21,9 @@ export function getStoredConfig() {
     finalRenderUrl = envCloudUrl;
     try {
       localStorage.setItem('documorph_render_url', envCloudUrl);
-    } catch (e) {}
+    } catch {
+      // Ignore localStorage write errors in private browsing
+    }
   }
 
   return {

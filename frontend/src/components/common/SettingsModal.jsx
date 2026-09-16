@@ -9,21 +9,30 @@ export default function SettingsModal({
   customPrompt,
   setCustomPrompt,
 }) {
-  const [tunnelUrl, setTunnelUrl] = useState('');
-  const [renderUrl, setRenderUrl] = useState('');
-  const [backendPref, setBackendPref] = useState('auto');
+  if (!isOpen) return null;
+  return (
+    <SettingsModalDialog
+      onClose={onClose}
+      customApiKey={customApiKey}
+      setCustomApiKey={setCustomApiKey}
+      customPrompt={customPrompt}
+      setCustomPrompt={setCustomPrompt}
+    />
+  );
+}
+
+function SettingsModalDialog({
+  onClose,
+  customApiKey,
+  setCustomApiKey,
+  customPrompt,
+  setCustomPrompt,
+}) {
+  const [tunnelUrl, setTunnelUrl] = useState(() => getStoredConfig().laptopUrl);
+  const [renderUrl, setRenderUrl] = useState(() => getStoredConfig().renderUrl);
+  const [backendPref, setBackendPref] = useState(() => getStoredConfig().preferred);
   const [probeStatus, setProbeStatus] = useState(null);
   const [isTesting, setIsTesting] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      const cfg = getStoredConfig();
-      setTunnelUrl(cfg.laptopUrl);
-      setRenderUrl(cfg.renderUrl);
-      setBackendPref(cfg.preferred);
-      runProbe();
-    }
-  }, [isOpen]);
 
   const runProbe = async () => {
     setIsTesting(true);
@@ -37,6 +46,19 @@ export default function SettingsModal({
     }
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await probeBackend(true);
+        if (!cancelled) setProbeStatus(res);
+      } catch {
+        if (!cancelled) setProbeStatus({ node: 'none', online: false });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const handleSaveBackend = () => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('documorph_tunnel_url', tunnelUrl.trim());
@@ -45,8 +67,6 @@ export default function SettingsModal({
       runProbe();
     }
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="settings-modal-backdrop" onClick={onClose}>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-export const SERVICES = [
+const SERVICES = [
   {
     id: 'clean_format',
     title: 'Clean & Beautify',

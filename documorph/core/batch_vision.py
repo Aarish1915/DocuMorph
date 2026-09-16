@@ -64,7 +64,7 @@ class BatchVisionEngine:
             
         ignore_clause = f"\nCRITICAL: DO NOT extract any images matching these descriptions: {self.ignore_images}. Return an empty string for them." if self.ignore_images else ""
         
-        prompt = f"""
+        prompt = """
 You are an expert OCR and document structure AI. Your job is to extract text, tables, and math equations from the provided image(s) perfectly.
 
 ### EXTRACTION RULES:
@@ -75,7 +75,7 @@ You are an expert OCR and document structure AI. Your job is to extract text, ta
 5. **MATH & CHEMICAL FORMULA PRECISION (CRITICAL)**:
    - For mathematical equations, use standard LaTeX notation ($...$ inline, $$...$$ display).
    - **CHEMICAL & SUBSCRIPT FIDELITY**: All chemical formulas and physics subscripts MUST use explicit LaTeX subscripts with underscores, e.g. $\text{C}_6\text{H}_{12}\text{O}_6$, $\text{H}_2\text{O}$, $\text{CO}_2$, $\text{H}_2\text{SO}_4$, $N_1, N_2, I_1, I_2, \Phi_B, B_1, B_2, v_0, t_1$. NEVER write subscripts as normal baseline digits (DO NOT write `\text{C}6\text{H}{12}\text{O}6`, `C6H12O6`, or `\text{H}{12}`).
-   - **DELIMITER BALANCE**: Always balance inline and display math delimiters symmetrically. NEVER enclose narrative text, explanatory sentences, or Devanagari/Hindi words inside `$$ ... $$` or `$...$` math blocks. Place all explanatory prose (e.g. "लेकिन परिनालिका के अंदर चुंबकीय क्षेत्र," or "इसकी तुलना $N\\Phi_B = LI$ से करने पर") OUTSIDE math delimiters as standard text paragraphs. Never nest `$ ... $` inside `$$ ... $$`. Always ensure \\text{{...}} has valid braces around text (e.g. $\\text{{m/s}}$).
+   - **DELIMITER BALANCE**: Always balance inline and display math delimiters symmetrically. NEVER enclose narrative text, explanatory sentences, or Devanagari/Hindi words inside `$$ ... $$` or `$...$` math blocks. Place all explanatory prose (e.g. "लेकिन परिनालिका के अंदर चुंबकीय क्षेत्र," or "इसकी तुलना $N\Phi_B = LI$ से करने पर") OUTSIDE math delimiters as standard text paragraphs. Never nest `$ ... $` inside `$$ ... $$`. Always ensure \\text{...} has valid braces around text (e.g. $\\text{m/s}$).
 6. **ZERO HALLUCINATION, ZERO COMMENTARY & ZERO OMISSION (CRITICAL)**:
    - Extract 100% of the authentic concepts, facts, names, formulas, and examples VERBATIM.
    - NEVER add meta-commentary, scene descriptions, or photo captions like "(No text found in image)" or "[Photograph depicting...]". If an image has no text, output an empty string or omit it.
@@ -114,7 +114,7 @@ You are an expert OCR and document structure AI. Your job is to extract text, ta
    - For river confluences / Panch Prayag: format as an HTML `<table>` with columns `Prayag` and `Confluence / Rivers`.
 9. **SPAM & PROMOTIONAL FEE DELETION**: Silently DELETE all coaching center promotional banners, watermarks, and fees (e.g. "LexRise Academy", "Bihar APO Pre", "Judiciary Pre", "Foundation Batch", "UK APO F: 4444/-", "Jharkhand APO Mains-6999/-", "Raj APO Pre : 2999/-", "7599457405", "@VRLEXA"). NEVER turn an advertisement fee into a document heading!
 10. **NATURAL READABILITY & TASTEFUL EMOJIS**: Use clean, un-bloated formatting. For major topic headings, you may include a simple, tasteful emoji (e.g. 💡 for concepts/definitions, ⚙ for mechanics/physics principles, ⏱ for speed/time, 📌 for key facts, 🌊 for river systems, 🏔 for mountain ranges) to guide the student's eye, but keep formatting natural and simple.
-{ignore_clause}
+""" + (f"\n{ignore_clause}" if ignore_clause else "") + """
 Output the raw markdown for each image in the exact order they appear. If multiple images are provided, you MUST separate the markdown for each image with exactly the following text on a new line: `---PAGE_BREAK---`. Do not use JSON. Output ONLY the markdown and the page breaks.
 """
             

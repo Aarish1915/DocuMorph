@@ -1,6 +1,6 @@
 import React from 'react';
 
-export const PRESETS = [
+const PRESETS = [
   {
     id: 'coaching_exam',
     icon: '🎓',

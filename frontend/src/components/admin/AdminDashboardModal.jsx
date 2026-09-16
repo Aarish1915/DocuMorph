@@ -2,45 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { getStoredConfig, probeBackend, API_BASE } from '../../config';
 
 export default function AdminDashboardModal({ isOpen, onClose }) {
+  if (!isOpen) return null;
+  return <AdminDashboardModalDialog onClose={onClose} />;
+}
+
+function AdminDashboardModalDialog({ onClose }) {
   const [activeTab, setActiveTab] = useState('monitoring'); // 'monitoring' | 'vault' | 'engine'
   const [adminStatus, setAdminStatus] = useState(null);
-  const [loadingStatus, setLoadingStatus] = useState(false);
   const [audits, setAudits] = useState([]);
   const [loadingAudits, setLoadingAudits] = useState(false);
   const [selectedAudit, setSelectedAudit] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Engine routing settings
-  const [config, setConfig] = useState({ laptopUrl: '', renderUrl: '', preferred: 'auto' });
-  const [customKey, setCustomKey] = useState('');
+  const [config, setConfig] = useState(() => getStoredConfig());
+  const [customKey, setCustomKey] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('documorph_custom_api_key') || '' : ''));
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      const stored = getStoredConfig();
-      setConfig(stored);
-      setCustomKey(localStorage.getItem('documorph_custom_api_key') || '');
-      loadStatus();
-      loadAudits();
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    let interval;
-    if (isOpen && autoRefresh && activeTab === 'monitoring') {
-      interval = setInterval(() => {
-        loadStatus(false);
-      }, 3500);
-    }
-    return () => clearInterval(interval);
-  }, [isOpen, autoRefresh, activeTab]);
 
   const getTargetApiUrl = () => {
     return API_BASE || 'http://localhost:8000';
   };
 
-  const loadStatus = async (showSpinner = true) => {
-    if (showSpinner) setLoadingStatus(true);
+  const loadStatus = async () => {
     try {
       const activeNode = await probeBackend();
       const base = activeNode.url || getTargetApiUrl();
@@ -51,8 +34,6 @@ export default function AdminDashboardModal({ isOpen, onClose }) {
       }
     } catch (e) {
       console.error('Failed to load admin status:', e);
-    } finally {
-      if (showSpinner) setLoadingStatus(false);
     }
   };
 
@@ -86,6 +67,41 @@ export default function AdminDashboardModal({ isOpen, onClose }) {
       console.error('Failed to load audit detail:', e);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const activeNode = await probeBackend();
+        const base = activeNode.url || getTargetApiUrl();
+        const [resStatus, resAudits] = await Promise.all([
+          fetch(`${base}/api/admin/status`),
+          fetch(`${base}/api/admin/audits`)
+        ]);
+        if (resStatus.ok && !cancelled) {
+          const statusData = await resStatus.json();
+          setAdminStatus(statusData);
+        }
+        if (resAudits.ok && !cancelled) {
+          const auditsData = await resAudits.json();
+          setAudits(auditsData.audits || []);
+        }
+      } catch (e) {
+        console.error('Failed to load initial admin data:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let interval;
+    if (autoRefresh && activeTab === 'monitoring') {
+      interval = setInterval(() => {
+        loadStatus();
+      }, 3500);
+    }
+    return () => clearInterval(interval);
+  }, [autoRefresh, activeTab]);
 
   const handleSaveEngine = (newPref) => {
     const updated = { ...config, preferred: newPref };
@@ -226,6 +242,15 @@ export default function AdminDashboardModal({ isOpen, onClose }) {
               <p>
                 <strong>Quality Improvement Vault:</strong> Every student document processed records the user's custom instructions, page count, and generated Markdown. Use this data to audit OCR quality, catch MathJax formatting edge-cases, and fine-tune system prompts.
               </p>
+              <button 
+                type="button" 
+                className="btn-refresh-vault" 
+                onClick={loadAudits} 
+                disabled={loadingAudits}
+                style={{ marginTop: '8px', padding: '4px 10px', fontSize: '0.8rem', cursor: 'pointer', borderRadius: '4px', border: '1px solid var(--border-color, #ccc)', background: 'var(--bg-secondary, #f5f5f5)' }}
+              >
+                {loadingAudits ? 'Refreshing...' : '🔄 Refresh Records'}
+              </button>
             </div>
 
             {selectedAudit ? (

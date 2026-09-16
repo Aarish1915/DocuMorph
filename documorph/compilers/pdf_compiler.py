@@ -558,16 +558,25 @@ class PDFCompiler:
             page = browser.new_page()
             page.set_default_timeout(60000)
             try:
-                page.set_content(full_html, wait_until="commit")
-                page.wait_for_load_state("domcontentloaded", timeout=12000)
+                page.set_content(full_html, wait_until="domcontentloaded", timeout=30000)
             except Exception as set_ex:
-                logger.debug(f"Fast load state fallback: {set_ex}")
+                logger.warning(f"DOM load warning, attempting commit fallback: {set_ex}")
+                try:
+                    page.set_content(full_html, wait_until="commit", timeout=20000)
+                    page.wait_for_load_state("domcontentloaded", timeout=15000)
+                except Exception:
+                    pass
+
+            try:
+                page.wait_for_selector("body", state="attached", timeout=10000)
+            except Exception:
+                pass
 
             if has_math:
                 if progress_callback:
                     progress_callback("Rendering vector MathJax expressions...", 93)
                 try:
-                    page.wait_for_function("window.mathjax_is_done === true", timeout=6000)
+                    page.wait_for_function("window.mathjax_is_done === true", timeout=8000)
                 except Exception:
                     pass
 

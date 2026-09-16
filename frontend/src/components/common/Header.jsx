@@ -4,7 +4,6 @@ export default function Header({
   step = 1,
   serviceTitle = 'Clean & Format',
   activeView = 'home',
-  activeNode = null,
   onNavigateView,
   onBack,
   onNewJob,

@@ -33,19 +33,17 @@ export default function ProgressCard({
   const [elapsedSec, setElapsedSec] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
   const [downloading, setDownloading] = useState(false);
-  const [canShare, setCanShare] = useState(false);
-
-  // Detect iOS / mobile Web Share capability for direct phone saving
-  useEffect(() => {
+  const [canShare] = useState(() => {
     try {
       if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && typeof File === 'function') {
         const dummyFile = new File([''], 'doc.pdf', { type: 'application/pdf' });
-        setCanShare(Boolean(navigator.canShare({ files: [dummyFile] })));
+        return Boolean(navigator.canShare({ files: [dummyFile] }));
       }
-    } catch (e) {
-      setCanShare(false);
+    } catch {
+      return false;
     }
-  }, []);
+    return false;
+  });
 
   // Live timer for active jobs
   useEffect(() => {

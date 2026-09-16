@@ -7,7 +7,6 @@ export default function InteractiveProofViewer({
   afterImg,
   beforeLabel = 'Scan with Ads & Watermarks',
   afterLabel = 'Clean Printable Note',
-  features = ['Watermarks Removed', 'Sharp Math & Formulas', 'Clean White Pages'],
 }) {
   const [displayMode, setDisplayMode] = useState('split'); // 'split' | 'side'
   const [viewMode, setViewMode] = useState('split'); // 'split' | 'before' | 'after'

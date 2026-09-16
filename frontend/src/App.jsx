@@ -9,7 +9,6 @@ import SettingsModal from './components/common/SettingsModal';
 import AdminDashboardModal from './components/admin/AdminDashboardModal';
 import ToastContainer from './components/common/ToastContainer';
 import HeroSection from './components/hero/HeroSection';
-import WorkspaceScreen from './components/workspace/WorkspaceScreen';
 import ProgressCard from './components/progress/ProgressCard';
 
 import ToolDirectory from './components/pages/ToolDirectory';
@@ -80,6 +79,24 @@ export default function App() {
   const [step, setStep] = useState(1);
   const [serviceType, setServiceType] = useState('clean_format');
   const [configs, setConfigs] = useState(DEFAULT_CONFIGS);
+
+  // File & Drag state
+  const [file, setFile] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Execution & Job state
+  const [jobStatus, setJobStatus] = useState(null);
+  const [jobHistory, setJobHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Advanced settings & Admin Dashboard
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState('');
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [toasts, setToasts] = useState([]);
 
   // Theme Engine (System auto-detect + localStorage + manual toggle)
   const [themeMode, setThemeMode] = useState(() => {
@@ -172,24 +189,6 @@ export default function App() {
     }
   };
 
-  // File & Drag state
-  const [file, setFile] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Execution & Job state
-  const [jobStatus, setJobStatus] = useState(null);
-  const [jobHistory, setJobHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [showHistory, setShowHistory] = useState(false);
-
-  // Advanced settings & Admin Dashboard
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
-  const [customApiKey, setCustomApiKey] = useState('');
-  const [customPrompt, setCustomPrompt] = useState('');
-  const [activeNode, setActiveNode] = useState(null);
-
   // Global Developer Admin Shortcut (Ctrl+Shift+A or Cmd+Shift+A)
   useEffect(() => {
     const handleAdminKey = (e) => {
@@ -201,9 +200,6 @@ export default function App() {
     window.addEventListener('keydown', handleAdminKey);
     return () => window.removeEventListener('keydown', handleAdminKey);
   }, []);
-
-  // Toast notifications
-  const [toasts, setToasts] = useState([]);
 
   const addToast = (msg, type = 'info') => {
     const id = Date.now();
@@ -277,7 +273,7 @@ export default function App() {
       baseUrl = node.url || API_BASE;
     }
 
-    const handleTerminalState = (s) => {
+    const handleTerminalState = () => {
       stopActiveStream();
       fetchHistory(baseUrl);
     };
@@ -605,7 +601,6 @@ export default function App() {
         step={headerStep}
         serviceTitle={getServiceTitle()}
         activeView={activeView}
-        activeNode={activeNode}
         onNavigateView={navigateView}
         onBack={handleBack}
         onNewJob={handleNewJob}
