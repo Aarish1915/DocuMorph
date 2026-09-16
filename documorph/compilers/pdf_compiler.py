@@ -290,7 +290,14 @@ class PDFCompiler:
     def css(self) -> str:
         return self._generate_css("standard")
 
-    def compile(self, markdown_text: str, output_filename: str, compact_mode: str = "standard", is_landscape: bool = False) -> str:
+    def compile(
+        self, 
+        markdown_text: str, 
+        output_filename: str, 
+        compact_mode: str = "standard", 
+        is_landscape: bool = False,
+        progress_callback = None
+    ) -> str:
         """
         Converts markdown to HTML, then uses Playwright to render it as a compact or standard A4 PDF.
         Supports Presentation Slide Landscape layout when is_landscape=True.
@@ -501,17 +508,33 @@ class PDFCompiler:
                 "print_background": True
             }
         
+        if progress_callback:
+            progress_callback("Typesetting page typography & HTML layout...", 91)
+
+        # Container-safe low-memory Chromium flags (prevents /dev/shm OOM crashes on Render/Docker)
+        chromium_args = [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--disable-software-rasterizer",
+            "--disable-extensions",
+            "--mute-audio"
+        ]
+        if sys.platform.startswith("linux"):
+            chromium_args.append("--no-zygote")
+
         # Render to PDF via Playwright Chromium (with automatic self-healing on missing browser)
         with sync_playwright() as p:
             try:
-                browser = p.chromium.launch(headless=True)
+                browser = p.chromium.launch(headless=True, args=chromium_args)
             except Exception as launch_err:
                 err_msg = str(launch_err)
                 if "Executable doesn't exist" in err_msg or "playwright install" in err_msg:
                     logger.warning("Playwright Chromium executable missing in environment. Running auto-install...")
                     try:
                         subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
-                        browser = p.chromium.launch(headless=True)
+                        browser = p.chromium.launch(headless=True, args=chromium_args)
                     except Exception as install_err:
                         logger.error(f"Failed to auto-install Playwright chromium: {install_err}")
                         raise launch_err
@@ -519,20 +542,29 @@ class PDFCompiler:
                     raise launch_err
 
             page = browser.new_page()
-            page.set_default_timeout(30000)
+            page.set_default_timeout(60000)
             try:
                 page.set_content(full_html, wait_until="commit")
-                page.wait_for_load_state("domcontentloaded", timeout=8000)
+                page.wait_for_load_state("domcontentloaded", timeout=12000)
             except Exception as set_ex:
                 logger.debug(f"Fast load state fallback: {set_ex}")
 
+            if progress_callback:
+                progress_callback("Rendering vector MathJax expressions...", 93)
+
             try:
-                page.wait_for_function("window.mathjax_is_done === true", timeout=6000)
+                page.wait_for_function("window.mathjax_is_done === true", timeout=8000)
             except Exception:
                 pass
+
+            if progress_callback:
+                progress_callback("Compiling print-ready PDF pages...", 96)
             
             page.pdf(**pdf_opts)
             browser.close()
+
+        if progress_callback:
+            progress_callback("Deflating streams & optimizing file size...", 99)
 
         # PyMuPDF Stream Deflation: optimize byte size as well as space
         try:

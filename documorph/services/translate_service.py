@@ -38,5 +38,11 @@ class TranslateServiceHandler(BaseServiceHandler):
         self.orchestrator._report("Compiling Translated PDF...", 90)
         final_pdf_path = os.path.join(self.orchestrator.output_dir, f"TRANSLATED_{timestamp}_{base_name}.pdf")
         is_landscape = getattr(self.orchestrator, "is_landscape", False)
-        self.orchestrator.pdf_compiler.compile(processed_markdown, final_pdf_path, compact_mode="standard", is_landscape=is_landscape)
+        self.orchestrator.pdf_compiler.compile(
+            processed_markdown, 
+            final_pdf_path, 
+            compact_mode="standard", 
+            is_landscape=is_landscape,
+            progress_callback=self.orchestrator.progress_callback
+        )
         return final_pdf_path

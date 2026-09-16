@@ -82,5 +82,11 @@ class CompressServiceHandler(BaseServiceHandler):
         final_pdf_path = os.path.join(self.orchestrator.output_dir, f"COMPACT_{timestamp}_{base_name}.pdf")
         compact_mode = "ultra_dense" if quality in ("max", "ultra_dense") else "compact"
         is_landscape = getattr(self.orchestrator, "is_landscape", False)
-        self.orchestrator.pdf_compiler.compile(processed_markdown, final_pdf_path, compact_mode=compact_mode, is_landscape=is_landscape)
+        self.orchestrator.pdf_compiler.compile(
+            processed_markdown, 
+            final_pdf_path, 
+            compact_mode=compact_mode, 
+            is_landscape=is_landscape,
+            progress_callback=self.orchestrator.progress_callback
+        )
         return final_pdf_path

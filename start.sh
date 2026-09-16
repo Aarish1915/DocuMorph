@@ -11,9 +11,7 @@ if ! python -c "from playwright.sync_api import sync_playwright; p = sync_playwr
     python -m playwright install chromium || true
 fi
 
-# Start background queue worker in background
-echo "Starting DocuMorph Queue Worker..."
-python -m documorph.worker.queue_worker &
+# Note: Worker is auto-spawned in background thread by FastAPI on_startup hook
 
 # Start FastAPI gateway on Render or local port
 PORT="${PORT:-8000}"
