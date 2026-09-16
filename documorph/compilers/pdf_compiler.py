@@ -432,39 +432,54 @@ class PDFCompiler:
             </script>
             """
 
+        has_math = bool("$" in markdown_text or "\\(" in markdown_text or "\\[" in markdown_text)
+        
+        if has_math:
+            mathjax_block = """
+            <script>
+              window.MathJax = {
+                options: {
+                  enableMenu: false
+                },
+                tex: {
+                  inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
+                  displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
+                  packages: {'[+]': ['noerrors']},
+                  formatError: (jax, err) => {
+                    const span = document.createElement('span');
+                    span.className = 'math-raw-fallback';
+                    span.textContent = jax.latex || '';
+                    return span;
+                  }
+                },
+                loader: {
+                  load: ['[tex]/noerrors']
+                },
+                startup: {
+                  pageReady: () => {
+                    return MathJax.startup.defaultPageReady().then(() => {
+                      window.mathjax_is_done = true;
+                    });
+                  }
+                }
+              };
+            </script>
+            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+            """
+        else:
+            mathjax_block = """
+            <script>
+              window.mathjax_is_done = true;
+            </script>
+            """
+
         full_html = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             {dynamic_css}
-            
-            <script>
-              window.MathJax = {{
-                tex: {{
-                  inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
-                  displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
-                  packages: {{'[+]': ['noerrors']}},
-                  formatError: (jax, err) => {{
-                    const span = document.createElement('span');
-                    span.className = 'math-raw-fallback';
-                    span.textContent = jax.latex || '';
-                    return span;
-                  }}
-                }},
-                loader: {{
-                  load: ['[tex]/noerrors']
-                }},
-                startup: {{
-                  pageReady: () => {{
-                    return MathJax.startup.defaultPageReady().then(() => {{
-                      window.mathjax_is_done = true;
-                    }});
-                  }}
-                }}
-              }};
-            </script>
-            <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+            {mathjax_block}
         </head>
         <body>
             {html_content}
@@ -548,13 +563,13 @@ class PDFCompiler:
             except Exception as set_ex:
                 logger.debug(f"Fast load state fallback: {set_ex}")
 
-            if progress_callback:
-                progress_callback("Rendering vector MathJax expressions...", 93)
-
-            try:
-                page.wait_for_function("window.mathjax_is_done === true", timeout=8000)
-            except Exception:
-                pass
+            if has_math:
+                if progress_callback:
+                    progress_callback("Rendering vector MathJax expressions...", 93)
+                try:
+                    page.wait_for_function("window.mathjax_is_done === true", timeout=6000)
+                except Exception:
+                    pass
 
             if progress_callback:
                 progress_callback("Compiling print-ready PDF pages...", 96)

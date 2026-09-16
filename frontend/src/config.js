@@ -61,7 +61,7 @@ export async function probeBackend(forceRefresh = false) {
   if (!hasExternalEnvApi && isLocalHost) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 2000);
+      const timer = setTimeout(() => controller.abort(), 350);
       const res = await fetch('http://localhost:8000/api/settings', { signal: controller.signal });
       clearTimeout(timer);
       if (res.ok) {

@@ -42,8 +42,8 @@ def run_worker():
                     if inner_job:
                         inner_job.progress_pct = pct
                         inner_job.progress_msg = msg
-                        # Also update status if we want the UI to show the granular message as status
-                        inner_job.status = msg 
+                        # Ensure canonical status remains PROCESSING for polling stability
+                        inner_job.status = "PROCESSING"
                         inner_db.commit()
                 finally:
                     inner_db.close()

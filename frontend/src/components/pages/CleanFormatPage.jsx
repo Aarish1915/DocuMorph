@@ -135,6 +135,69 @@ export default function CleanFormatPage({
               />
             </div>
           </div>
+
+          {/* Page Range Selection for Rapid Iteration & Fast Testing */}
+          <div className="tool-settings-group" style={{ marginTop: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span className="tool-setting-label" style={{ fontWeight: 650 }}>📄 Pages to Process:</span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => onChangeConfig({ ...config, page_range: 'all' })}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: '1.5px solid var(--border-default)',
+                    background: config.page_range !== 'custom' ? 'var(--color-primary, #2563eb)' : 'var(--surface-white)',
+                    color: config.page_range !== 'custom' ? '#ffffff' : 'var(--text-main)',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  All Pages
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChangeConfig({ ...config, page_range: 'custom', page_from: config.page_from || 1, page_to: config.page_to || 3 })}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: '1.5px solid var(--border-default)',
+                    background: config.page_range === 'custom' ? 'var(--color-primary, #2563eb)' : 'var(--surface-white)',
+                    color: config.page_range === 'custom' ? '#ffffff' : 'var(--text-main)',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ⚡ Quick Test (1–3)
+                </button>
+              </div>
+            </div>
+
+            {config.page_range === 'custom' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: 'var(--surface-subtle)', borderRadius: '8px', marginTop: '6px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>From:</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={config.page_from || 1}
+                  onChange={(e) => onChangeConfig({ ...config, page_from: Math.max(1, parseInt(e.target.value) || 1) })}
+                  style={{ width: '52px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border-default)', fontSize: '12px', textAlign: 'center' }}
+                />
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>To:</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={config.page_to || 3}
+                  onChange={(e) => onChangeConfig({ ...config, page_to: Math.max(1, parseInt(e.target.value) || 1) })}
+                  style={{ width: '52px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border-default)', fontSize: '12px', textAlign: 'center' }}
+                />
+                <span style={{ fontSize: '11px', color: 'var(--color-primary)', marginLeft: 'auto', fontWeight: 600 }}>~5 sec speed</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right column: Interactive Before/After Proof */}
