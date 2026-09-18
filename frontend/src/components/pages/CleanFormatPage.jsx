@@ -14,9 +14,14 @@ export default function CleanFormatPage({
   onProcess,
   isProcessing = false,
 }) {
+  const whiteningLevel = config.whitening_level || 'high';
+  const cleanWatermarks = config.clean_watermarks !== false;
+  const fixFormulas = config.fix_formulas !== false;
+  const printMargins = config.print_margins !== false;
+
   return (
-    <div className="tool-page-container">
-      {/* Top back breadcrumb (Accessible semantic breadcrumb - Issue 8) */}
+    <div className="tool-page-container tool-theme-clean">
+      {/* Top back breadcrumb */}
       <nav aria-label="Breadcrumb" className="tool-page-breadcrumb">
         <a
           href="#tools"
@@ -36,14 +41,20 @@ export default function CleanFormatPage({
         <span className="breadcrumb-current" aria-current="page">Clean &amp; Format</span>
       </nav>
 
-      {/* Header */}
+      {/* Header with Distinct Badge */}
       <div className="tool-page-header">
-        <h1 className="tool-page-title">Clean &amp; Format</h1>
+        <div className="tool-hero-badge">
+          <span className="tool-badge-dot"></span>
+          <span>Photocopy Whitening &amp; Telegram Ad Eraser</span>
+        </div>
+        <h1 className="tool-page-title">Clean &amp; Format PDF Notes</h1>
+        <p className="tool-card-desc" style={{ maxWidth: '600px', margin: '0 auto 20px auto' }}>
+          Turn dark, shadowed photocopies and mobile phone scans into crisp, print-ready white paper with pure vector LaTeX equations.
+        </p>
       </div>
 
-      {/* 2-Column Working Area */}
+      {/* 2-Column Focused Working Area */}
       <div className="tool-work-grid">
-        {/* Left column: Dropzone, Language & Settings */}
         <div className="tool-action-card">
           <DropZone
             file={file}
@@ -57,8 +68,97 @@ export default function CleanFormatPage({
             }}
           />
 
+          {/* Specialized Whitening Cards */}
+          <div style={{ marginTop: '20px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)' }}>
+              1. Paper Background Whitening
+            </label>
+            <div className="choice-cards-grid">
+              <div
+                className={`choice-card-item ${whiteningLevel === 'natural' ? 'selected' : ''}`}
+                onClick={() => onChangeConfig({ ...config, whitening_level: 'natural' })}
+              >
+                <div className="choice-card-header">
+                  <span className="choice-card-title">Natural White</span>
+                  <span>📄</span>
+                </div>
+                <span className="choice-card-desc">Subtle shadow removal. Preserves delicate pencil strokes.</span>
+              </div>
+
+              <div
+                className={`choice-card-item ${whiteningLevel === 'high' ? 'selected' : ''}`}
+                onClick={() => onChangeConfig({ ...config, whitening_level: 'high' })}
+              >
+                <div className="choice-card-header">
+                  <span className="choice-card-title">High Contrast</span>
+                  <span>✨</span>
+                </div>
+                <span className="choice-card-desc">Deep black ink on #FFFFFF paper. Ideal for study printing.</span>
+              </div>
+
+              <div
+                className={`choice-card-item ${whiteningLevel === 'ultra' ? 'selected' : ''}`}
+                onClick={() => onChangeConfig({ ...config, whitening_level: 'ultra' })}
+              >
+                <div className="choice-card-header">
+                  <span className="choice-card-title">Ultra Clean</span>
+                  <span>⚡</span>
+                </div>
+                <span className="choice-card-desc">Aggressive background bleaching for heavy dark photocopies.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Specialized Cleaning Toggles */}
+          <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-default)', paddingTop: '16px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '10px', display: 'block' }}>
+              2. Document Protection Refinements
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', cursor: 'pointer', padding: '8px', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={cleanWatermarks}
+                  onChange={(e) => onChangeConfig({ ...config, clean_watermarks: e.target.checked })}
+                  style={{ accentColor: 'var(--tool-primary)' }}
+                />
+                <span><strong>Erase Telegram / Fee Ads</strong></span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', cursor: 'pointer', padding: '8px', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={fixFormulas}
+                  onChange={(e) => onChangeConfig({ ...config, fix_formulas: e.target.checked })}
+                  style={{ accentColor: 'var(--tool-primary)' }}
+                />
+                <span><strong>Typeset LaTeX Formulas</strong></span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', cursor: 'pointer', padding: '8px', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={printMargins}
+                  onChange={(e) => onChangeConfig({ ...config, print_margins: e.target.checked })}
+                  style={{ accentColor: 'var(--tool-primary)' }}
+                />
+                <span><strong>15mm Binder Margins</strong></span>
+              </label>
+            </div>
+          </div>
+
+          {/* Language / Exam Mode Selector */}
+          <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-default)', paddingTop: '16px' }}>
+            <StudentExamLanguageSelector
+              selectedMode={config.doc_type || 'auto'}
+              onChangeMode={(mode) => onChangeConfig({ ...config, doc_type: mode })}
+            />
+          </div>
+
+          {/* Primary Action Button */}
           {file && (
-            <div style={{ marginTop: '16px' }}>
+            <div style={{ marginTop: '24px' }}>
               <button
                 type="button"
                 className="tool-execute-btn"
@@ -67,147 +167,41 @@ export default function CleanFormatPage({
                 style={{
                   width: '100%',
                   padding: '14px 20px',
-                  background: 'var(--color-primary, #2563eb)',
+                  background: 'var(--tool-primary)',
                   color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
                   fontSize: '15px',
-                  fontWeight: 600,
+                  fontWeight: 750,
+                  borderRadius: '12px',
+                  border: 'none',
                   cursor: isProcessing ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
-                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 14px var(--tool-glow)'
                 }}
               >
-                <span>{isProcessing ? 'Processing Document...' : 'Clean Document'}</span>
-                {!isProcessing && <span>→</span>}
+                <span>✨</span>
+                <span>{isProcessing ? 'Processing Clean & Format...' : 'Clean & Beautify Document'}</span>
               </button>
             </div>
           )}
-
-          {/* Student & Exam Language Selector */}
-          <StudentExamLanguageSelector
-            languageMode={config.language_mode || 'auto'}
-            onChange={(mode) => onChangeConfig({ ...config, language_mode: mode })}
-          />
-
-          {/* Clean Controls (Gestalt Proximity & Accessible Labels - Issues 5 & 9) */}
-          <div className="tool-settings-group" style={{ marginTop: '16px' }}>
-            <label className="tool-setting-row" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <input
-                type="checkbox"
-                checked={config.clean_watermarks !== false}
-                onChange={(e) => onChangeConfig({ ...config, clean_watermarks: e.target.checked })}
-                style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer', flexShrink: 0 }}
-              />
-              <span className="tool-setting-label">Remove watermarks &amp; ads</span>
-            </label>
-
-            <label className="tool-setting-row" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <input
-                type="checkbox"
-                checked={config.fix_formulas !== false}
-                onChange={(e) => onChangeConfig({ ...config, fix_formulas: e.target.checked })}
-                style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer', flexShrink: 0 }}
-              />
-              <span className="tool-setting-label">Sharpen handwriting &amp; formulas</span>
-            </label>
-
-            <div className="tool-setting-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-              <span className="tool-setting-label">Custom words to remove</span>
-              <input
-                type="text"
-                placeholder="e.g. Channel Name, Telegram"
-                value={config.custom_spam_words || ''}
-                onChange={(e) => onChangeConfig({ ...config, custom_spam_words: e.target.value })}
-                style={{
-                  padding: '7px 12px',
-                  borderRadius: '8px',
-                  border: '1.5px solid var(--border-default)',
-                  background: 'var(--surface-white)',
-                  color: 'var(--text-main)',
-                  fontSize: '12px',
-                  width: '180px',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Page Range Selection for Rapid Iteration & Fast Testing */}
-          <div className="tool-settings-group" style={{ marginTop: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span className="tool-setting-label" style={{ fontWeight: 650 }}>📄 Pages to Process:</span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => onChangeConfig({ ...config, page_range: 'all' })}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    border: '1.5px solid var(--border-default)',
-                    background: config.page_range !== 'custom' ? 'var(--color-primary, #2563eb)' : 'var(--surface-white)',
-                    color: config.page_range !== 'custom' ? '#ffffff' : 'var(--text-main)',
-                    fontSize: '11.5px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  All Pages
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChangeConfig({ ...config, page_range: 'custom', page_from: config.page_from || 1, page_to: config.page_to || 3 })}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    border: '1.5px solid var(--border-default)',
-                    background: config.page_range === 'custom' ? 'var(--color-primary, #2563eb)' : 'var(--surface-white)',
-                    color: config.page_range === 'custom' ? '#ffffff' : 'var(--text-main)',
-                    fontSize: '11.5px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  ⚡ Quick Test (1–3)
-                </button>
-              </div>
-            </div>
-
-            {config.page_range === 'custom' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: 'var(--surface-subtle)', borderRadius: '8px', marginTop: '6px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>From:</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={config.page_from || 1}
-                  onChange={(e) => onChangeConfig({ ...config, page_from: Math.max(1, parseInt(e.target.value) || 1) })}
-                  style={{ width: '52px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border-default)', fontSize: '12px', textAlign: 'center' }}
-                />
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>To:</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={config.page_to || 3}
-                  onChange={(e) => onChangeConfig({ ...config, page_to: Math.max(1, parseInt(e.target.value) || 1) })}
-                  style={{ width: '52px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--border-default)', fontSize: '12px', textAlign: 'center' }}
-                />
-                <span style={{ fontSize: '11px', color: 'var(--color-primary)', marginLeft: 'auto', fontWeight: 600 }}>~5 sec speed</span>
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Right column: Interactive Before/After Proof */}
-        <InteractiveProofViewer
-          title="Scan Cleanup Preview"
-          beforeImg="/samples/doc_1_before.jpg"
-          afterImg="/samples/doc_1_after.jpg"
-          beforeLabel="Original Scan"
-          afterLabel="Clean Note"
-        />
+        {/* Tailored Proof Viewer */}
+        <section className="home-showcase-section" style={{ margin: '16px 0 0 0', maxWidth: '100%' }}>
+          <div className="home-showcase-header">
+            <h2 className="home-showcase-title" style={{ fontSize: '20px' }}>Whitening &amp; Despeckle Preview</h2>
+            <p className="home-showcase-subtitle">Slide to verify true photocopy gray shadow removal and telegram watermark erasure.</p>
+          </div>
+          <InteractiveProofViewer
+            title="Clean & Format Test"
+            beforeImg="/samples/doc_1_before.jpg"
+            afterImg="/samples/doc_1_after.jpg"
+            beforeLabel="Dark Photocopy Scan"
+            afterLabel="Cleaned White Paper"
+          />
+        </section>
       </div>
     </div>
   );

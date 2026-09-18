@@ -110,10 +110,11 @@ You are an expert OCR and document structure AI. Your job is to extract text, ta
      `[Figure: <short description> | bbox: [ymin, xmin, ymax, xmax]]`
      at the exact sentence, question, or paragraph where that figure belongs contextually.
      CRITICAL BOUNDING BOX RULE: The bounding box `[ymin, xmin, ymax, xmax]` MUST generously enclose the ENTIRE diagram, including all sub-parts, circuit wires, AC generators, terminal connections, coil turns, arrows, labels (e.g. 'Coil 1 with N1 turns', 'Coil 2', 'AC power supply'), and captions with a comfortable buffer. NEVER clip off the top or bottom of a diagram or omit hand-drawn sketches.
-   - For organic chemistry rings (benzene, cyclohexane, chair forms), skeletal structures, molecular bonds, and complex reaction mechanisms: NEVER attempt to draw them using warped ASCII dashes or unicode symbols. ALWAYS capture them as a visual diagram using `[Figure: Chemical Structure of <name> | bbox: [ymin, xmin, ymax, xmax]]`. For linear chemical formulas, ALWAYS use standard MathJax with subscripts and reaction arrows (e.g. `$\text{C}_6\text{H}_{12}\text{O}_6 + 6\text{O}_2 \rightarrow 6\text{CO}_2 + 6\text{H}_2\text{O}$`).
-   - For comparison charts or ordered values (e.g. `SPEED IN DIFFERENT MEDIA`: `VACUUM > GAS > LIQUID > SOLID`): ALWAYS structure the data into an HTML table (`<table>` with `<th>` and `<td>`).
-   - For river confluences / Panch Prayag: format as an HTML `<table>` with columns `Prayag` and `Confluence / Rivers`.
-9. **SPAM & PROMOTIONAL FEE DELETION**: Silently DELETE all coaching center promotional banners, watermarks, and fees (e.g. "LexRise Academy", "Bihar APO Pre", "Judiciary Pre", "Foundation Batch", "UK APO F: 4444/-", "Jharkhand APO Mains-6999/-", "Raj APO Pre : 2999/-", "7599457405", "@VRLEXA"). NEVER turn an advertisement fee into a document heading!
+   - For organic chemistry rings (benzene, cyclohexane, chair forms), skeletal structures, molecular bonds, and complex reaction mechanisms: NEVER attempt to draw them using warped ASCII dashes or unicode symbols. ALWAYS capture them as a visual diagram using `[Fi    - For comparison charts or ordered values (e.g. `SPEED IN DIFFERENT MEDIA`: `VACUUM > GAS > LIQUID > SOLID`): ALWAYS structure the data into an HTML table (`<table>` with `<th>` and `<td>`).
+    - For river confluences / Panch Prayag: format as an HTML `<table>` with columns `Prayag` and `Confluence / Rivers`.
+9. **SPAM & PROMOTIONAL WATERMARK DELETION (CRITICAL)**:
+   - Silently DELETE all coaching center promotional banners, watermarks, fees, and contact info (e.g. "LexRise Academy", "Bihar APO Pre", "Judiciary Pre", "Foundation Batch", "UK APO F: 4444/-", "Jharkhand APO Mains-6999/-", "Raj APO Pre : 2999/-", "7599457405", "@VRLEXA", Telegram channel stickers, WhatsApp logos, QR codes).
+   - NEVER create a `[Figure: ...]` tag for academy logos, publisher crests, Telegram channel stamps, phone number stickers, or watermarks. ONLY create `[Figure: ...]` tags for genuine academic/scientific diagrams.
 10. **NATURAL READABILITY & TASTEFUL EMOJIS**: Use clean, un-bloated formatting. For major topic headings, you may include a simple, tasteful emoji (e.g. 💡 for concepts/definitions, ⚙ for mechanics/physics principles, ⏱ for speed/time, 📌 for key facts, 🌊 for river systems, 🏔 for mountain ranges) to guide the student's eye, but keep formatting natural and simple.
 """ + (f"\n{ignore_clause}" if ignore_clause else "") + """
 Output the raw markdown for each image in the exact order they appear. If multiple images are provided, you MUST separate the markdown for each image with exactly the following text on a new line: `---PAGE_BREAK---`. Do not use JSON. Output ONLY the markdown and the page breaks.
@@ -130,7 +131,15 @@ Output the raw markdown for each image in the exact order they appear. If multip
         # Inject Strict Language Isolation or Multi-Language Translation (Prevent duplicate bilingual output)
         if self.service_type == "translate":
             target_lang = self.language_mode or "Hindi"
-            prompt += f"\n\nSTRICT TRANSLATION REQUIREMENT ({target_lang.upper()}): Translate all narrative text, explanations, headings, and questions fluently into {target_lang}. CRITICAL FORMULA & CODE SHIELD: Retain 100% of mathematical equations ($...$, $$...$$), formulas, fractions, variable symbols, and code blocks completely UNTOUCHED, in original LaTeX format, and uncorrupted. NEVER omit passages or delete text because of language—translate all content into {target_lang}."
+            prompt += (
+                f"\n\nSTRICT TRANSLATION REQUIREMENT ({target_lang.upper()}):\n"
+                f"1. Translate all narrative text, explanations, headings, and questions fluently into {target_lang}.\n"
+                f"2. CRITICAL FORMULA & CODE SHIELD: Retain 100% of mathematical equations ($...$, $$...$$), formulas, fractions, variable symbols, and code blocks completely UNTOUCHED, in original LaTeX format, and uncorrupted. NEVER omit passages or delete text because of language -- translate all content into {target_lang}.\n"
+                f"3. TRANSLATED DIAGRAM LABELS: When you output a `[Figure: <desc> | bbox: [...]]` tag for any diagram containing text labels in the source language, follow it immediately with a translated glossary key table:\n\n"
+                f"| Diagram Label (Original) | Translation ({target_lang}) |\n"
+                f"| :--- | :--- |\n"
+                f"| ... | ... |\n"
+            )
         elif self.language_mode and self.language_mode not in ("auto", "Auto-Detect"):
             mode_clean = self.language_mode.lower().strip().replace("-", " ").replace("_", " ")
             if any(x in mode_clean for x in ["math+hindi", "hindi+math", "math + hindi", "hindi + math", "hi+math", "math+hi"]):

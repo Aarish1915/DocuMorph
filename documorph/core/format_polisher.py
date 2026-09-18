@@ -55,7 +55,7 @@ def polish_markdown(markdown_text: str) -> str:
     """ + markdown_text
 
     max_retries = 3
-    base_wait = 15  # seconds
+    base_wait = 3  # Fast recovery retry with minimal stall (3s, 6s)
     
     for attempt in range(max_retries):
         try:

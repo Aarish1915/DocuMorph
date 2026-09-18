@@ -54,21 +54,28 @@ def run_worker():
             job_id = job.id
             file_path = job.file_path
             
-            # Define the callback to update the database in real-time
+            # Throttled progress callback: avoids slamming remote Neon PostgreSQL with dozens of TCP commits
+            last_progress_time = 0.0
+            last_progress_pct = -1
+
             def progress_callback(msg: str, pct: int):
-                # We need a fresh session for the callback to ensure thread safety 
-                # (though this is technically synchronous, it's good practice)
-                inner_db = SessionLocal()
-                try:
-                    inner_job = inner_db.query(Job).filter(Job.id == job_id).first()
-                    if inner_job:
-                        inner_job.progress_pct = pct
-                        inner_job.progress_msg = msg
-                        # Ensure canonical status remains PROCESSING for polling stability
-                        inner_job.status = "PROCESSING"
-                        inner_db.commit()
-                finally:
-                    inner_db.close()
+                nonlocal last_progress_time, last_progress_pct
+                now = time.time()
+                is_terminal = pct == 100 or pct == -1
+                is_significant = abs(pct - last_progress_pct) >= 3 and (now - last_progress_time >= 1.2)
+                if is_terminal or is_significant or last_progress_pct == -1:
+                    last_progress_time = now
+                    last_progress_pct = pct
+                    inner_db = SessionLocal()
+                    try:
+                        inner_job = inner_db.query(Job).filter(Job.id == job_id).first()
+                        if inner_job:
+                            inner_job.progress_pct = pct
+                            inner_job.progress_msg = msg
+                            inner_job.status = "PROCESSING"
+                            inner_db.commit()
+                    finally:
+                        inner_db.close()
             
             try:
                 orchestrator = DocuMorphOrchestrator(

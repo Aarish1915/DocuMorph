@@ -91,11 +91,22 @@ class DiagramExtractor:
                     (rect.x0 > 0.70 * page.rect.width and rect.y1 < 0.30 * page.rect.height)    # Top-Right
                 ) and (area < 0.20 * page_area)
 
-                # 4. Body text intersection filter (dense text running over watermark)
+                # 4. Banner ribbon aspect ratio filter (headers, footers, ad divider ribbons)
+                is_banner = (w / max(1.0, h) > 4.2) or (h / max(1.0, w) > 4.5)
+
+                # 5. Overlapping promotional spam text filter
+                import re
+                clip_text = page.get_text("text", clip=rect).lower()
+                is_spam_text = (
+                    any(k in clip_text for k in ["telegram", "whatsapp", "@", "call", "academy", "institute", "classes", "fee", "mains", "pre :", "batch"])
+                    or bool(re.search(r'\b[6-9]\d{9}\b', clip_text))
+                )
+
+                # 6. Body text intersection filter (dense text running over watermark)
                 intersecting_chars = sum(len(b[4].strip()) for b in raw_blocks if b[6] == 0 and fitz.Rect(b[:4]).intersects(rect))
                 is_watermark = intersecting_chars > 60
 
-                # 5. Document-wide template watermark recurrence filter
+                # 7. Document-wide template watermark recurrence filter
                 is_repeated_template = (xref_frequency.get(xref, 0) >= 3) or (total_doc_pages > 1 and xref_frequency.get(xref, 0) >= total_doc_pages * 0.35)
 
                 if (
@@ -104,18 +115,29 @@ class DiagramExtractor:
                     and not is_full_page
                     and not is_composite_scan
                     and not is_corner_stamp
+                    and not is_banner
+                    and not is_spam_text
                     and not is_watermark
                     and area >= 4000
                     and w >= 80
                     and h >= 80
                 ):
                     d_mat = fitz.Matrix(2.5, 2.5) # 300 DPI high-fidelity crop
-                    # Generous 8pt safety padding so diagram labels, circuit terminals, and arrows are never clipped
+                    # Text boundary collision avoidance: expand safely without slicing adjacent text
+                    pad_l, pad_t, pad_r, pad_b = 6.0, 6.0, 6.0, 6.0
+                    for b in raw_blocks:
+                        if b[6] == 0: # text block
+                            bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
+                            if max(rect.x0 - pad_l, bx0) < min(rect.x1 + pad_r, bx1):
+                                if by1 <= rect.y0 and (rect.y0 - by1) < pad_t:
+                                    pad_t = max(0.0, rect.y0 - by1 - 2.0)
+                                if by0 >= rect.y1 and (by0 - rect.y1) < pad_b:
+                                    pad_b = max(0.0, by0 - rect.y1 - 2.0)
                     padded_rect = fitz.Rect(
-                        max(0, rect.x0 - 8),
-                        max(0, rect.y0 - 8),
-                        min(page.rect.width, rect.x1 + 8),
-                        min(page.rect.height, rect.y1 + 8)
+                        max(0, rect.x0 - pad_l),
+                        max(0, rect.y0 - pad_t),
+                        min(page.rect.width, rect.x1 + pad_r),
+                        min(page.rect.height, rect.y1 + pad_b)
                     )
                     diag_pix = page.get_pixmap(matrix=d_mat, clip=padded_rect)
                     diag_filename = f"{job_prefix}_scanned_diag_{page_num}_{xref}_{r_idx}.png"

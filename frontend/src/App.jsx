@@ -17,6 +17,10 @@ import CompressPage from './components/pages/CompressPage';
 import ExtractTextPage from './components/pages/ExtractTextPage';
 import TranslatePage from './components/pages/TranslatePage';
 import InteractiveProofViewer from './components/common/InteractiveProofViewer';
+import PrivacyModal from './components/legal/PrivacyModal';
+import TermsModal from './components/legal/TermsModal';
+import CookieConsent from './components/common/CookieConsent';
+import NotFoundView from './components/common/NotFoundView';
 
 const STAGES = [
   { icon: '📄', label: 'Reading',    desc: 'Loading PDF' },
@@ -109,6 +113,8 @@ export default function App() {
   const [customApiKey, setCustomApiKey] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
   const [toasts, setToasts] = useState([]);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   // Theme Engine (System auto-detect + localStorage + manual toggle)
   const [themeMode, setThemeMode] = useState(() => {
@@ -168,7 +174,8 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (hash === 'admin') {
+      const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      if (hash === 'admin' || path === '/admin') {
         setShowAdmin(true);
       } else if (hash === 'settings') {
         setShowSettings(true);
@@ -629,6 +636,30 @@ export default function App() {
   const isError = Boolean(jobStatus && ['ERROR', 'Error', 'FAILED', 'Failed', 'CANCELLED', 'Cancelled'].includes(jobStatus.status));
   const stageIdx = jobStatus ? getPipelineStage(jobStatus.status, jobStatus.progress) : -1;
 
+  // Dedicated Admin Hub Screen (Active via /admin, #admin, or VITE_ADMIN_ONLY)
+  if (showAdmin || import.meta.env.VITE_ADMIN_ONLY === 'true') {
+    return (
+      <div className="app-layout" data-theme={appliedTheme} style={{ minHeight: '100vh', width: '100%', background: 'var(--bg-main, #0f172a)' }}>
+        <AdminDashboardModal
+          isOpen={true}
+          onClose={() => {
+            setShowAdmin(false);
+            if (typeof window !== 'undefined') {
+              if (window.location.hash === '#admin') {
+                window.location.hash = '';
+              }
+              if (window.location.pathname === '/admin') {
+                window.history.pushState(null, '', '/');
+              }
+            }
+          }}
+          standalone={true}
+        />
+        <ToastContainer toasts={toasts} />
+      </div>
+    );
+  }
+
   return (
     <div className="app-layout">
       {/* ── UNIFIED MINIMAL HEADER ── */}
@@ -659,17 +690,6 @@ export default function App() {
         setCustomApiKey={setCustomApiKey}
         customPrompt={customPrompt}
         setCustomPrompt={setCustomPrompt}
-      />
-
-      {/* ── DEVELOPER ADMIN & QUALITY VAULT MODAL (Protected Owner Access) ── */}
-      <AdminDashboardModal
-        isOpen={showAdmin}
-        onClose={() => {
-          setShowAdmin(false);
-          if (typeof window !== 'undefined' && window.location.hash === '#admin') {
-            window.location.hash = '';
-          }
-        }}
       />
 
       {/* ── HISTORY DRAWER ── */}
@@ -757,7 +777,7 @@ export default function App() {
             }}
             isProcessing={isProcessing}
           />
-        ) : (
+        ) : activeView === 'home' ? (
           /* ── SCREEN 1: HOME HUB TOOL DIRECTORY & QUALITY SHOWCASE ── */
           <>
             <HeroSection />
@@ -778,13 +798,25 @@ export default function App() {
               />
             </section>
           </>
+        ) : (
+          /* ── CUSTOM 404 FALLBACK (Checklist Item 15) ── */
+          <NotFoundView onNavigateHome={() => navigateView('home')} />
         )}
       </main>
 
-      {/* ── MINIMAL FOOTER ── */}
-      <footer className="site-footer">
-        <span>DocuMorph • 100% Private & Secure Processing. Files are never stored.</span>
+      {/* ── FOOTER WITH PRIVACY & TERMS LINKS (Checklist Items 1, 2) ── */}
+      <footer className="site-footer" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '24px 16px', maxWidth: '860px', margin: '0 auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+        <span>DocuMorph • 100% Private &amp; Secure Processing. Files are never stored.</span>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <button type="button" onClick={() => setShowPrivacy(true)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}>Privacy Policy</button>
+          <button type="button" onClick={() => setShowTerms(true)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}>Terms of Service</button>
+        </div>
       </footer>
+
+      {/* ── LEGAL & CONSENT MODALS ── */}
+      <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+      <TermsModal isOpen={showTerms} onClose={() => setShowTerms(false)} />
+      <CookieConsent onOpenPrivacy={() => setShowPrivacy(true)} />
 
       {/* ── TOAST CONTAINER ── */}
       <ToastContainer toasts={toasts} />

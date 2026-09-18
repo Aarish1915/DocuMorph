@@ -1,6 +1,5 @@
 import React from 'react';
 import DropZone from '../workspace/DropZone';
-import InteractiveProofViewer from '../common/InteractiveProofViewer';
 
 const LANGUAGES = [
   { id: 'Hindi', label: 'Hindi', script: 'हिन्दी' },
@@ -31,10 +30,12 @@ export default function TranslatePage({
   isProcessing = false,
 }) {
   const selectedTarget = config.to_language || 'Hindi';
-  const selectedType = config.content_type || 'science_math';
+  const protectMath = config.protect_math !== false;
+  const translateDiagramLabels = config.translate_diagram_labels !== false;
+  const outputFormat = config.output_format || 'pdf';
 
   return (
-    <div className="tool-page-container">
+    <div className="tool-page-container tool-theme-translate">
       {/* Top back breadcrumb */}
       <nav aria-label="Breadcrumb" className="tool-page-breadcrumb">
         <a
@@ -55,25 +56,41 @@ export default function TranslatePage({
         <span className="breadcrumb-current" aria-current="page">Translate PDF</span>
       </nav>
 
+      {/* Header with Distinct Badge */}
       <div className="tool-page-header">
-        <h1 className="tool-page-title">Translate PDF</h1>
+        <div className="tool-hero-badge">
+          <span className="tool-badge-dot"></span>
+          <span>14 Languages • Zero Math Corruption • Translated Diagram Key</span>
+        </div>
+        <h1 className="tool-page-title">Translate PDF Documents</h1>
+        <p className="tool-card-desc" style={{ maxWidth: '600px', margin: '0 auto 20px auto' }}>
+          Translate academic notes, competitive exam guides, and papers into regional languages. All mathematical formulas and scientific symbols remain 100% untouched.
+        </p>
       </div>
 
       <div className="tool-work-grid">
-        {/* Left column: Language matrix, Content type, DropZone */}
         <div className="tool-action-card">
-          <div className="format-selection-group" style={{ marginBottom: '16px' }}>
-            <div className="language-grid">
+          {/* Target Language Matrix with Native Scripts */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)' }}>
+                1. Select Target Language
+              </label>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--tool-primary)' }}>
+                Source: Auto-Detect → Target: {selectedTarget}
+              </span>
+            </div>
+
+            <div className="language-matrix-grid">
               {LANGUAGES.map((lang) => (
-                <button
+                <div
                   key={lang.id}
-                  type="button"
-                  className={`lang-card-pill ${selectedTarget === lang.id ? 'selected' : ''}`}
+                  className={`lang-chip-card ${selectedTarget === lang.id ? 'selected' : ''}`}
                   onClick={() => onChangeConfig({ ...config, to_language: lang.id })}
                 >
-                  <span className="lang-script-text">{lang.script}</span>
-                  <span className="lang-label-text">{lang.label}</span>
-                </button>
+                  <span className="lang-native-script">{lang.script}</span>
+                  <span className="lang-english-label">{lang.label}</span>
+                </div>
               ))}
             </div>
           </div>
@@ -90,8 +107,89 @@ export default function TranslatePage({
             }}
           />
 
+          {/* Specialized Diagram Translation & Math Protection Toggles (User Point 4) */}
+          <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-default)', paddingTop: '16px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', display: 'block' }}>
+              2. Scientific &amp; Diagram Translation Guard
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', cursor: 'pointer', padding: '10px', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={translateDiagramLabels}
+                  onChange={(e) => onChangeConfig({ ...config, translate_diagram_labels: e.target.checked })}
+                  style={{ accentColor: 'var(--tool-primary)' }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700 }}>Translated Diagram Glossary</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Translates text labels inside diagrams into {selectedTarget}</div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', cursor: 'pointer', padding: '10px', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={protectMath}
+                  onChange={(e) => onChangeConfig({ ...config, protect_math: e.target.checked })}
+                  style={{ accentColor: 'var(--tool-primary)' }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700 }}>LaTeX Math Formula Shield</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Never translates math symbols, units, or variables</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Output Format Picker */}
+          <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-default)', paddingTop: '16px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', display: 'block' }}>
+              3. Output Format
+            </label>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => onChangeConfig({ ...config, output_format: 'pdf' })}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: '1.5px solid',
+                  borderColor: outputFormat === 'pdf' ? 'var(--tool-primary)' : 'var(--border-default)',
+                  background: outputFormat === 'pdf' ? 'var(--tool-light)' : 'var(--surface-card)',
+                  color: outputFormat === 'pdf' ? 'var(--tool-primary)' : 'var(--text-main)',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                📄 Translated A4 PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeConfig({ ...config, output_format: 'md' })}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: '1.5px solid',
+                  borderColor: outputFormat === 'md' ? 'var(--tool-primary)' : 'var(--border-default)',
+                  background: outputFormat === 'md' ? 'var(--tool-light)' : 'var(--surface-card)',
+                  color: outputFormat === 'md' ? 'var(--tool-primary)' : 'var(--text-main)',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                📝 Translated Markdown (.md)
+              </button>
+            </div>
+          </div>
+
+          {/* Primary Action Button */}
           {file && (
-            <div style={{ marginTop: '16px' }}>
+            <div style={{ marginTop: '24px' }}>
               <button
                 type="button"
                 className="tool-execute-btn"
@@ -100,59 +198,60 @@ export default function TranslatePage({
                 style={{
                   width: '100%',
                   padding: '14px 20px',
-                  background: '#ea580c',
+                  background: 'var(--tool-primary)',
                   color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
                   fontSize: '15px',
-                  fontWeight: 600,
+                  fontWeight: 750,
+                  borderRadius: '12px',
+                  border: 'none',
                   cursor: isProcessing ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 14px rgba(234, 88, 12, 0.3)',
-                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 14px var(--tool-glow)'
                 }}
               >
-                <span>{isProcessing ? 'Translating...' : `Translate into ${selectedTarget}`}</span>
-                {!isProcessing && <span>→</span>}
+                <span>🌐</span>
+                <span>{isProcessing ? `Translating into ${selectedTarget}...` : `Translate Document to ${selectedTarget}`}</span>
               </button>
             </div>
           )}
-
-          <div className="tool-settings-group" style={{ marginTop: '20px' }}>
-            <div className="tool-setting-row">
-              <span className="tool-setting-label">Document content type</span>
-              <select
-                value={selectedType}
-                onChange={(e) => onChangeConfig({ ...config, content_type: e.target.value })}
-                style={{
-                  padding: '7px 12px',
-                  borderRadius: '8px',
-                  border: '1.5px solid var(--border-default)',
-                  background: 'var(--surface-white)',
-                  color: 'var(--text-main)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="science_math">Science &amp; Math (Formulas preserved)</option>
-                <option value="humanities">Literature &amp; General Notes</option>
-              </select>
-            </div>
-          </div>
         </div>
 
-        {/* Right column: Interactive Before/After Proof */}
-        <InteractiveProofViewer
-          title="Translation Preview"
-          beforeImg="/samples/doc_4_before.jpg"
-          afterImg="/samples/doc_4_after.jpg"
-          beforeLabel="English Original Scan"
-          afterLabel={`${selectedTarget} Translation`}
-        />
+        {/* Bilingual Preview with Translated Diagram Key Showcase */}
+        <section className="home-showcase-section" style={{ margin: '16px 0 0 0', maxWidth: '100%' }}>
+          <div className="home-showcase-header">
+            <h2 className="home-showcase-title" style={{ fontSize: '20px' }}>Translated Diagram &amp; Text Sample</h2>
+            <p className="home-showcase-subtitle">See how physics definitions are translated while formulas and diagram label keys are generated.</p>
+          </div>
+
+          <div style={{ background: 'var(--surface-card)', border: '1.5px solid var(--border-default)', borderRadius: '14px', padding: '18px', textAlign: 'left' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', borderBottom: '1px solid var(--border-default)', paddingBottom: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 750, color: 'var(--tool-primary)' }}>हिन्दी अनुवाद (Hindi Translation Sample):</span>
+              <span style={{ fontSize: '11.5px', background: 'var(--tool-light)', color: 'var(--tool-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>LaTeX Formulas Untouched</span>
+            </div>
+
+            <p style={{ fontSize: '14px', lineHeight: '1.7', margin: '0 0 12px 0', color: 'var(--text-main)' }}>
+              <strong>न्यूटन का द्वितीय नियम (Newton's Second Law):</strong> किसी वस्तु के संवेग परिवर्तन की दर उस पर आरोपित असंतुलित बल के समानुपाती होती है तथा यह उसी दिशा में होती है जिस दिशा में बल कार्य करता है:
+            </p>
+            <div style={{ background: 'var(--bg-secondary)', padding: '8px 14px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '13px', margin: '0 0 12px 0', textAlign: 'center' }}>
+              $$F = \frac{dp}{dt} = m \cdot a$$
+            </div>
+
+            {/* Diagram Label Key (Feature 4 Showcase) */}
+            <div style={{ background: 'var(--tool-light)', border: '1px solid var(--tool-border)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px' }}>
+              <div style={{ fontWeight: 700, color: 'var(--tool-primary)', marginBottom: '4px' }}>
+                図 आरेख शब्दावली कुंजी (Translated Diagram Labels):
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '4px', color: 'var(--text-main)' }}>
+                <span>• <strong>Mass (m):</strong> द्रव्यमान</span>
+                <span>• <strong>Acceleration (a):</strong> त्वरण</span>
+                <span>• <strong>Applied Force (F):</strong> आरोपित बल</span>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

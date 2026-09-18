@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { getStoredConfig, probeBackend, API_BASE } from '../../config';
 
-export default function AdminDashboardModal({ isOpen, onClose }) {
+export default function AdminDashboardModal({ isOpen, onClose, standalone = false }) {
   if (!isOpen) return null;
-  return <AdminDashboardModalDialog onClose={onClose} />;
+  return <AdminDashboardModalDialog onClose={onClose} standalone={standalone} />;
 }
 
-function AdminDashboardModalDialog({ onClose }) {
+function AdminDashboardModalDialog({ onClose, standalone = false }) {
   // Authentication State (JWT Bearer Token persisted in sessionStorage)
   const [token, setToken] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -258,20 +258,70 @@ function AdminDashboardModalDialog({ onClose }) {
   };
 
   return (
-    <div className="admin-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="admin-modal-window" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={standalone ? "admin-standalone-wrapper" : "admin-modal-overlay"}
+      onClick={standalone ? undefined : onClose}
+      role="dialog"
+      aria-modal="true"
+      style={standalone ? { minHeight: '100vh', width: '100%', background: 'var(--bg-main, #0f172a)', padding: '24px 16px', boxSizing: 'border-box' } : undefined}
+    >
+      <div
+        className="admin-modal-window"
+        onClick={(e) => e.stopPropagation()}
+        style={standalone ? { maxWidth: '1080px', margin: '0 auto', minHeight: '85vh' } : undefined}
+      >
         {/* Modal Header */}
         <div className="admin-modal-header">
           <div className="admin-title-group">
             <div className="admin-badge-icon">🛠️</div>
             <div>
-              <h2 className="admin-title">DocuMorph Owner & System Control Hub</h2>
+              <h2 className="admin-title">DocuMorph Owner &amp; System Control Hub</h2>
               <p className="admin-subtitle">
                 {token ? 'Authenticated Session • Real-Time Telemetry & Process Control' : 'Cryptographically Restricted Portal'}
               </p>
             </div>
           </div>
-          <button className="admin-close-btn" onClick={onClose} aria-label="Close Admin Modal">✕</button>
+          {!standalone && (
+            <button className="admin-close-btn" onClick={onClose} aria-label="Close Admin Modal">✕</button>
+          )}
+          {standalone && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#cbd5e1',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                ← Back to Site
+              </button>
+              {token && (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    color: '#f87171',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Sign Out
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Not Authenticated: Render Login Form */}

@@ -938,3 +938,218 @@
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   SPECIALIZED THEMES & UNIQUE CONTROLS FOR THE 4 FEATURES (Issue 1)
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Theme 1: Clean & Format (Electric Violet) */
+.tool-theme-clean {
+  --tool-primary: #6366f1;
+  --tool-primary-hover: #4f46e5;
+  --tool-light: rgba(99, 102, 241, 0.08);
+  --tool-border: rgba(99, 102, 241, 0.25);
+  --tool-glow: rgba(99, 102, 241, 0.2);
+}
+
+/* Theme 2: Compress PDF (Emerald Mint) */
+.tool-theme-compress {
+  --tool-primary: #10b981;
+  --tool-primary-hover: #059669;
+  --tool-light: rgba(16, 185, 129, 0.08);
+  --tool-border: rgba(16, 185, 129, 0.25);
+  --tool-glow: rgba(16, 185, 129, 0.2);
+}
+
+/* Theme 3: Extract Text (Cyber Amber) */
+.tool-theme-extract {
+  --tool-primary: #f59e0b;
+  --tool-primary-hover: #d97706;
+  --tool-light: rgba(245, 158, 11, 0.08);
+  --tool-border: rgba(245, 158, 11, 0.25);
+  --tool-glow: rgba(245, 158, 11, 0.2);
+}
+
+/* Theme 4: Translate PDF (Ocean Cyan) */
+.tool-theme-translate {
+  --tool-primary: #06b6d4;
+  --tool-primary-hover: #0284c7;
+  --tool-light: rgba(6, 182, 212, 0.08);
+  --tool-border: rgba(6, 182, 212, 0.25);
+  --tool-glow: rgba(6, 182, 212, 0.2);
+}
+
+/* ── Tool Hero Badge ── */
+.tool-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: var(--tool-light, rgba(37, 99, 235, 0.08));
+  color: var(--tool-primary, #2563eb);
+  border: 1px solid var(--tool-border, rgba(37, 99, 235, 0.25));
+  margin-bottom: 12px;
+}
+
+.tool-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tool-primary, #2563eb);
+  box-shadow: 0 0 8px var(--tool-glow, rgba(37, 99, 235, 0.5));
+}
+
+/* ── Interactive Choice Grid (For Whitening, Modes, Tables) ── */
+.choice-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 12px 0 18px 0;
+}
+
+.choice-card-item {
+  border: 1.5px solid var(--border-default);
+  border-radius: 12px;
+  padding: 14px 12px;
+  background: var(--surface-card, #ffffff);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  user-select: none;
+}
+
+.choice-card-item:hover {
+  border-color: var(--tool-border, var(--color-primary));
+  background: var(--tool-light, rgba(37, 99, 235, 0.04));
+  transform: translateY(-2px);
+}
+
+.choice-card-item.selected {
+  border-color: var(--tool-primary, #2563eb);
+  background: var(--tool-light, rgba(37, 99, 235, 0.08));
+  box-shadow: 0 0 0 1px var(--tool-primary, #2563eb), 0 4px 12px var(--tool-glow, rgba(37, 99, 235, 0.15));
+}
+
+.choice-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.choice-card-title {
+  font-size: 13.5px;
+  font-weight: 750;
+  color: var(--text-main);
+}
+
+.choice-card-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── Specialized Sliders ── */
+.lux-range-wrap {
+  background: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.lux-range-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* ── Language Script Chips Matrix ── */
+.language-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+  gap: 8px;
+  margin: 12px 0 18px 0;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.lang-chip-card {
+  border: 1.5px solid var(--border-default);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--surface-card, #ffffff);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition: all 0.18s ease;
+}
+
+.lang-chip-card:hover {
+  border-color: var(--tool-primary);
+  transform: translateY(-1px);
+}
+
+.lang-chip-card.selected {
+  border-color: var(--tool-primary);
+  background: var(--tool-light);
+  box-shadow: 0 0 0 1px var(--tool-primary);
+}
+
+.lang-native-script {
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--text-main);
+}
+
+.lang-english-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Code / Extraction Live Preview Area ── */
+.extract-preview-box {
+  background: var(--bg-secondary, #0f172a);
+  color: var(--text-code, #e2e8f0);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 16px;
+  font-family: 'Fira Code', monospace, Consolas, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.6;
+  max-height: 280px;
+  overflow-y: auto;
+  position: relative;
+  text-align: left;
+}
+
+.copy-badge-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.copy-badge-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+

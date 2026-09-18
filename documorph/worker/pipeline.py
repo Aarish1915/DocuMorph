@@ -405,18 +405,40 @@ class DocuMorphOrchestrator:
                                         # Validate dimensions (ignore tiny noise or full-page captures)
                                         if box_w >= 40 and box_h >= 40 and (box_w * box_h) < 850000:
                                             pw, ph = page_obj.rect.width, page_obj.rect.height
-                                            # Generous adaptive margin padding: 5.5% height, 4.0% width
-                                            # Ensures terminals, arrows, coil turns, and captions are never clipped
-                                            pad_x = max(24.0, 0.040 * pw)
-                                            pad_y = max(36.0, 0.055 * ph)
-                                            rx0 = max(0.0, (xmin * pw / 1000.0) - pad_x)
-                                            ry0 = max(0.0, (ymin * ph / 1000.0) - pad_y)
-                                            rx1 = min(pw, (xmax * pw / 1000.0) + pad_x)
-                                            ry1 = min(ph, (ymax * ph / 1000.0) + pad_y)
+                                            raw_x0 = (xmin * pw / 1000.0)
+                                            raw_y0 = (ymin * ph / 1000.0)
+                                            raw_x1 = (xmax * pw / 1000.0)
+                                            raw_y1 = (ymax * ph / 1000.0)
+
+                                            # Safe adaptive padding: 3% width, 3% height (tight, avoid blind over-expansion)
+                                            pad_x = max(12.0, 0.030 * pw)
+                                            pad_y = max(14.0, 0.030 * ph)
+
+                                            rx0 = max(0.0, raw_x0 - pad_x)
+                                            ry0 = max(0.0, raw_y0 - pad_y)
+                                            rx1 = min(pw, raw_x1 + pad_x)
+                                            ry1 = min(ph, raw_y1 + pad_y)
+
+                                            # SUB-PIXEL TEXT COLLISION BARRIER:
+                                            # Inspect text blocks on the page to prevent expanding into adjacent paragraphs
+                                            try:
+                                                blocks = page_obj.get_text("blocks")
+                                                for b in blocks:
+                                                    if b[6] == 0:  # text block
+                                                        bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
+                                                        # If text block horizontally overlaps candidate diagram
+                                                        if max(rx0, bx0) < min(rx1, bx1):
+                                                            # Text block is directly above the diagram
+                                                            if by1 <= raw_y0 + 3.0 and by1 > ry0:
+                                                                ry0 = min(raw_y0, by1 + 2.0)
+                                                            # Text block is directly below the diagram
+                                                            if by0 >= raw_y1 - 3.0 and by0 < ry1:
+                                                                ry1 = max(raw_y1, by0 - 2.0)
+                                            except Exception as coll_err:
+                                                logger.debug(f"Text boundary collision check skipped: {coll_err}")
 
                                             orig_ry0 = ry0
-                                            # Intelligent Whitespace Gutter Snapping:
-                                            # Snaps to natural blank lines to avoid slicing through adjacent text paragraphs
+                                            # Intelligent Whitespace Gutter & Ink Snapping
                                             try:
                                                 cand_rect = fitz.Rect(rx0, ry0, rx1, ry1)
                                                 cand_pix = page_obj.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), clip=cand_rect)
@@ -426,17 +448,15 @@ class DocuMorphOrchestrator:
                                                     gray = cand_arr[:, :, 0]
                                                     is_ink = (gray < 235)
 
-                                                    # Search for horizontal whitespace gutter near top (within first 25% of height)
-                                                    # Allow up to 0.5% dust/scanner noise
-                                                    top_window = min(int(cand_pix.height * 0.25), 50)
+                                                    # Search for horizontal whitespace gutter near top
+                                                    top_window = min(int(cand_pix.height * 0.20), 40)
                                                     for dy in range(top_window):
                                                         if np.mean(is_ink[dy, :]) <= 0.005:
                                                             ry0 = orig_ry0 + (dy / 1.5)
                                                             break
 
-                                                    # Search for horizontal whitespace gutter near bottom (within last 25% of height)
-                                                    # CRITICAL BUG FIX: Reference unshifted orig_ry0, NOT modified ry0
-                                                    bot_window = min(int(cand_pix.height * 0.25), 50)
+                                                    # Search for horizontal whitespace gutter near bottom
+                                                    bot_window = min(int(cand_pix.height * 0.20), 40)
                                                     for dy in range(cand_pix.height - 1, cand_pix.height - bot_window, -1):
                                                         if np.mean(is_ink[dy, :]) <= 0.005:
                                                             ry1 = orig_ry0 + (dy / 1.5)
@@ -445,6 +465,19 @@ class DocuMorphOrchestrator:
                                                 logger.debug(f"Whitespace snapping skipped: {snap_ex}")
 
                                             crop_rect = fitz.Rect(rx0, ry0, rx1, ry1)
+
+                                            # SPAM DIAGRAM & WATERMARK FILTER:
+                                            # Rejects coaching stamps, telegram banners, phone numbers, and watermark seals
+                                            crop_text = page_obj.get_text("text", clip=crop_rect).lower()
+                                            is_spam_diag = (
+                                                any(k in crop_text for k in ["telegram", "whatsapp", "@", "call", "academy", "classes", "institute", "pre :", "mains :", "foundation batch", "fee:"])
+                                                or bool(re.search(r'\b[6-9]\d{9}\b', crop_text))
+                                            )
+                                            if is_spam_diag:
+                                                logger.info(f"Rejected spam diagram on page {pnum}: '{desc}' containing promotional text.")
+                                                extracted_text = extracted_text[:m.start()] + "" + extracted_text[m.end():]
+                                                continue
+
                                             diag_pix = page_obj.get_pixmap(matrix=fitz.Matrix(2.5, 2.5), clip=crop_rect)
                                             diag_fname = f"{self.job_id or timestamp}_vdiag_{pnum}_{m_idx}.png"
                                             diag_path = images_dir / diag_fname
@@ -552,17 +585,26 @@ class DocuMorphOrchestrator:
             ordered_pages = [polished_pages[p] for p in range(len(final_markdown_pages))]
             raw_markdown = "\n\n---\n\n".join(ordered_pages)
 
-            # Persist PageResult records & version audit trails for review & selective page reprocessing
+            # Persist PageResult records & version audit trails in a single bulk transaction
             if self.job_id:
                 try:
                     import difflib
+                    from sqlalchemy import func
                     db = SessionLocal()
+                    # Batch fetch all existing PageResult and version counts in 2 single queries
+                    existing_prs = {
+                        pr.page_number: pr for pr in db.query(PageResult).filter(PageResult.job_id == self.job_id).all()
+                    }
+                    existing_v_counts = dict(
+                        db.query(PageResultVersion.page_number, func.count(PageResultVersion.id))
+                        .filter(PageResultVersion.job_id == self.job_id)
+                        .group_by(PageResultVersion.page_number)
+                        .all()
+                    )
+
                     for p_idx, p_text in polished_pages.items():
                         page_num = p_idx + 1
-                        pr = db.query(PageResult).filter(
-                            PageResult.job_id == self.job_id,
-                            PageResult.page_number == page_num
-                        ).first()
+                        pr = existing_prs.get(page_num)
 
                         prev_text = pr.raw_markdown if pr and pr.raw_markdown else ""
                         diff_summary = ""
@@ -575,10 +617,7 @@ class DocuMorphOrchestrator:
                             ))
                             diff_summary = "".join(diff_lines[:50])
 
-                        v_count = db.query(PageResultVersion).filter(
-                            PageResultVersion.job_id == self.job_id,
-                            PageResultVersion.page_number == page_num
-                        ).count()
+                        v_count = existing_v_counts.get(page_num, 0)
 
                         pv = PageResultVersion(
                             job_id=self.job_id,
