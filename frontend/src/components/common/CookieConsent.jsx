@@ -53,21 +53,22 @@ export default function CookieConsent({ onOpenPrivacy }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <span style={{ fontSize: '18px' }} aria-hidden="true">🍪</span>
         <span>
-          DocuMorph uses local storage only for theme &amp; document settings. Zero advertising cookies. Files are never stored.{' '}
+          We only store your dark/light theme on your device. We never save your files or track you.{' '}
           <button
             type="button"
             onClick={onOpenPrivacy}
             style={{
               background: 'none',
               border: 'none',
-              padding: 0,
-              color: 'var(--color-primary, #2563eb)',
+              color: 'var(--tool-primary, #2563eb)',
               textDecoration: 'underline',
               cursor: 'pointer',
-              fontSize: '13px'
+              padding: 0,
+              fontSize: '13px',
+              fontWeight: 600
             }}
           >
-            Privacy Policy
+            Read Privacy
           </button>
         </span>
       </div>

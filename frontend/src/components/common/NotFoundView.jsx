@@ -24,11 +24,11 @@ export default function NotFoundView({ onNavigateHome }) {
       }}>
         404
       </div>
-      <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-main, #0f172a)', marginBottom: '8px' }}>
-        Document Tool Not Found
+      <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-main, #0f172a)', marginBottom: '10px' }}>
+        Page Not Found
       </h1>
-      <p style={{ fontSize: '14px', color: 'var(--text-secondary, #64748b)', marginBottom: '28px', lineHeight: 1.6 }}>
-        The tool page or document link you requested could not be located or has been relocated to our main AI suite.
+      <p style={{ fontSize: '15px', color: 'var(--text-secondary, #64748b)', marginBottom: '28px', lineHeight: 1.6 }}>
+        We couldn't find the page you are looking for. Don't worry, all our free PDF tools are right on the home page.
       </p>
       <button
         type="button"
@@ -36,9 +36,9 @@ export default function NotFoundView({ onNavigateHome }) {
         onClick={onNavigateHome}
         style={{
           padding: '12px 28px',
-          borderRadius: '8px',
-          fontSize: '14px',
-          fontWeight: 600,
+          borderRadius: '10px',
+          fontSize: '15px',
+          fontWeight: 700,
           display: 'inline-flex',
           alignItems: 'center',
           gap: '8px',

@@ -7,7 +7,7 @@ const TOOLS = [
     iconBg: 'rgba(37, 99, 235, 0.1)',
     iconColor: '#2563eb',
     title: 'Clean & Format',
-    desc: 'Erase dark shadows, Telegram ads, and watermarks.',
+    desc: 'Make dark scans bright white. Remove coaching stamps and ads.',
     accent: '#2563eb',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -21,7 +21,7 @@ const TOOLS = [
     iconBg: 'rgba(22, 163, 74, 0.1)',
     iconColor: '#16a34a',
     title: 'Compress PDF',
-    desc: 'Compact margins to fit more notes on fewer pages.',
+    desc: 'Fit more notes on fewer pages. Save money on photocopy & printing.',
     accent: '#16a34a',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -36,7 +36,7 @@ const TOOLS = [
     iconBg: 'rgba(2, 132, 199, 0.1)',
     iconColor: '#0284c7',
     title: 'Extract Text',
-    desc: 'Convert tables and scanned pages into clean text.',
+    desc: 'Copy words, questions, and tables into Word, Notion, or WhatsApp.',
     accent: '#0284c7',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -54,7 +54,7 @@ const TOOLS = [
     iconBg: 'rgba(234, 88, 12, 0.1)',
     iconColor: '#ea580c',
     title: 'Translate PDF',
-    desc: 'Translate notes into Indic languages with math intact.',
+    desc: 'Translate notes into Hindi, Marathi & more. Math formulas stay safe.',
     accent: '#ea580c',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,7 +69,7 @@ const TOOLS = [
 export default function ToolDirectory({ onSelectTool }) {
   return (
     <section className="tool-directory-section" aria-labelledby="tools-directory-heading">
-      <h2 id="tools-directory-heading" className="sr-only">Core Transformation Tools</h2>
+      <h2 id="tools-directory-heading" className="sr-only">Free PDF Transformation Tools</h2>
       <div className="tool-grid">
         {TOOLS.map((tool) => (
           <div

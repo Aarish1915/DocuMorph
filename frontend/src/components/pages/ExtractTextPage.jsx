@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import DropZone from '../workspace/DropZone';
 import StudentExamLanguageSelector from '../common/StudentExamLanguageSelector';
 
@@ -29,6 +29,7 @@ export default function ExtractTextPage({
   onProcess,
   isProcessing = false,
 }) {
+  const hiddenFileInputRef = useRef(null);
   const [copied, setCopied] = useState(false);
   const activeFormat = config.output_format || 'markdown';
   const tableMode = config.table_mode || 'html';
@@ -42,37 +43,53 @@ export default function ExtractTextPage({
     }
   };
 
+  const handleChooseFileClick = () => {
+    if (hiddenFileInputRef.current) {
+      hiddenFileInputRef.current.click();
+    }
+  };
+
   return (
     <div className="tool-page-container tool-theme-extract">
+      {/* Hidden file input for one-click CTA upload */}
+      <input
+        ref={hiddenFileInputRef}
+        type="file"
+        accept=".pdf,application/pdf"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          if (e.target.files?.[0]) {
+            setFile(e.target.files[0]);
+          }
+        }}
+      />
+
       {/* Top back breadcrumb */}
       <nav aria-label="Breadcrumb" className="tool-page-breadcrumb">
-        <a
-          href="#tools"
-          onClick={(e) => {
-            e.preventDefault();
-            onNavigateHome();
-          }}
+        <button
+          type="button"
+          onClick={onNavigateHome}
           className="breadcrumb-back-btn"
-          style={{ textDecoration: 'none' }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="15 18 9 12 15 6" />
           </svg>
           <span>All Tools</span>
-        </a>
+        </button>
         <span className="breadcrumb-separator" aria-hidden="true">/</span>
         <span className="breadcrumb-current" aria-current="page">Extract Text</span>
       </nav>
 
-      {/* Header with Distinct Badge */}
+      {/* Header with Simple English */}
       <div className="tool-page-header">
         <div className="tool-hero-badge">
           <span className="tool-badge-dot"></span>
-          <span>100% Data Fidelity • Markdown, Tables &amp; Formulas</span>
+          <span>Copy Words &amp; Tables • Math Formulas Protected</span>
         </div>
         <h1 className="tool-page-title">Extract Text &amp; Tables</h1>
         <p className="tool-card-desc" style={{ maxWidth: '600px', margin: '0 auto 20px auto' }}>
-          Extract text, structured comparison tables, and LaTeX formulas directly from complex PDFs into Markdown (Notion/Obsidian) or developer JSON.
+          Copy words, questions, and tables directly from your PDF into Word, Notion, or simple notes. Math equations stay fully intact.
         </p>
       </div>
 
@@ -81,7 +98,7 @@ export default function ExtractTextPage({
           {/* Format Selector Pills */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', display: 'block' }}>
-              1. Choose Export Format
+              1. Choose File Format
             </label>
             <div className="choice-cards-grid">
               <div
@@ -92,18 +109,7 @@ export default function ExtractTextPage({
                   <span className="choice-card-title">Markdown</span>
                   <span>📝</span>
                 </div>
-                <span className="choice-card-desc">.md for Notion, Obsidian, GitHub, with LaTeX equations.</span>
-              </div>
-
-              <div
-                className={`choice-card-item ${activeFormat === 'json' ? 'selected' : ''}`}
-                onClick={() => onChangeConfig({ ...config, output_format: 'json' })}
-              >
-                <div className="choice-card-header">
-                  <span className="choice-card-title">Developer JSON</span>
-                  <span>⚙️</span>
-                </div>
-                <span className="choice-card-desc">.json array with page numbers, structured tables, and telemetry.</span>
+                <span className="choice-card-desc">.md file. Best for Notion, Obsidian, and Word with math formulas.</span>
               </div>
 
               <div
@@ -114,7 +120,18 @@ export default function ExtractTextPage({
                   <span className="choice-card-title">Plain Text</span>
                   <span>📄</span>
                 </div>
-                <span className="choice-card-desc">.txt raw UTF-8 content without markdown formatting tags.</span>
+                <span className="choice-card-desc">.txt file. Simple text you can paste into WhatsApp or Notepad.</span>
+              </div>
+
+              <div
+                className={`choice-card-item ${activeFormat === 'json' ? 'selected' : ''}`}
+                onClick={() => onChangeConfig({ ...config, output_format: 'json' })}
+              >
+                <div className="choice-card-header">
+                  <span className="choice-card-title">Data JSON</span>
+                  <span>⚙️</span>
+                </div>
+                <span className="choice-card-desc">.json file. For coders who need page numbers and structured data.</span>
               </div>
             </div>
           </div>
@@ -131,10 +148,10 @@ export default function ExtractTextPage({
             }}
           />
 
-          {/* Specialized Table & Math Fidelity Controls */}
+          {/* Simple Table & Math Settings */}
           <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-default)', paddingTop: '16px' }}>
             <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', display: 'block' }}>
-              2. Table &amp; Formula Extraction Rules
+              2. How to Format Tables &amp; Math
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
               <div
@@ -142,8 +159,8 @@ export default function ExtractTextPage({
                 onClick={() => onChangeConfig({ ...config, table_mode: 'html' })}
                 style={{ padding: '10px' }}
               >
-                <div className="choice-card-title" style={{ fontSize: '12.5px' }}>HTML &lt;table&gt; Fidelity</div>
-                <span className="choice-card-desc">Preserves multi-row header cells and complex table borders.</span>
+                <div className="choice-card-title" style={{ fontSize: '12.5px' }}>Clean Grid Tables</div>
+                <span className="choice-card-desc">Keeps lines, boxes, and table columns lined up neatly.</span>
               </div>
 
               <div
@@ -151,8 +168,8 @@ export default function ExtractTextPage({
                 onClick={() => onChangeConfig({ ...config, table_mode: 'pipes' })}
                 style={{ padding: '10px' }}
               >
-                <div className="choice-card-title" style={{ fontSize: '12.5px' }}>Markdown | Pipes |</div>
-                <span className="choice-card-desc">Lightweight standard pipes for quick editing in text editors.</span>
+                <div className="choice-card-title" style={{ fontSize: '12.5px' }}>Simple Text Tables</div>
+                <span className="choice-card-desc">Uses simple | bars | for easy copying into plain text.</span>
               </div>
 
               <div
@@ -160,8 +177,8 @@ export default function ExtractTextPage({
                 onClick={() => onChangeConfig({ ...config, math_delim: 'latex' })}
                 style={{ padding: '10px' }}
               >
-                <div className="choice-card-title" style={{ fontSize: '12.5px' }}>LaTeX Equations ($...$)</div>
-                <span className="choice-card-desc">Compatible with MathJax, KaTeX, and scientific papers.</span>
+                <div className="choice-card-title" style={{ fontSize: '12.5px' }}>Math Equations ($...$)</div>
+                <span className="choice-card-desc">Keeps fractions, square roots, and math symbols safe.</span>
               </div>
             </div>
           </div>
@@ -174,9 +191,33 @@ export default function ExtractTextPage({
             />
           </div>
 
-          {/* Primary Action Button */}
-          {file && (
-            <div style={{ marginTop: '24px' }}>
+          {/* Always Visible Action Button */}
+          <div style={{ marginTop: '24px' }}>
+            {!file ? (
+              <button
+                type="button"
+                onClick={handleChooseFileClick}
+                style={{
+                  width: '100%',
+                  padding: '14px 20px',
+                  background: 'var(--tool-primary)',
+                  color: '#ffffff',
+                  fontSize: '15px',
+                  fontWeight: 750,
+                  borderRadius: '12px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px var(--tool-glow)'
+                }}
+              >
+                <span>📂</span>
+                <span>Select PDF File to Extract Text</span>
+              </button>
+            ) : (
               <button
                 type="button"
                 className="tool-execute-btn"
@@ -200,17 +241,17 @@ export default function ExtractTextPage({
                 }}
               >
                 <span>📋</span>
-                <span>{isProcessing ? 'Extracting Data & Tables...' : `Extract to ${activeFormat.toUpperCase()}`}</span>
+                <span>{isProcessing ? 'Extracting Text & Tables...' : `Extract Text (${activeFormat.toUpperCase()}) Now`}</span>
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Live Structured Output Sample Showcase */}
         <section className="home-showcase-section" style={{ margin: '16px 0 0 0', maxWidth: '100%' }}>
           <div className="home-showcase-header">
-            <h2 className="home-showcase-title" style={{ fontSize: '20px' }}>Structured Output Quality Sample</h2>
-            <p className="home-showcase-subtitle">See how complex math equations and table grids are cleanly extracted into Notion-ready Markdown.</p>
+            <h2 className="home-showcase-title" style={{ fontSize: '18px' }}>Example Output</h2>
+            <p className="home-showcase-subtitle">See how questions, equations, and tables are cleanly copied.</p>
           </div>
 
           <div className="extract-preview-box">

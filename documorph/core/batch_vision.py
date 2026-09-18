@@ -75,7 +75,7 @@ You are an expert OCR and document structure AI. Your job is to extract text, ta
 5. **MATH & CHEMICAL FORMULA PRECISION (CRITICAL)**:
    - For mathematical equations, use standard LaTeX notation ($...$ inline, $$...$$ display).
    - **CHEMICAL & SUBSCRIPT FIDELITY**: All chemical formulas and physics subscripts MUST use explicit LaTeX subscripts with underscores, e.g. $\text{C}_6\text{H}_{12}\text{O}_6$, $\text{H}_2\text{O}$, $\text{CO}_2$, $\text{H}_2\text{SO}_4$, $N_1, N_2, I_1, I_2, \\Phi_B, B_1, B_2, v_0, t_1$. NEVER write subscripts as normal baseline digits (DO NOT write `\text{C}6\text{H}{12}\text{O}6`, `C6H12O6`, or `\text{H}{12}`).
-   - **DELIMITER BALANCE**: Always balance inline and display math delimiters symmetrically. NEVER enclose narrative text, explanatory sentences, or Devanagari/Hindi words inside `$$ ... $$` or `$...$` math blocks. Place all explanatory prose (e.g. "लेकिन परिनालिका के अंदर चुंबकीय क्षेत्र," or "इसकी तुलना $N\Phi_B = LI$ से करने पर") OUTSIDE math delimiters as standard text paragraphs. Never nest `$ ... $` inside `$$ ... $$`. Always ensure \\text{...} has valid braces around text (e.g. $\\text{m/s}$).
+   - **DELIMITER BALANCE**: Always balance inline and display math delimiters symmetrically. NEVER enclose narrative text, explanatory sentences, or Devanagari/Hindi words inside `$$ ... $$` or `$...$` math blocks. Place all explanatory prose (e.g. "लेकिन परिनालिका के अंदर चुंबकीय क्षेत्र," or "इसकी तुलना $N\\Phi_B = LI$ से करने पर") OUTSIDE math delimiters as standard text paragraphs. Never nest `$ ... $` inside `$$ ... $$`. Always ensure \\text{...} has valid braces around text (e.g. $\\text{m/s}$).
 6. **ZERO HALLUCINATION, ZERO COMMENTARY & ZERO OMISSION (CRITICAL)**:
    - Extract 100% of the authentic concepts, facts, names, formulas, and examples VERBATIM.
    - NEVER add meta-commentary, scene descriptions, or photo captions like "(No text found in image)" or "[Photograph depicting...]". If an image has no text, output an empty string or omit it.
@@ -130,8 +130,9 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 
         # Inject Strict Language Isolation or Multi-Language Translation (Prevent duplicate bilingual output)
         if self.service_type == "translate":
-            target_lang = self.language_mode or "Hindi"
+            target_lang = self.language_mode if (self.language_mode and str(self.language_mode).lower() not in ("auto", "none", "")) else "Hindi"
             prompt += (
+
                 f"\n\nSTRICT TRANSLATION REQUIREMENT ({target_lang.upper()}):\n"
                 f"1. Translate all narrative text, explanations, headings, and questions fluently into {target_lang}.\n"
                 f"2. CRITICAL FORMULA & CODE SHIELD: Retain 100% of mathematical equations ($...$, $$...$$), formulas, fractions, variable symbols, and code blocks completely UNTOUCHED, in original LaTeX format, and uncorrupted. NEVER omit passages or delete text because of language -- translate all content into {target_lang}.\n"

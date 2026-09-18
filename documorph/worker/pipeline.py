@@ -113,9 +113,11 @@ class DocuMorphOrchestrator:
 
         # If translate service has a target language, wire it
         if self.service_type == "translate":
-            to_lang = self.config_options.get("to_language", "")
-            if to_lang:
-                language_mode = to_lang
+            to_lang = self.config_options.get("to_language") or self.config_options.get("language_mode") or language_mode
+            if not to_lang or str(to_lang).lower() in ("auto", "none", ""):
+                language_mode = "Hindi"
+            else:
+                language_mode = str(to_lang).strip()
         elif self.config_options.get("language_mode"):
             language_mode = self.config_options.get("language_mode")
 

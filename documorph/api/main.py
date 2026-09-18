@@ -369,8 +369,15 @@ async def process_pdf(
     if not spam_words and parsed_config.get("spam_words"):
         spam_words = str(parsed_config.get("spam_words", "")).strip()
 
-    if (not language_mode or language_mode == "auto") and parsed_config.get("language_mode"):
+    if service_type == "translate":
+        to_lang = parsed_config.get("to_language") or language_mode
+        if not to_lang or to_lang.lower() in ("auto", "none", ""):
+            language_mode = "Hindi"
+        else:
+            language_mode = to_lang
+    elif (not language_mode or language_mode == "auto") and parsed_config.get("language_mode"):
         language_mode = str(parsed_config.get("language_mode")).strip()
+
 
     if service_type == "extract_text":
         raw_fmt = str(parsed_config.get("output_format", "markdown")).lower()

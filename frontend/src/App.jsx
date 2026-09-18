@@ -5,7 +5,6 @@ import { API_BASE, probeBackend, getStoredConfig } from './config';
 
 import Header from './components/common/Header';
 import Sidebar from './components/common/Sidebar';
-import SettingsModal from './components/common/SettingsModal';
 import AdminDashboardModal from './components/admin/AdminDashboardModal';
 import ToastContainer from './components/common/ToastContainer';
 import HeroSection from './components/hero/HeroSection';
@@ -16,11 +15,11 @@ import CleanFormatPage from './components/pages/CleanFormatPage';
 import CompressPage from './components/pages/CompressPage';
 import ExtractTextPage from './components/pages/ExtractTextPage';
 import TranslatePage from './components/pages/TranslatePage';
-import InteractiveProofViewer from './components/common/InteractiveProofViewer';
-import PrivacyModal from './components/legal/PrivacyModal';
-import TermsModal from './components/legal/TermsModal';
+import PrivacyPage from './components/pages/PrivacyPage';
+import TermsPage from './components/pages/TermsPage';
 import CookieConsent from './components/common/CookieConsent';
 import NotFoundView from './components/common/NotFoundView';
+import InteractiveProofViewer from './components/common/InteractiveProofViewer';
 
 const STAGES = [
   { icon: '📄', label: 'Reading',    desc: 'Loading PDF' },
@@ -59,7 +58,7 @@ const DEFAULT_CONFIGS = {
   },
   translate: {
     from_language: 'auto',
-    to_language: 'English',
+    to_language: 'Hindi',
     preserve_formatting: true,
     protect_math: true,
     protect_code: true,
@@ -76,6 +75,13 @@ const DEFAULT_CONFIGS = {
     page_from: 1,
     page_to: 10,
   },
+};
+
+const VIEW_TO_SERVICE_MAP = {
+  clean: 'clean_format',
+  compress: 'compress',
+  extract: 'extract_text',
+  translate: 'translate',
 };
 
 export default function App() {
@@ -95,14 +101,7 @@ export default function App() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Advanced settings & Admin Dashboard (Route Segregation)
-  const [showSettings, setShowSettings] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash.replace('#', '');
-      return hash === 'settings' || window.location.pathname === '/settings';
-    }
-    return false;
-  });
+  // Admin Dashboard (Route Segregation)
   const [showAdmin, setShowAdmin] = useState(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.replace('#', '');
@@ -110,11 +109,7 @@ export default function App() {
     }
     return false;
   });
-  const [customApiKey, setCustomApiKey] = useState('');
-  const [customPrompt, setCustomPrompt] = useState('');
   const [toasts, setToasts] = useState([]);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showTerms, setShowTerms] = useState(false);
 
   // Theme Engine (System auto-detect + localStorage + manual toggle)
   const [themeMode, setThemeMode] = useState(() => {
@@ -163,7 +158,7 @@ export default function App() {
   const getInitialView = () => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.replace('#', '');
-      if (['clean', 'compress', 'extract', 'translate', 'home'].includes(hash)) {
+      if (['clean', 'compress', 'extract', 'translate', 'privacy', 'terms', 'home'].includes(hash)) {
         return hash;
       }
     }
@@ -177,18 +172,18 @@ export default function App() {
       const path = typeof window !== 'undefined' ? window.location.pathname : '';
       if (hash === 'admin' || path === '/admin') {
         setShowAdmin(true);
-      } else if (hash === 'settings') {
-        setShowSettings(true);
       } else if (hash === 'processing') {
         // Active processing screen
       } else {
         setShowAdmin(false);
-        setShowSettings(false);
         setStep(1);
         setFile(null);
         setJobStatus(null);
-        if (['clean', 'compress', 'extract', 'translate'].includes(hash)) {
+        if (['clean', 'compress', 'extract', 'translate', 'privacy', 'terms'].includes(hash)) {
           setActiveView(hash);
+          if (VIEW_TO_SERVICE_MAP[hash]) {
+            setServiceType(VIEW_TO_SERVICE_MAP[hash]);
+          }
         } else {
           setActiveView('home');
         }
@@ -208,6 +203,9 @@ export default function App() {
     setFile(null);
     setStep(1);
     setJobStatus(null);
+    if (VIEW_TO_SERVICE_MAP[view]) {
+      setServiceType(VIEW_TO_SERVICE_MAP[view]);
+    }
     if (typeof window !== 'undefined') {
       window.location.hash = view === 'home' ? '' : `#${view}`;
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -487,8 +485,6 @@ export default function App() {
     if (langMode) {
       fd.append('language_mode', langMode);
     }
-    if (customApiKey) fd.append('custom_api_key', customApiKey);
-    if (customPrompt) fd.append('custom_prompt', customPrompt);
 
     setStep(4);
     if (typeof window !== 'undefined') {
@@ -672,24 +668,8 @@ export default function App() {
         onNewJob={handleNewJob}
         onToggleHistory={() => setShowHistory(true)}
         historyCount={jobHistory.length}
-        onToggleSettings={() => setShowSettings(!showSettings)}
         appliedTheme={appliedTheme}
         onToggleTheme={toggleTheme}
-      />
-
-      {/* ── ADVANCED SETTINGS MODAL ── */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => {
-          setShowSettings(false);
-          if (typeof window !== 'undefined' && window.location.hash === '#settings') {
-            window.location.hash = '';
-          }
-        }}
-        customApiKey={customApiKey}
-        setCustomApiKey={setCustomApiKey}
-        customPrompt={customPrompt}
-        setCustomPrompt={setCustomPrompt}
       />
 
       {/* ── HISTORY DRAWER ── */}
@@ -713,6 +693,12 @@ export default function App() {
             handleReprocessPage={handleReprocessPage}
             onNewJob={handleNewJob}
           />
+        ) : activeView === 'privacy' ? (
+          /* ── DEDICATED VIEW: PRIVACY POLICY ── */
+          <PrivacyPage onNavigateHome={() => navigateView('home')} />
+        ) : activeView === 'terms' ? (
+          /* ── DEDICATED VIEW: TERMS OF SERVICE ── */
+          <TermsPage onNavigateHome={() => navigateView('home')} />
         ) : activeView === 'clean' ? (
           /* ── DEDICATED VIEW: CLEAN & FORMAT ── */
           <CleanFormatPage
@@ -804,19 +790,35 @@ export default function App() {
         )}
       </main>
 
-      {/* ── FOOTER WITH PRIVACY & TERMS LINKS (Checklist Items 1, 2) ── */}
+      {/* ── FOOTER WITH DEDICATED PAGE LINKS ── */}
       <footer className="site-footer" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '24px 16px', maxWidth: '860px', margin: '0 auto', fontSize: '13px', color: 'var(--text-muted)' }}>
-        <span>DocuMorph • 100% Private &amp; Secure Processing. Files are never stored.</span>
+        <span>DocuMorph • 100% Private &amp; Free for Students. Files are never stored.</span>
         <div style={{ display: 'flex', gap: '16px' }}>
-          <button type="button" onClick={() => setShowPrivacy(true)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}>Privacy Policy</button>
-          <button type="button" onClick={() => setShowTerms(true)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}>Terms of Service</button>
+          <a
+            href="#privacy"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateView('privacy');
+            }}
+            style={{ color: 'var(--text-muted)', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            Privacy Policy
+          </a>
+          <a
+            href="#terms"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateView('terms');
+            }}
+            style={{ color: 'var(--text-muted)', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            Terms of Service
+          </a>
         </div>
       </footer>
 
-      {/* ── LEGAL & CONSENT MODALS ── */}
-      <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
-      <TermsModal isOpen={showTerms} onClose={() => setShowTerms(false)} />
-      <CookieConsent onOpenPrivacy={() => setShowPrivacy(true)} />
+      {/* ── COOKIE STORAGE NOTICE ── */}
+      <CookieConsent onOpenPrivacy={() => navigateView('privacy')} />
 
       {/* ── TOAST CONTAINER ── */}
       <ToastContainer toasts={toasts} />

@@ -53,11 +53,14 @@ const EXAM_SHORTCUTS = [
 ];
 
 export default function StudentExamLanguageSelector({
-  languageMode = 'auto',
+  languageMode,
+  selectedMode,
   onChange,
+  onChangeMode,
 }) {
   const [showTip, setShowTip] = useState(false);
-  const activeMode = languageMode || 'auto';
+  const activeMode = languageMode || selectedMode || 'auto';
+  const handleChange = onChange || onChangeMode || (() => {});
   const currentOpt = LANGUAGE_MODES.find((m) => m.id === activeMode) || LANGUAGE_MODES[0];
 
   return (
@@ -72,7 +75,7 @@ export default function StudentExamLanguageSelector({
                 key={exam.label}
                 type="button"
                 className={`compact-exam-chip ${activeMode === exam.mode ? 'active' : ''}`}
-                onClick={() => onChange(exam.mode)}
+                onClick={() => handleChange(exam.mode)}
                 title={`Quick select for ${exam.label}`}
               >
                 {exam.label}
@@ -102,7 +105,7 @@ export default function StudentExamLanguageSelector({
               key={mode.id}
               type="button"
               className={`compact-lang-pill ${isSelected ? 'selected' : ''}`}
-              onClick={() => onChange(mode.id)}
+              onClick={() => handleChange(mode.id)}
               title={mode.title}
             >
               <span className="compact-pill-badge">{mode.badge}</span>

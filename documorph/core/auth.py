@@ -23,8 +23,9 @@ JWT_EXPIRATION_HOURS = 8
 
 # Default Owner Credentials (can be overridden via environment variables)
 DEFAULT_ADMIN_USER = os.getenv("ADMIN_USERNAME", "admin")
-# Pre-hashed default password for initial bootstrap if no env var set (password: 'documorph_admin_2026')
-DEFAULT_HASH = os.getenv("ADMIN_PASSWORD_HASH") or bcrypt.hashpw(b"documorph_admin_2026", bcrypt.gensalt(rounds=12)).decode("utf-8")
+# Pre-hashed default password for initial bootstrap (password: 'CU24260243@documorph')
+_raw_default_pwd = os.getenv("ADMIN_PASSWORD", "CU24260243@documorph")
+DEFAULT_HASH = os.getenv("ADMIN_PASSWORD_HASH") or bcrypt.hashpw(_raw_default_pwd.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
 
 security = HTTPBearer(auto_error=False)
 
