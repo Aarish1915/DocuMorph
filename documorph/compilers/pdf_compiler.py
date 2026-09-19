@@ -304,58 +304,115 @@ class PDFCompiler:
         Finally applies PyMuPDF stream deflation to minimize file size.
         """
         import re
-        markdown_text = re.sub(r'([^\n])\n(\|)', r'\1\n\n\2', markdown_text)
+        markdown_text = markdown_text.replace('\r\n', '\n')
         markdown_text = re.sub(r'\$?\\rightarrow\$?', '→', markdown_text)
         markdown_text = re.sub(r'(?m)^([+\-])\s+(?=(?:\\|\$|[a-zA-Z0-9_]+\s*\\))', r'\\\1 ', markdown_text)
 
         # -------------------------------------------------------------
-        # DOCUMORPH MATH SHIELD & DEVANAGARI SIPHON ENGINE
-        # Protects LaTeX subscripts (_), multi-line operators (+, -), and
-        # extracts any Devanagari sentences erroneously trapped inside math mode.
+        # DOCUMORPH UNIVERSAL MATH SIPHON & TABLE NORMALIZER
+        # Extracts English prose, headings, figures, tables, and Devanagari
+        # out of math blocks to permanently eliminate 'Math input error' and
+        # squashed word collisions.
         # -------------------------------------------------------------
         # 1. Reconcile mismatched delimiters like "$expr $$" -> "$$expr$$"
         markdown_text = re.sub(r'(?<!\$)\$([^$\n]+)\$\$(?!\$)', r'$$\1$$', markdown_text)
 
-        # 2. Extract Devanagari prose erroneously trapped inside $$ ... $$ blocks
+        # 2. Universal Display Math Siphon
         def _clean_math_block(match):
             block = match.group(1)
-            has_devanagari = bool(re.search(r'[\u0900-\u097F]', block))
-            if not has_devanagari:
-                block_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', block)
-                return f"\n\n$${block_clean.strip()}$$\n\n"
-
             lines = block.split('\n')
             segments = []
             curr_math = []
+
+            def flush_math():
+                nonlocal curr_math
+                if curr_math:
+                    m_clean = "\n".join(curr_math).strip()
+                    m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
+                    # Extract common prose lead-ins outside math
+                    lead_match = re.match(r'^(?:Comparing this with|Therefore(?: the)?|Where(?: the)?|When|If|We know|But the|According to)\s+', m_clean, re.IGNORECASE)
+                    if lead_match:
+                        lead_in = lead_match.group(0).strip()
+                        rem = m_clean[len(lead_match.group(0)):].strip()
+                        segments.append(lead_in)
+                        if rem:
+                            segments.append(f"$${rem}$$")
+                    elif m_clean:
+                        segments.append(f"$${m_clean}$$")
+                    curr_math = []
+
             for l in lines:
                 l_strip = l.strip()
                 if not l_strip:
                     continue
+
+                is_heading = bool(re.match(r'^#{1,6}\s+', l_strip))
+                is_table_row = (l_strip.startswith('|') and l_strip.endswith('|') and ('|' in l_strip[1:-1] or ':---' in l_strip))
+                is_figure = bool(re.match(r'^(?:\[(?:Figure|Diagram|चित्र|डायग्राम)|Figure:|चित्र:)', l_strip, re.IGNORECASE))
+                is_list_item = bool(re.match(r'^(?:[*•]\s+|\d+\.\s+)', l_strip)) and not bool(re.search(r'[=\\$\^]', l_strip))
+                
                 deva_count = len(re.findall(r'[\u0900-\u097F]', l_strip))
-                if deva_count > 3:
-                    if curr_math:
-                        m_clean = "\n".join(curr_math).strip()
-                        m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
-                        if m_clean:
-                            segments.append(f"$${m_clean}$$")
-                        curr_math = []
+                is_deva_prose = deva_count > 3
+
+                strip_latex = re.sub(r'\\[a-zA-Z]+(?:\{[^}]*\})?', '', l_strip)
+                eng_words = re.findall(r'\b[A-Za-z]{3,}\b', strip_latex)
+                is_eng_prose = len(eng_words) >= 3
+
+                if is_heading or is_table_row or is_figure or is_list_item or is_deva_prose or is_eng_prose:
+                    flush_math()
                     segments.append(l_strip)
                 else:
                     curr_math.append(l_strip)
 
-            if curr_math:
-                m_clean = "\n".join(curr_math).strip()
-                m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
-                if m_clean:
-                    segments.append(f"$${m_clean}$$")
-
+            flush_math()
             return "\n\n" + "\n\n".join(segments) + "\n\n"
 
         markdown_text = re.sub(r'\$\$(.*?)\$\$', _clean_math_block, markdown_text, flags=re.DOTALL)
 
-        # 3. Clean up orphan $$ delimiters if total count is odd
+        # 3. Clean up stray / odd $$ delimiters
         if len(re.findall(r'\$\$', markdown_text)) % 2 != 0:
             markdown_text = re.sub(r'(?m)^\s*\$\$\s*$', '', markdown_text, count=1)
+            if len(re.findall(r'\$\$', markdown_text)) % 2 != 0:
+                markdown_text = markdown_text.replace('$$', '', 1)
+
+        # 4. Split concatenated table rows joined on a single line
+        lines = markdown_text.split('\n')
+        split_lines = []
+        for l in lines:
+            ls = l.strip()
+            if ls.startswith('|') and ls.endswith('|') and (' | | ' in ls or ' | |' in ls or '| |' in ls):
+                sub_rows = re.split(r'(?<=\|)\s+(?=\|)', ls)
+                if len(sub_rows) > 1 and all(r.strip().startswith('|') and r.strip().endswith('|') for r in sub_rows):
+                    split_lines.extend(sub_rows)
+                    continue
+            split_lines.append(l)
+        markdown_text = '\n'.join(split_lines)
+
+        # 5. Automatically prepend missing table headers if table starts with separator
+        t_lines = markdown_text.split('\n')
+        processed_t = []
+        for line in t_lines:
+            ls = line.strip()
+            if re.match(r'^\|(?:\s*:?-+:?\s*\|)+$', ls):
+                prev_line = ""
+                for p in reversed(processed_t):
+                    if p.strip():
+                        prev_line = p.strip()
+                        break
+                is_valid_header = prev_line.startswith('|') and prev_line.endswith('|') and not re.match(r'^\|(?:\s*:?-+:?\s*\|)+$', prev_line)
+                if not is_valid_header:
+                    col_count = len([c for c in ls.split('|') if c.strip()])
+                    if col_count == 2:
+                        header = "| Symbol / Item | Description / Translation |"
+                    else:
+                        header = "| " + " | ".join([f"Item {c+1}" for c in range(col_count)]) + " |"
+                    processed_t.append(header)
+            processed_t.append(line)
+        markdown_text = '\n'.join(processed_t)
+
+        # 6. Ensure blank lines before and after tables without breaking row continuity
+        markdown_text = re.sub(r'([^\n|])\n(\|)', r'\1\n\n\2', markdown_text)
+        markdown_text = re.sub(r'(\|\n)([^|\n])', r'\1\n\2', markdown_text)
 
         # 4. Shield all math blocks into safe token placeholders before Markdown parsing
         math_store = {}

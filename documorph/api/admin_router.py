@@ -10,13 +10,14 @@ import glob
 import json
 import psutil
 import logging
+import base64
 from typing import Dict, Any, List, Optional
 from collections import defaultdict
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from documorph.core.database import get_db, Job, AdminUser, engine, utc_now
+from documorph.core.database import get_db, Job, PageResult, AdminUser, engine, utc_now
 from documorph.core.auth import (
     verify_password,
     create_access_token,
@@ -294,6 +295,65 @@ def get_job_telemetry_report(
 * *(Network dropouts and retry delays have been successfully excluded from this time)*
 """
 
+    # 1. Fetch Page-by-page intermediate results from PageResult
+    pages_data = []
+    try:
+        page_results = db.query(PageResult).filter(PageResult.job_id == job.id).order_by(PageResult.page_number).all()
+        for pr in page_results:
+            raw_text = pr.raw_markdown or ""
+            pages_data.append({
+                "page_number": pr.page_number,
+                "status": pr.status,
+                "error_msg": pr.error_msg,
+                "char_count": len(raw_text),
+                "has_math": ("$$" in raw_text or "$" in raw_text),
+                "has_tables": ("|" in raw_text and "---" in raw_text),
+                "preview": (raw_text[:600] + "...") if len(raw_text) > 600 else raw_text
+            })
+    except Exception as pe:
+        logger.warning(f"Could not load PageResults for job {job.id}: {pe}")
+
+    # 2. Discover extracted diagram image crops
+    diagrams_list = []
+    try:
+        diag_patterns = [
+            f"data/output/**/{job_id}*.png",
+            f"data/output/images/*{job_id}*.png",
+            f"data/uploads/extracted_diagrams/*{job_id}*.png"
+        ]
+        found_paths = set()
+        for pat in diag_patterns:
+            for p in glob.glob(pat, recursive=True):
+                found_paths.add(p)
+
+        for p in sorted(list(found_paths))[:16]:
+            try:
+                size_kb = round(os.path.getsize(p) / 1024, 1)
+                fname = os.path.basename(p)
+                b64 = None
+                if size_kb <= 350:
+                    with open(p, "rb") as img_f:
+                        b64 = f"data:image/png;base64,{base64.b64encode(img_f.read()).decode('ascii')}"
+                diagrams_list.append({
+                    "filename": fname,
+                    "size_kb": size_kb,
+                    "data_url": b64
+                })
+            except Exception:
+                pass
+    except Exception as de:
+        logger.warning(f"Could not load diagram images for job {job.id}: {de}")
+
+    # 3. Before & After comparison info
+    before_after = {
+        "original_filename": file_name,
+        "original_size_kb": orig_kb,
+        "compressed_size_kb": out_kb,
+        "compaction_pct": compaction,
+        "result_url": job.result_url,
+        "download_url": f"/api/download/{job.id}" if (job.result_url and job.status == "COMPLETED") else None
+    }
+
     return {
         "job_id": job.id,
         "file_name": file_name,
@@ -315,6 +375,23 @@ def get_job_telemetry_report(
             "tokens_input": in_tokens,
             "tokens_output": out_tokens,
             "cost_usd": cost_usd
-        }
+        },
+        "pages": pages_data,
+        "diagrams": diagrams_list,
+        "before_after": before_after
     }
+
+
+@admin_router.get("/admin/jobs/{job_id}/details")
+def get_job_full_details(
+    job_id: str,
+    admin: Dict[str, Any] = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Detailed inspection endpoint for a specific PDF job:
+    Returns full telemetry report, processing breakdown, intermediate page markdown,
+    and diagram image crops.
+    """
+    return get_job_telemetry_report(job_id=job_id, admin=admin, db=db)
 

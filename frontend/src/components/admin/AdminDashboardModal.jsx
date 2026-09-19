@@ -31,6 +31,7 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
 
   // Ground Reality & Telemetry Report Inspection
   const [selectedReport, setSelectedReport] = useState(null);
+  const [reportDetailTab, setReportDetailTab] = useState('telemetry'); // 'telemetry' | 'intermediate'
   const [loadingReport, setLoadingReport] = useState(false);
   const [copiedReport, setCopiedReport] = useState(false);
 
@@ -54,6 +55,7 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
       if (res.ok) {
         const data = await res.json();
         setSelectedReport(data);
+        setReportDetailTab('telemetry');
       } else {
         alert('Could not fetch telemetry report for job ' + jobId);
       }
@@ -154,7 +156,8 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setAdminJobs(data.jobs || []);
+        const jobsList = Array.isArray(data) ? data : (data.jobs || []);
+        setAdminJobs(jobsList);
       } else if (res.status === 401) {
         handleLogout();
       }
@@ -222,7 +225,8 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
 
         if (resJobs.ok) {
           const data = await resJobs.json();
-          setAdminJobs(data.jobs || []);
+          const jobsList = Array.isArray(data) ? data : (data.jobs || []);
+          setAdminJobs(jobsList);
         }
       } catch (e) {
         console.error('Failed to load initial admin data:', e);
@@ -573,7 +577,7 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                 </div>
 
                 {selectedReport ? (
-                  /* Ground Reality & Telemetry Report Detailed View */
+                  /* Ground Reality & Telemetry Report & Intermediate Inspection View */
                   <div className="telemetry-report-view" style={{
                     background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
                     border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
@@ -581,7 +585,8 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                     padding: '20px',
                     color: 'var(--text-primary, #fff)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.1))', paddingBottom: '12px' }}>
+                    {/* Header Bar */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.1))', paddingBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                       <button
                         type="button"
                         onClick={() => setSelectedReport(null)}
@@ -597,7 +602,28 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                       >
                         ← Back to Jobs List
                       </button>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {selectedReport.before_after?.download_url && (
+                          <a
+                            href={`${getTargetApiUrl()}${selectedReport.before_after.download_url}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              background: 'rgba(16, 185, 129, 0.2)',
+                              border: '1px solid rgba(16, 185, 129, 0.4)',
+                              borderRadius: '6px',
+                              padding: '6px 12px',
+                              color: '#34d399',
+                              textDecoration: 'none',
+                              fontSize: '0.8rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            ⬇️ Download Result ({selectedReport.metrics?.out_size_kb} KB)
+                          </a>
+                        )}
                         <button
                           type="button"
                           onClick={handleCopyReportMarkdown}
@@ -626,104 +652,340 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                             fontSize: '0.8rem'
                           }}
                         >
-                          ⬇️ Download (.md)
+                          ⬇️ Download Report (.md)
                         </button>
                       </div>
                     </div>
 
-                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '8px' }}>
-                      📊 Ground Reality & Telemetry Report: {selectedReport.file_name}
+                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span>📄 {selectedReport.file_name}</span>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: selectedReport.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                        color: selectedReport.status === 'COMPLETED' ? '#34d399' : '#f87171'
+                      }}>
+                        {selectedReport.status}
+                      </span>
                     </div>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #94a3b8)', marginBottom: '16px' }}>
                       <strong>Service Type:</strong> <code style={{ color: '#60a5fa' }}>{selectedReport.service_type}</code> &nbsp;|&nbsp; <strong>Language Mode:</strong> <code style={{ color: '#a78bfa' }}>{selectedReport.language_mode}</code> &nbsp;|&nbsp; <strong>Generated:</strong> {selectedReport.created_at}
                     </div>
 
-                    <hr style={{ borderColor: 'rgba(255,255,255,0.1)', margin: '16px 0' }} />
+                    {/* Per-PDF View Mode Switcher Tabs */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setReportDetailTab('telemetry')}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          border: reportDetailTab === 'telemetry' ? '1px solid var(--color-primary, #2563eb)' : '1px solid rgba(255,255,255,0.15)',
+                          background: reportDetailTab === 'telemetry' ? 'var(--color-primary, #2563eb)' : 'transparent',
+                          color: '#fff'
+                        }}
+                      >
+                        📊 Ground Reality & Telemetry Report
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReportDetailTab('intermediate')}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          border: reportDetailTab === 'intermediate' ? '1px solid var(--color-primary, #2563eb)' : '1px solid rgba(255,255,255,0.15)',
+                          background: reportDetailTab === 'intermediate' ? 'var(--color-primary, #2563eb)' : 'transparent',
+                          color: '#fff'
+                        }}
+                      >
+                        🖼️ Before / After & Intermediate Data ({selectedReport.pages?.length || 0} Pages, {selectedReport.diagrams?.length || 0} Visuals)
+                      </button>
+                    </div>
 
-                    <h4 style={{ margin: '16px 0 8px 0', fontSize: '1rem' }}>1. Performance & Telemetry</h4>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '16px' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', textAlign: 'left', color: 'var(--text-secondary, #94a3b8)' }}>
-                          <th style={{ padding: '8px 6px' }}>Metric</th>
-                          <th style={{ padding: '8px 6px' }}>Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Original Pages</td>
-                          <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.total_pages}</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Processed Pages</td>
-                          <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.total_pages}</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Original File Size</td>
-                          <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.orig_size_kb} KB</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Output File Size</td>
-                          <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.out_size_kb} KB</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Physical Space / Data Compaction</td>
-                          <td style={{ padding: '6px 8px', color: '#34d399' }}>{selectedReport.metrics?.compaction_pct}%</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Processing Latency</td>
-                          <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.latency_seconds} seconds</td>
-                        </tr>
-                        <tr>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Status</td>
-                          <td style={{ padding: '6px 8px', color: '#34d399' }}>✅ {selectedReport.status}</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                    {/* Tab 1: Telemetry & Performance */}
+                    {reportDetailTab === 'telemetry' && (
+                      <div>
+                        <h4 style={{ margin: '16px 0 8px 0', fontSize: '1rem' }}>1. Performance & Telemetry</h4>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '16px' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', textAlign: 'left', color: 'var(--text-secondary, #94a3b8)' }}>
+                              <th style={{ padding: '8px 6px' }}>Metric</th>
+                              <th style={{ padding: '8px 6px' }}>Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Original Pages</td>
+                              <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.total_pages}</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Processed Pages</td>
+                              <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.total_pages}</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Original File Size</td>
+                              <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.orig_size_kb} KB</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Output File Size</td>
+                              <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.out_size_kb} KB</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Physical Space / Data Compaction</td>
+                              <td style={{ padding: '6px 8px', color: '#34d399', fontWeight: 'bold' }}>{selectedReport.metrics?.compaction_pct}%</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Processing Latency</td>
+                              <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.latency_seconds} seconds</td>
+                            </tr>
+                            <tr>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Status</td>
+                              <td style={{ padding: '6px 8px', color: '#34d399' }}>✅ {selectedReport.status}</td>
+                            </tr>
+                          </tbody>
+                        </table>
 
-                    <hr style={{ borderColor: 'rgba(255,255,255,0.1)', margin: '16px 0' }} />
+                        <hr style={{ borderColor: 'rgba(255,255,255,0.1)', margin: '16px 0' }} />
 
-                    <h4 style={{ margin: '16px 0 8px 0', fontSize: '1rem' }}>2. Processing Breakdown</h4>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '16px' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', textAlign: 'left', color: 'var(--text-secondary, #94a3b8)' }}>
-                          <th style={{ padding: '8px 6px' }}>Metric</th>
-                          <th style={{ padding: '8px 6px' }}>Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Total Pages</td>
-                          <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.total_pages}</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Local CPU Pages (Count)</td>
-                          <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.local_pages_count}</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Vision AI Pages (Count)</td>
-                          <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.ai_pages_count}</td>
-                        </tr>
-                        <tr>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Total API Calls</td>
-                          <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>{selectedReport.metrics?.total_api_calls}</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                        <h4 style={{ margin: '16px 0 8px 0', fontSize: '1rem' }}>2. Processing Breakdown</h4>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '16px' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', textAlign: 'left', color: 'var(--text-secondary, #94a3b8)' }}>
+                              <th style={{ padding: '8px 6px' }}>Metric</th>
+                              <th style={{ padding: '8px 6px' }}>Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Total Pages</td>
+                              <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.total_pages}</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Local CPU Pages (Count)</td>
+                              <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.local_pages_count}</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Vision AI Pages (Count)</td>
+                              <td style={{ padding: '6px 8px' }}>{selectedReport.metrics?.ai_pages_count}</td>
+                            </tr>
+                            <tr>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>Total API Calls</td>
+                              <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>{selectedReport.metrics?.total_api_calls}</td>
+                            </tr>
+                          </tbody>
+                        </table>
 
-                    <h4 style={{ margin: '16px 0 8px 0', fontSize: '1rem' }}>🪙 Token Usage (Gemini 3.5 Flash-Lite)</h4>
-                    <ul style={{ margin: '0 0 16px 0', paddingLeft: '20px', fontSize: '0.85rem', lineHeight: '1.8' }}>
-                      <li><strong>Input Tokens (Images + Prompt):</strong> {selectedReport.metrics?.tokens_input} tokens</li>
-                      <li><strong>Output Tokens (Markdown Text):</strong> {selectedReport.metrics?.tokens_output} tokens</li>
-                      <li><strong>Total Cost Equivalent:</strong> {selectedReport.metrics?.cost_usd} USD (Estimated)</li>
-                    </ul>
+                        <h4 style={{ margin: '16px 0 8px 0', fontSize: '1rem' }}>🪙 Token Usage (Gemini 3.5 Flash-Lite)</h4>
+                        <ul style={{ margin: '0 0 16px 0', paddingLeft: '20px', fontSize: '0.85rem', lineHeight: '1.8' }}>
+                          <li><strong>Input Tokens (Images + Prompt):</strong> {selectedReport.metrics?.tokens_input} tokens</li>
+                          <li><strong>Output Tokens (Markdown Text):</strong> {selectedReport.metrics?.tokens_output} tokens</li>
+                          <li><strong>Total Cost Equivalent:</strong> {selectedReport.metrics?.cost_usd} USD (Estimated)</li>
+                        </ul>
 
-                    <h4 style={{ margin: '16px 0 8px 0', fontSize: '1rem' }}>⏱️ Timing Calculations (Pure Compute)</h4>
-                    <ul style={{ margin: '0 0 16px 0', paddingLeft: '20px', fontSize: '0.85rem', lineHeight: '1.8' }}>
-                      <li><strong>Total Compute Time:</strong> {selectedReport.metrics?.compute_time_seconds} Seconds</li>
-                      <li style={{ color: 'var(--text-secondary, #94a3b8)', fontStyle: 'italic' }}>
-                        (Network dropouts and retry delays have been successfully excluded from this time)
-                      </li>
-                    </ul>
+                        <h4 style={{ margin: '16px 0 8px 0', fontSize: '1rem' }}>⏱️ Timing Calculations (Pure Compute)</h4>
+                        <ul style={{ margin: '0 0 16px 0', paddingLeft: '20px', fontSize: '0.85rem', lineHeight: '1.8' }}>
+                          <li><strong>Total Compute Time:</strong> {selectedReport.metrics?.compute_time_seconds} Seconds</li>
+                          <li style={{ color: 'var(--text-secondary, #94a3b8)', fontStyle: 'italic' }}>
+                            (Network dropouts and retry delays have been successfully excluded from this time)
+                          </li>
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Tab 2: Before & After and Intermediate Data */}
+                    {reportDetailTab === 'intermediate' && (
+                      <div>
+                        {/* Section A: Before vs After Overview */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                          gap: '14px',
+                          marginBottom: '20px'
+                        }}>
+                          <div style={{
+                            padding: '14px',
+                            borderRadius: '8px',
+                            background: 'rgba(255,255,255,0.02)',
+                            border: '1px solid rgba(255,255,255,0.08)'
+                          }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #94a3b8)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                              Original Document
+                            </div>
+                            <div style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '4px' }}>
+                              {selectedReport.file_name}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                              Size: <strong>{selectedReport.metrics?.orig_size_kb} KB</strong> &nbsp;|&nbsp; Pages: <strong>{selectedReport.metrics?.total_pages}</strong>
+                            </div>
+                          </div>
+
+                          <div style={{
+                            padding: '14px',
+                            borderRadius: '8px',
+                            background: 'rgba(16, 185, 129, 0.05)',
+                            border: '1px solid rgba(16, 185, 129, 0.2)'
+                          }}>
+                            <div style={{ fontSize: '0.75rem', color: '#34d399', textTransform: 'uppercase', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Output Document</span>
+                              <span>{selectedReport.metrics?.compaction_pct}% Compaction</span>
+                            </div>
+                            <div style={{ fontSize: '1rem', fontWeight: '600', color: '#34d399', marginBottom: '4px' }}>
+                              {selectedReport.metrics?.out_size_kb} KB
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                              Status: <strong>{selectedReport.status}</strong> &nbsp;|&nbsp; Service: <strong>{selectedReport.service_type}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section B: Extracted Diagram Crops Gallery */}
+                        <div style={{ marginBottom: '24px' }}>
+                          <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>🖼️ Extracted Diagrams & Crops</span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #94a3b8)' }}>({selectedReport.diagrams?.length || 0} found)</span>
+                          </h4>
+                          {selectedReport.diagrams && selectedReport.diagrams.length > 0 ? (
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                              gap: '12px'
+                            }}>
+                              {selectedReport.diagrams.map((diag, dIdx) => (
+                                <div
+                                  key={diag.filename || dIdx}
+                                  style={{
+                                    background: 'rgba(255,255,255,0.02)',
+                                    border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '6px',
+                                    padding: '10px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center'
+                                  }}
+                                >
+                                  {diag.data_url ? (
+                                    <img
+                                      src={diag.data_url}
+                                      alt={diag.filename}
+                                      style={{
+                                        maxWidth: '100%',
+                                        maxHeight: '140px',
+                                        objectFit: 'contain',
+                                        borderRadius: '4px',
+                                        background: '#fff',
+                                        padding: '4px',
+                                        marginBottom: '8px'
+                                      }}
+                                    />
+                                  ) : (
+                                    <div style={{
+                                      height: '100px',
+                                      width: '100%',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      background: 'rgba(255,255,255,0.05)',
+                                      borderRadius: '4px',
+                                      marginBottom: '8px',
+                                      color: '#94a3b8',
+                                      fontSize: '0.8rem'
+                                    }}>
+                                      🖼️ Diagram Image
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: '0.75rem', fontWeight: '500', color: '#e2e8f0', textAlign: 'center', wordBreak: 'break-all' }}>
+                                    {diag.filename}
+                                  </div>
+                                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
+                                    {diag.size_kb} KB
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #94a3b8)', fontStyle: 'italic', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                              No standalone diagram crops were generated for this document.
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Section C: Intermediate Page-by-Page Markdown Preview */}
+                        <div>
+                          <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>📝 Intermediate Page Markdown</span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #94a3b8)' }}>({selectedReport.pages?.length || 0} Pages)</span>
+                          </h4>
+                          {selectedReport.pages && selectedReport.pages.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {selectedReport.pages.map((p) => (
+                                <div
+                                  key={p.page_number}
+                                  style={{
+                                    border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '6px',
+                                    padding: '12px',
+                                    background: 'rgba(255,255,255,0.02)'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>Page {p.page_number}</span>
+                                      <span style={{
+                                        fontSize: '0.7rem',
+                                        padding: '1px 6px',
+                                        borderRadius: '3px',
+                                        background: p.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                        color: p.status === 'COMPLETED' ? '#34d399' : '#f87171'
+                                      }}>
+                                        {p.status}
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '6px', fontSize: '0.75rem' }}>
+                                      {p.has_math && (
+                                        <span style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', padding: '1px 6px', borderRadius: '3px' }}>
+                                          ∑ Math
+                                        </span>
+                                      )}
+                                      {p.has_tables && (
+                                        <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '1px 6px', borderRadius: '3px' }}>
+                                          📊 Tables
+                                        </span>
+                                      )}
+                                      <span style={{ color: 'var(--text-secondary, #94a3b8)' }}>{p.char_count} chars</span>
+                                    </div>
+                                  </div>
+                                  <div style={{
+                                    maxHeight: '120px',
+                                    overflowY: 'auto',
+                                    background: 'rgba(0,0,0,0.25)',
+                                    padding: '8px 10px',
+                                    borderRadius: '4px',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.75rem',
+                                    color: '#cbd5e1',
+                                    whiteSpace: 'pre-wrap',
+                                    lineHeight: '1.4'
+                                  }}>
+                                    {p.preview || '(Empty text)'}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #94a3b8)', fontStyle: 'italic', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                              No per-page intermediate markdown entries in database.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : adminJobs.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary, #94a3b8)' }}>
@@ -745,11 +1007,25 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                       </thead>
                       <tbody>
                         {adminJobs.map((j) => (
-                          <tr key={j.id} style={{ borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.05))' }}>
+                          <tr
+                            key={j.id}
+                            onClick={() => handleViewReport(j.id)}
+                            style={{
+                              borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.05))',
+                              cursor: 'pointer',
+                              transition: 'background 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                            title="Click to view full Telemetry Report & Intermediate Data for this PDF"
+                          >
                             <td style={{ padding: '8px 6px' }}>
                               <button
                                 type="button"
-                                onClick={() => handleViewReport(j.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewReport(j.id);
+                                }}
                                 style={{
                                   background: 'none',
                                   border: 'none',
@@ -787,7 +1063,10 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                             <td style={{ padding: '8px 6px', textAlign: 'right' }}>
                               <button
                                 type="button"
-                                onClick={() => handleViewReport(j.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewReport(j.id);
+                                }}
                                 disabled={loadingReport}
                                 style={{
                                   background: 'rgba(59, 130, 246, 0.15)',
@@ -802,7 +1081,7 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                                   gap: '4px'
                                 }}
                               >
-                                📊 Telemetry Report
+                                📊 View Details
                               </button>
                             </td>
                           </tr>

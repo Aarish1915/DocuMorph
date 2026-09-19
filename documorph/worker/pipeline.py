@@ -203,6 +203,10 @@ class DocuMorphOrchestrator:
             sweeper = LightningSweeper(doc)
             classifications = sweeper.sweep()
             
+            if self.service_type == "translate":
+                for p in range(len(doc)):
+                    classifications[p] = "complex"
+            
             ai_pages = [p for p, c in classifications.items() if c in ("complex", "corrupted")]
             local_pages = [p for p in range(len(doc)) if p not in ai_pages]
             logger.info(f"TELEMETRY_PAGES_AI: {ai_pages}")

@@ -137,10 +137,11 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 f"\n\nSTRICT TRANSLATION REQUIREMENT ({target_lang.upper()}):\n"
                 f"1. Translate all narrative text, explanations, headings, and questions fluently into {target_lang}.\n"
                 f"2. CRITICAL FORMULA & CODE SHIELD: Retain 100% of mathematical equations ($...$, $$...$$), formulas, fractions, variable symbols, and code blocks completely UNTOUCHED, in original LaTeX format, and uncorrupted. NEVER omit passages or delete text because of language -- translate all content into {target_lang}.\n"
-                f"3. TRANSLATED DIAGRAM LABELS: When you output a `[Figure: <desc> | bbox: [...]]` tag for any diagram containing text labels in the source language, follow it immediately with a translated glossary key table:\n\n"
+                f"3. TRANSLATED DIAGRAM LABELS: When you output a `[Figure: <desc> | bbox: [...]]` tag for any diagram containing text labels in the source language, follow it immediately with a translated glossary key table on separate lines (NEVER wrap the table inside $$ math delimiters):\n\n"
                 f"| Diagram Label (Original) | Translation ({target_lang}) |\n"
                 f"| :--- | :--- |\n"
-                f"| ... | ... |\n"
+                f"| [Label 1] | [Translation 1] |\n"
+                f"| [Label 2] | [Translation 2] |\n\n"
             )
         elif self.language_mode and self.language_mode not in ("auto", "Auto-Detect"):
             mode_clean = self.language_mode.lower().strip().replace("-", " ").replace("_", " ")

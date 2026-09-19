@@ -136,52 +136,63 @@ class FormatFixer:
         # Fix mismatched inline/display math delimiters like "$e = ... $$" -> "$$e = ...$$"
         text = re.sub(r'(?<!\$)\$([^$\n]+)\$\$(?!\$)', r'$$\1$$', text)
 
-        # Reconcile Devanagari text erroneously trapped inside $$ ... $$ blocks
+        # Reconcile prose, headings, tables, and figures erroneously trapped inside $$ ... $$ blocks
         def _clean_display_math(match):
             block = match.group(1)
-            # Check if block contains Devanagari characters
-            has_devanagari = bool(re.search(r'[\u0900-\u097F]', block))
-            if not has_devanagari:
-                # Remove nested $ ... $ inside $$ ... $$
-                block_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', block)
-                return f"\n\n$${block_clean.strip()}$$\n\n"
-
-            # Block has Devanagari text! Split line by line to separate prose from pure math
             lines = block.split('\n')
             segments = []
             curr_math = []
+
+            def flush_math():
+                nonlocal curr_math
+                if curr_math:
+                    m_clean = "\n".join(curr_math).strip()
+                    m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
+                    lead_match = re.match(r'^(?:Comparing this with|Therefore(?: the)?|Where(?: the)?|When|If|We know|But the|According to)\s+', m_clean, re.IGNORECASE)
+                    if lead_match:
+                        lead_in = lead_match.group(0).strip()
+                        rem = m_clean[len(lead_match.group(0)):].strip()
+                        segments.append(lead_in)
+                        if rem:
+                            segments.append(f"$${rem}$$")
+                    elif m_clean:
+                        segments.append(f"$${m_clean}$$")
+                    curr_math = []
 
             for l in lines:
                 l_strip = l.strip()
                 if not l_strip:
                     continue
+
+                is_heading = bool(re.match(r'^#{1,6}\s+', l_strip))
+                is_table_row = (l_strip.startswith('|') and l_strip.endswith('|') and ('|' in l_strip[1:-1] or ':---' in l_strip))
+                is_figure = bool(re.match(r'^(?:\[(?:Figure|Diagram|चित्र|डायग्राम)|Figure:|चित्र:)', l_strip, re.IGNORECASE))
+                is_list_item = bool(re.match(r'^(?:[*•]\s+|\d+\.\s+)', l_strip)) and not bool(re.search(r'[=\\$\^]', l_strip))
+                
                 deva_count = len(re.findall(r'[\u0900-\u097F]', l_strip))
-                if deva_count > 3:
-                    # This line is prose (e.g. "लेकिन परिनालिका के अंदर चुंबकीय क्षेत्र,")
-                    if curr_math:
-                        m_clean = "\n".join(curr_math).strip()
-                        m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
-                        if m_clean:
-                            segments.append(f"$${m_clean}$$")
-                        curr_math = []
+                is_deva_prose = deva_count > 3
+
+                strip_latex = re.sub(r'\\[a-zA-Z]+(?:\{[^}]*\})?', '', l_strip)
+                eng_words = re.findall(r'\b[A-Za-z]{3,}\b', strip_latex)
+                is_eng_prose = len(eng_words) >= 3
+
+                if is_heading or is_table_row or is_figure or is_list_item or is_deva_prose or is_eng_prose:
+                    flush_math()
                     segments.append(l_strip)
                 else:
                     curr_math.append(l_strip)
 
-            if curr_math:
-                m_clean = "\n".join(curr_math).strip()
-                m_clean = re.sub(r'(?<!\\)\$([^$\n]+)(?<!\\)\$', r'\1', m_clean)
-                if m_clean:
-                    segments.append(f"$${m_clean}$$")
-
+            flush_math()
             return "\n\n" + "\n\n".join(segments) + "\n\n"
 
         text = re.sub(r'\$\$(.*?)\$\$', _clean_display_math, text, flags=re.DOTALL)
 
-        # Clean up orphan $$ delimiters on lines by themselves if total $$ count is odd
+        # Clean up orphan $$ delimiters if total count is odd
         total_double_dollars = len(re.findall(r'\$\$', text))
         if total_double_dollars % 2 != 0:
             text = re.sub(r'(?m)^\s*\$\$\s*$', '', text, count=1)
+            if len(re.findall(r'\$\$', text)) % 2 != 0:
+                text = text.replace('$$', '', 1)
 
         # Auto-wrap bare/naked LaTeX equations outside delimiters (e.g. \frac{dI}{dt} = 40, \Rightarrow N_2\phi_2 = MI_1)
         latex_starters = (
@@ -213,8 +224,45 @@ class FormatFixer:
         # Ensure block math equations ($$) have clean blank line spacing
         text = re.sub(r'(?<!\n)\n\s*\$\$(.*?)\$\$\s*\n(?!\n)', r'\n\n$$\1$$\n\n', text, flags=re.DOTALL)
 
-        # 14. Ensure blank line before markdown tables so table extension parses them
-        text = re.sub(r'([^\n\s])\n(\|)', r'\1\n\n\2', text)
+        # 14. Table row splitting & header repair
+        # Split concatenated table rows joined on a single line
+        lines = text.split('\n')
+        split_lines = []
+        for l in lines:
+            ls = l.strip()
+            if ls.startswith('|') and ls.endswith('|') and (' | | ' in ls or ' | |' in ls or '| |' in ls):
+                sub_rows = re.split(r'(?<=\|)\s+(?=\|)', ls)
+                if len(sub_rows) > 1 and all(r.strip().startswith('|') and r.strip().endswith('|') for r in sub_rows):
+                    split_lines.extend(sub_rows)
+                    continue
+            split_lines.append(l)
+        text = '\n'.join(split_lines)
+
+        # Automatically prepend missing table headers if table starts with separator
+        t_lines = text.split('\n')
+        processed_t = []
+        for line in t_lines:
+            ls = line.strip()
+            if re.match(r'^\|(?:\s*:?-+:?\s*\|)+$', ls):
+                prev_line = ""
+                for p in reversed(processed_t):
+                    if p.strip():
+                        prev_line = p.strip()
+                        break
+                is_valid_header = prev_line.startswith('|') and prev_line.endswith('|') and not re.match(r'^\|(?:\s*:?-+:?\s*\|)+$', prev_line)
+                if not is_valid_header:
+                    col_count = len([c for c in ls.split('|') if c.strip()])
+                    if col_count == 2:
+                        header = "| Symbol / Item | Description / Translation |"
+                    else:
+                        header = "| " + " | ".join([f"Item {c+1}" for c in range(col_count)]) + " |"
+                    processed_t.append(header)
+            processed_t.append(line)
+        text = '\n'.join(processed_t)
+
+        # Ensure blank line before and after markdown tables WITHOUT inserting blank lines between rows
+        text = re.sub(r'([^\n|])\n(\|)', r'\1\n\n\2', text)
+        text = re.sub(r'(\|\n)([^|\n])', r'\1\n\2', text)
 
         # 15. Fix glued punctuation and adjacent bilingual scripts (English and Devanagari)
         text = re.sub(r'([.!?])([\u0900-\u097F])', r'\1 \2', text)
