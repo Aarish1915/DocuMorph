@@ -36,8 +36,9 @@
 
   /* Color Tokens - Light Theme (Default) */
   --bg-page: #f8fafc;
+  --bg-secondary: #f1f5f9;
   --surface-white: #ffffff;
-  --surface-subtle: #f1f5f9;
+  --surface-subtle: #f8fafc;
   --surface-selected: #eff6ff;
   --surface-card: #ffffff;
   
@@ -54,6 +55,7 @@
   --text-muted: #64748b;
   --text-subtle: #94a3b8;
   --text-light: #cbd5e1;
+  --text-code: #0f172a;
 
   --color-success: #16a34a;
   --color-success-bg: #f0fdf4;
@@ -65,7 +67,7 @@
 
   /* Shadows */
   --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
-  --shadow-card: 0 2px 8px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.02);
+  --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 6px 16px -4px rgba(15, 23, 42, 0.04);
   --shadow-hover: 0 12px 28px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
   --shadow-lg: 0 20px 32px -6px rgba(15, 23, 42, 0.12);
 
@@ -77,15 +79,16 @@
 /* Dark Theme Tokens */
 [data-theme="dark"] {
   --bg-page: #0b0f19;
+  --bg-secondary: #0f172a;
   --surface-white: #111827;
-  --surface-subtle: #1a2337;
+  --surface-subtle: #162034;
   --surface-selected: #1e293b;
   --surface-card: #131d31;
 
-  --border-default: #1f2d47;
+  --border-default: #1e293b;
   --border-subtle: #162034;
   --border-active: #3b82f6;
-  --border-hover: #2e4166;
+  --border-hover: #334155;
 
   --color-primary: #3b82f6;
   --color-primary-hover: #60a5fa;
@@ -95,6 +98,7 @@
   --text-muted: #94a3b8;
   --text-subtle: #64748b;
   --text-light: #475569;
+  --text-code: #e2e8f0;
 
   --color-success: #22c55e;
   --color-success-bg: #052e16;
@@ -106,8 +110,8 @@
 
   /* Dark Shadows */
   --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 4px 16px 0 rgba(0, 0, 0, 0.45);
-  --shadow-hover: 0 14px 32px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(59, 130, 246, 0.3);
+  --shadow-card: 0 4px 20px 0 rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 12px 30px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.25);
   --shadow-lg: 0 24px 40px -8px rgba(0, 0, 0, 0.7);
 
   /* Glassmorphism Dark */

@@ -24,8 +24,8 @@ class TierManager:
             "max_polish_pages": 20,
             "api_delay_seconds": 0.1,  # Virtually no delay
             "max_retries": 2,
-            "vision_model": "gemini-1.5-flash",
-            "text_model": "gemini-1.5-flash"
+            "vision_model": "gemini-3.6-flash",
+            "text_model": "gemini-3.6-flash"
         },
         "openai_tier1": {
             "max_crops_per_call": 15,

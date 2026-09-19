@@ -181,12 +181,46 @@ export default function ProgressCard({
         {/* Header */}
         <div className="progress-header">
           <span className="progress-title">
-            {isComplete ? 'Processing Complete' : isError ? 'Processing Failed' : 'Processing Document'}
+            {isComplete
+              ? 'Processing Complete'
+              : isError
+              ? 'Processing Failed'
+              : jobStatus.status === 'UPLOADING'
+              ? 'Uploading Document to Engine...'
+              : 'Processing Document'}
           </span>
           {jobStatus.progress >= 0 && !isComplete && (
-            <span className="progress-pct">{Math.round(jobStatus.progress)}%</span>
+            <span className="progress-pct">
+              {jobStatus.status === 'UPLOADING' ? (jobStatus.upload_pct ?? Math.round(jobStatus.progress)) : Math.round(jobStatus.progress)}%
+            </span>
           )}
         </div>
+
+        {/* Real-Time Upload Bandwidth Badge */}
+        {jobStatus.status === 'UPLOADING' && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 14px',
+              background: 'var(--surface-selected, #eff6ff)',
+              borderRadius: '12px',
+              border: '1px solid var(--border-default)',
+              marginBottom: '16px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+              <span>📡</span>
+              <span>
+                Uploaded {jobStatus.loaded_mb || '0.0'} MB of {jobStatus.total_mb || '0.0'} MB ({jobStatus.upload_pct || 0}%)
+              </span>
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: 750, color: 'var(--color-primary)' }}>
+              ⚡ {jobStatus.upload_speed || 'Uploading...'}
+            </div>
+          </div>
+        )}
 
         {/* Progress Bar (during active processing) */}
         {!isComplete && !isError && (

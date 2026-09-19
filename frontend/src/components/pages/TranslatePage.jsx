@@ -221,31 +221,31 @@ export default function TranslatePage({
             </div>
           </div>
 
-          {/* Big, Clear Action Button that is ALWAYS visible */}
+          {/* Unified Action Button */}
           <div style={{ marginTop: '24px' }}>
             {!file ? (
               <button
                 type="button"
+                className="tool-execute-btn"
                 onClick={handleChooseFileClick}
                 style={{
                   width: '100%',
                   padding: '14px 20px',
-                  background: 'var(--tool-primary)',
-                  color: '#ffffff',
-                  fontSize: '15px',
-                  fontWeight: 750,
+                  background: 'var(--surface-subtle)',
+                  color: 'var(--text-muted)',
+                  fontSize: '14px',
+                  fontWeight: 650,
                   borderRadius: '12px',
-                  border: 'none',
+                  border: '1px dashed var(--border-default)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 14px var(--tool-glow)'
+                  gap: '8px'
                 }}
               >
-                <span>📂</span>
-                <span>Select PDF File to Translate</span>
+                <span>👆</span>
+                <span>Choose or drop a PDF above to translate</span>
               </button>
             ) : (
               <button

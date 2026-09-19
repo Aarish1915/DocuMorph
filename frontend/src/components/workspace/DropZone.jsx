@@ -47,18 +47,12 @@ export default function DropZone({
           }}
         >
           <div className="dropzone-inner-content">
-            <div className="dropzone-icon-circle">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
+            <div className="dropzone-action-pill">
+              <span className="dropzone-icon">📂</span>
+              <span className="dropzone-btn-text">Choose PDF File</span>
             </div>
-            <h2 className="dropzone-main-text">
-              Drop your PDF here, or <span className="browse-link">browse files</span>
-            </h2>
             <p className="dropzone-sub-text">
-              PDF documents up to 50MB
+              or drag &amp; drop your PDF here <span className="dropzone-limit">• up to 50MB</span>
             </p>
           </div>
         </div>
@@ -66,7 +60,7 @@ export default function DropZone({
         <div className="file-ready-card">
           <div className="file-ready-left">
             <div className="file-pdf-icon">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
                 <line x1="16" y1="13" x2="8" y2="13" />
@@ -77,20 +71,21 @@ export default function DropZone({
             <div className="file-ready-details">
               <span className="file-ready-name">{file.name}</span>
               <span className="file-ready-meta">
-                {formatBytes(file.size)} • Ready for transformation
+                {formatBytes(file.size)} • PDF Ready
               </span>
             </div>
           </div>
           <button
             type="button"
             className="btn-change-file"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setFile(null);
               if (fileInputRef.current) fileInputRef.current.value = '';
             }}
             title="Remove or choose another file"
           >
-            Change File
+            ✕ Change
           </button>
         </div>
       )}

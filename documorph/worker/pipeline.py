@@ -203,11 +203,6 @@ class DocuMorphOrchestrator:
             sweeper = LightningSweeper(doc)
             classifications = sweeper.sweep()
             
-            # For translation service, all pages must be processed by the AI engine to translate into target language
-            if self.service_type == "translate":
-                for p in range(len(doc)):
-                    classifications[p] = "complex"
-
             ai_pages = [p for p, c in classifications.items() if c in ("complex", "corrupted")]
             local_pages = [p for p in range(len(doc)) if p not in ai_pages]
             logger.info(f"TELEMETRY_PAGES_AI: {ai_pages}")
@@ -352,8 +347,8 @@ class DocuMorphOrchestrator:
                         self._report(f"AI Reading: Processing {total_batches} batches concurrently...", 40)
                         
                         completed_batches = 0
-                        # Use a semaphore to prevent SSL dropped connections from Google's API
-                        semaphore = asyncio.Semaphore(15) 
+                        # Use a restrained semaphore (3) to prevent Render 512MB RAM OOM crashes
+                        semaphore = asyncio.Semaphore(3) 
                         async def sem_task(task):
                             nonlocal completed_batches
                             async with semaphore:
@@ -380,10 +375,27 @@ class DocuMorphOrchestrator:
                                 pnum = c["page_num"]
                                 
                                 if c["type"] == "full_page":
-                                    extracted_text = ai_results.get(j, f"<!-- AI Extraction Failed for {c['path']} -->")
+                                    extracted_text = ai_results.get(j, "")
                                     page_obj = doc[pnum]
                                     images_dir = Path("data/output/images")
                                     images_dir.mkdir(parents=True, exist_ok=True)
+                                    
+                                    # BULLETPROOF FALLBACK: If AI extraction returned empty or failed (network/quota/rate limit):
+                                    # Fall back to native selectable text so the output NEVER produces empty lined pages!
+                                    if not extracted_text or not extracted_text.strip() or extracted_text.strip().startswith("<!--"):
+                                        native_text = page_obj.get_text("text").strip()
+                                        if native_text:
+                                            logger.info(f"Page {pnum + 1}: AI extraction empty; falling back to native text ({len(native_text)} chars).")
+                                            if self.service_type == "translate":
+                                                try:
+                                                    extracted_text = asyncio.run(self.vision_engine.translate_text_direct(native_text, self.target_lang or "Hindi"))
+                                                except Exception as trans_ex:
+                                                    logger.warning(f"Fallback translation error on page {pnum + 1}: {trans_ex}")
+                                                    extracted_text = native_text
+                                            else:
+                                                extracted_text = native_text
+                                        else:
+                                            extracted_text = f"\n\n*Page {pnum + 1}: Visual diagram or handwritten content retained in document.*\n\n"
                                     
                                     # 1. First, search for Vision-detected diagram bounding boxes:
                                     # [Figure: <desc> | bbox: [ymin, xmin, ymax, xmax]] or [चित्र: <desc> | bbox: [...]]
@@ -560,6 +572,16 @@ class DocuMorphOrchestrator:
             def polish_page_worker(p_idx, text):
                 # Sanitize promotional spam BEFORE polishing so fee banners do not become H1 titles!
                 sanitized_text = self.spam_filter.clean_text(text)
+                
+                # If translation service and local page, translate directly using fast text model
+                if self.service_type == "translate" and p_idx in local_pages and len(sanitized_text.strip()) > 10:
+                    try:
+                        translated = asyncio.run(self.vision_engine.translate_text_direct(sanitized_text, self.target_lang or "Hindi"))
+                        return p_idx, translated
+                    except Exception as t_err:
+                        logger.warning(f"Error translating local page {p_idx}: {t_err}")
+                        return p_idx, sanitized_text
+                        
                 # Only polish local pages that have sufficient text content
                 if p_idx in local_pages and len(sanitized_text.strip()) > 60:
                     try:

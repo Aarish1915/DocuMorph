@@ -162,6 +162,21 @@ export default function CleanFormatPage({
                 <span><strong>Add Margins for Binding/Folder</strong></span>
               </label>
             </div>
+
+            {cleanWatermarks && (
+              <div style={{ marginTop: '12px', padding: '10px 14px', background: 'var(--surface-subtle)', borderRadius: '10px', border: '1px solid var(--border-default)' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  Specific names or words to remove (comma-separated):
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. ALLEN, PhysicsWallah, Sir Name, @telegramchannel"
+                  value={config.spam_words || ''}
+                  onChange={(e) => onChangeConfig({ ...config, spam_words: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '13px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--surface-white)', color: 'var(--text-main)', boxSizing: 'border-box' }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Language / Exam Mode Selector */}
@@ -172,31 +187,31 @@ export default function CleanFormatPage({
             />
           </div>
 
-          {/* Always Visible Action Button */}
+          {/* Unified Action Button */}
           <div style={{ marginTop: '24px' }}>
             {!file ? (
               <button
                 type="button"
+                className="tool-execute-btn"
                 onClick={handleChooseFileClick}
                 style={{
                   width: '100%',
                   padding: '14px 20px',
-                  background: 'var(--tool-primary)',
-                  color: '#ffffff',
-                  fontSize: '15px',
-                  fontWeight: 750,
+                  background: 'var(--surface-subtle)',
+                  color: 'var(--text-muted)',
+                  fontSize: '14px',
+                  fontWeight: 650,
                   borderRadius: '12px',
-                  border: 'none',
+                  border: '1px dashed var(--border-default)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 14px var(--tool-glow)'
+                  gap: '8px'
                 }}
               >
-                <span>📂</span>
-                <span>Select PDF File to Clean</span>
+                <span>👆</span>
+                <span>Choose or drop a PDF above to clean</span>
               </button>
             ) : (
               <button

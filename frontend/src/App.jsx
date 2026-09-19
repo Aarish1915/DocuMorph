@@ -30,7 +30,7 @@ const STAGES = [
 ];
 
 function getPipelineStage(status, progress) {
-  if (status === 'QUEUED') return 0;
+  if (status === 'QUEUED' || status === 'UPLOADING') return 0;
   if (progress <= 15) return 0;
   if (progress <= 35) return 1;
   if (progress <= 65) return 2;
@@ -83,6 +83,50 @@ const VIEW_TO_SERVICE_MAP = {
   extract: 'extract_text',
   translate: 'translate',
 };
+
+function uploadWithProgress(url, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const startTime = Date.now();
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        const elapsedSec = Math.max(0.1, (Date.now() - startTime) / 1000);
+        const speedMBps = (event.loaded / (1024 * 1024)) / elapsedSec;
+        const pct = Math.round((event.loaded / event.total) * 100);
+        const loadedMB = (event.loaded / (1024 * 1024)).toFixed(1);
+        const totalMB = (event.total / (1024 * 1024)).toFixed(1);
+        const speedStr = speedMBps >= 1 ? `${speedMBps.toFixed(1)} MB/s` : `${Math.round(speedMBps * 1024)} KB/s`;
+
+        onProgress({
+          pct,
+          loadedMB,
+          totalMB,
+          speedStr,
+        });
+      }
+    };
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ ok: true, data });
+        } else {
+          resolve({ ok: false, data, status: xhr.status });
+        }
+      } catch {
+        resolve({ ok: false, data: { detail: xhr.statusText || 'Upload response parse error' }, status: xhr.status });
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Network error during upload'));
+    xhr.ontimeout = () => reject(new Error('Upload timed out'));
+    xhr.timeout = 180000;
+    xhr.open('POST', url);
+    xhr.send(formData);
+  });
+}
 
 export default function App() {
   // Wizard Steps: 1 (Select), 2 (Configure), 3 (Upload), 4 (Progress/Done)
@@ -490,41 +534,54 @@ export default function App() {
     if (typeof window !== 'undefined') {
       window.location.hash = '#processing';
     }
+
+    const fileSizeMB = fileToProcess.size ? (fileToProcess.size / (1024 * 1024)).toFixed(1) : '0';
     setJobStatus({
-      status: 'QUEUED',
-      progress: 5,
-      message: 'Uploading to server...',
+      status: 'UPLOADING',
+      progress: 3,
+      upload_pct: 0,
+      loaded_mb: '0.0',
+      total_mb: fileSizeMB,
+      upload_speed: 'Starting...',
+      message: `Connecting & uploading document (${fileSizeMB} MB)...`,
       service_type: targetService,
     });
+
+    const onUploadProgress = (upData) => {
+      setJobStatus({
+        status: 'UPLOADING',
+        progress: Math.min(99, Math.max(3, Math.round(upData.pct * 0.95))),
+        upload_pct: upData.pct,
+        loaded_mb: upData.loadedMB,
+        total_mb: upData.totalMB,
+        upload_speed: upData.speedStr,
+        message: `Uploading: ${upData.loadedMB} MB / ${upData.totalMB} MB (${upData.pct}%) • ${upData.speedStr}`,
+        service_type: targetService,
+      });
+    };
 
     try {
       const activeBackend = await probeBackend();
       let targetUrl = activeBackend.url || API_BASE;
 
-      let res;
+      let uploadRes;
       try {
-        res = await fetch(`${targetUrl}/api/process`, {
-          method: 'POST',
-          body: fd,
-        });
+        uploadRes = await uploadWithProgress(`${targetUrl}/api/process`, fd, onUploadProgress);
       } catch (netErr) {
         // Laptop offline or tunnel dropped — failover to Render Cloud
         const cfg = getStoredConfig();
         if (targetUrl !== cfg.renderUrl && cfg.renderUrl) {
           addToast('Local/Laptop node offline. Diverting to Render Cloud...', 'info');
           targetUrl = cfg.renderUrl;
-          res = await fetch(`${targetUrl}/api/process`, {
-            method: 'POST',
-            body: fd,
-          });
+          uploadRes = await uploadWithProgress(`${targetUrl}/api/process`, fd, onUploadProgress);
         } else {
           throw netErr;
         }
       }
 
-      const data = await res.json();
+      const { ok, data } = uploadRes;
 
-      if (!res.ok) {
+      if (!ok) {
         addToast(data.detail || 'Upload failed', 'error');
         setJobStatus({
           status: 'ERROR',
@@ -533,6 +590,13 @@ export default function App() {
         });
         return;
       }
+
+      setJobStatus({
+        status: 'QUEUED',
+        progress: 8,
+        message: 'Uploaded! Queueing on server...',
+        service_type: targetService,
+      });
 
       const nodeName = (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1'))
         ? 'Local High-Speed Engine'

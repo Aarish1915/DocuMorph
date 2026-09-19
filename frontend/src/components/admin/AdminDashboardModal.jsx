@@ -235,13 +235,18 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
     };
   }, [token]);
 
-  // Auto-refresh timer
+  // Auto-refresh timer: Real-time dual updates for both telemetry status and jobs queue
   useEffect(() => {
     let interval;
-    if (token && autoRefresh && activeTab === 'monitoring') {
+    if (token && autoRefresh) {
       interval = setInterval(() => {
-        loadStatus(token);
-      }, 3500);
+        if (activeTab === 'monitoring') {
+          loadStatus(token);
+          loadJobs(token);
+        } else if (activeTab === 'jobs') {
+          loadJobs(token);
+        }
+      }, 3000);
     }
     return () => clearInterval(interval);
   }, [token, autoRefresh, activeTab]);

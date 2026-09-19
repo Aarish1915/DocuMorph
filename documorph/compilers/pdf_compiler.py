@@ -526,17 +526,24 @@ class PDFCompiler:
         if progress_callback:
             progress_callback("Typesetting page typography & HTML layout...", 91)
 
-        # Container-safe low-memory Chromium flags (prevents /dev/shm OOM crashes on Render/Docker)
+        # Container-safe low-memory Chromium flags (prevents /dev/shm OOM crashes on Render 512MB)
         chromium_args = [
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
             "--disable-gpu",
             "--disable-extensions",
-            "--mute-audio"
+            "--disable-background-networking",
+            "--disable-default-apps",
+            "--disable-sync",
+            "--mute-audio",
+            "--js-flags=--max-old-space-size=128"
         ]
         if sys.platform.startswith("linux"):
             chromium_args.append("--no-zygote")
+
+        import gc
+        gc.collect()
 
         # Render to PDF via Playwright Chromium (with automatic self-healing on missing browser)
         with sync_playwright() as p:
@@ -585,6 +592,7 @@ class PDFCompiler:
             
             page.pdf(**pdf_opts)
             browser.close()
+            gc.collect()
 
         if progress_callback:
             progress_callback("Deflating streams & optimizing file size...", 99)

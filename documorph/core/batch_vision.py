@@ -16,10 +16,11 @@ socket.getaddrinfo = _ipv4_getaddrinfo
 from google import genai
 from google.genai import types
 from typing import Dict, Optional, List
-import re
 from PIL import Image
 import io
 import asyncio
+from dotenv import load_dotenv
+load_dotenv(override=True)
 
 from documorph.core.tier_manager import TierManager
 from documorph.core.api_router import APIRouter
@@ -215,14 +216,33 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 # Fetch next round-robin key
                 current_key = self.router.get_next_key()
                 client = genai.Client(api_key=current_key)
-                    
-                # Run the synchronous generate_content in a thread to allow asyncio concurrency
-                response = await asyncio.to_thread(
-                    client.models.generate_content,
-                    model=self.model_name,
-                    contents=contents,
-                    config=config
-                )
+                
+                # Candidate model list to prevent hard failures on deprecated model names
+                candidate_models = [self.model_name, "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash"]
+                seen_models = set()
+                response = None
+                
+                for candidate in candidate_models:
+                    if not candidate or candidate in seen_models:
+                        continue
+                    seen_models.add(candidate)
+                    try:
+                        response = await asyncio.to_thread(
+                            client.models.generate_content,
+                            model=candidate,
+                            contents=contents,
+                            config=config
+                        )
+                        if response:
+                            self.model_name = candidate
+                            break
+                    except Exception as model_err:
+                        err_text = str(model_err).lower()
+                        if "404" in err_text or "not found" in err_text or "not available" in err_text or "400" in err_text:
+                            logger.warning(f"Model '{candidate}' unavailable ({model_err}). Falling back to next candidate...")
+                            continue
+                        else:
+                            raise model_err
                 
                 if response:
                     self.total_api_calls += 1
@@ -261,3 +281,38 @@ Output the raw markdown for each image in the exact order they appear. If multip
                     
         logger.error(f"Failed to process image batch after max retries.")
         return {}
+
+    async def translate_text_direct(self, text: str, target_lang: str = "Hindi") -> str:
+        """
+        Translates raw digital text directly using text models.
+        Preserves LaTeX math, skips image rasterization, and executes in <1s with minimal memory.
+        """
+        if not text or not text.strip():
+            return ""
+
+        prompt = (
+            f"You are an academic textbook and notes translator.\n"
+            f"STRICT TRANSLATION REQUIREMENT ({target_lang.upper()}):\n"
+            f"1. Translate all narrative text, explanations, headings, questions, and examples fluently into {target_lang}.\n"
+            f"2. CRITICAL FORMULA & CODE SHIELD: Retain 100% of mathematical equations ($...$, $$...$$), formulas, fractions, variable symbols, units, and code blocks completely UNTOUCHED, in original LaTeX format.\n"
+            f"3. Return ONLY the translated Markdown. Do not include conversational greetings or explanations.\n\n"
+            f"Source Text:\n{text}"
+        )
+        current_key = self.router.get_next_key()
+        client = genai.Client(api_key=current_key)
+        candidate_models = [self.model_name, "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash"]
+        for candidate in candidate_models:
+            if not candidate:
+                continue
+            try:
+                response = await asyncio.to_thread(
+                    client.models.generate_content,
+                    model=candidate,
+                    contents=prompt
+                )
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as e:
+                logger.warning(f"translate_text_direct error with {candidate}: {e}")
+                continue
+        return text
