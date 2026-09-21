@@ -73,20 +73,24 @@ class CompressServiceHandler(BaseServiceHandler):
         processed_markdown: str = "",
         file_path: str = ""
     ) -> str:
-        quality = config.get("quality", "balanced")
-        if quality == "bytes_only":
+        shrink_mode = config.get("compact_mode") or config.get("shrink_mode") or config.get("quality", "smart_dense")
+        if shrink_mode in ("web_share", "small_file", "bytes_only"):
             return self.process_bytes_only(doc, config, file_path, timestamp, base_name)
 
         # Intelligent Layout Compaction to PDF
         self.orchestrator._report("Compiling Compact PDF...", 90)
         final_pdf_path = os.path.join(self.orchestrator.output_dir, f"COMPACT_{timestamp}_{base_name}.pdf")
-        compact_mode = "ultra_dense" if quality in ("max", "ultra_dense") else "compact"
-        is_landscape = getattr(self.orchestrator, "is_landscape", False)
+        
+        compact_mode = "two_up" if shrink_mode in ("two_up", "two_on_one", "2_on_1") else "smart_dense"
+        is_landscape = (compact_mode == "two_up") or getattr(self.orchestrator, "is_landscape", False)
+        print_margins = bool(config.get("print_margins", False))
+
         self.orchestrator.pdf_compiler.compile(
             processed_markdown, 
             final_pdf_path, 
             compact_mode=compact_mode, 
             is_landscape=is_landscape,
+            print_margins=print_margins,
             progress_callback=self.orchestrator.progress_callback
         )
         return final_pdf_path

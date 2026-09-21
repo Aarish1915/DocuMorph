@@ -26,11 +26,13 @@ class CleanFormatServiceHandler(BaseServiceHandler):
         self.orchestrator._report("Compiling Final Clean PDF...", 90)
         final_pdf_path = os.path.join(self.orchestrator.output_dir, f"FINAL_{timestamp}_{base_name}.pdf")
         is_landscape = getattr(self.orchestrator, "is_landscape", False)
+        print_margins = bool(config.get("print_margins", False))
         self.orchestrator.pdf_compiler.compile(
             processed_markdown, 
             final_pdf_path, 
             compact_mode="standard", 
             is_landscape=is_landscape,
+            print_margins=print_margins,
             progress_callback=self.orchestrator.progress_callback
         )
         return final_pdf_path
