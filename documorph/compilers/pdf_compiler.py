@@ -296,7 +296,9 @@ class PDFCompiler:
         output_filename: str, 
         compact_mode: str = "standard", 
         is_landscape: bool = False,
-        progress_callback = None
+        print_margins: bool = False,
+        progress_callback = None,
+        **kwargs
     ) -> str:
         """
         Converts markdown to HTML, then uses Playwright to render it as a compact or standard A4 PDF.
@@ -563,7 +565,9 @@ class PDFCompiler:
                 "print_background": True
             }
         else:
-            if compact_mode == "ultra_dense":
+            if print_margins:
+                margins = {"top": "20mm", "right": "20mm", "bottom": "20mm", "left": "20mm"}
+            elif compact_mode == "ultra_dense":
                 margins = {"top": "8mm", "right": "10mm", "bottom": "12mm", "left": "10mm"}
             elif compact_mode in ("compact", "balanced"):
                 margins = {"top": "10mm", "right": "12mm", "bottom": "14mm", "left": "12mm"}

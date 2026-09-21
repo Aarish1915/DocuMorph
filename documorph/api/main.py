@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 import json
 import asyncio
 import os
@@ -491,11 +492,12 @@ async def process_pdf(
     )
     db.add(new_job)
     db.commit()
+    db.refresh(new_job)
     # Calculate initial live queue position
-    queue_pos = db.query(Job).filter(
+    queue_pos = max(1, db.query(Job).filter(
         Job.status.in_(["QUEUED", "QUEUED_REPROCESS"]),
         Job.created_at <= new_job.created_at
-    ).count()
+    ).count())
 
     # Web server completely disconnects from processing here. It is zero-rejection & hyper-scalable.
     return {
@@ -574,6 +576,9 @@ async def poll_progress(job_id: str, db: Session = Depends(get_db)):
     Provides resilient, non-streaming job status checks for mobile devices
     and proxy firewalls where Server-Sent Events (SSE) get blocked or buffered.
     """
+    if not job_id or not re.match(r'^[a-zA-Z0-9_\-]+$', job_id) or ".." in job_id:
+        raise HTTPException(status_code=400, detail="Invalid job identifier format")
+        
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -614,6 +619,8 @@ async def poll_progress(job_id: str, db: Session = Depends(get_db)):
 
 @app.get("/api/progress/{job_id}")
 async def stream_progress(job_id: str, request: Request):
+    if not job_id or not re.match(r'^[a-zA-Z0-9_\-]+$', job_id) or ".." in job_id:
+        raise HTTPException(status_code=400, detail="Invalid job identifier format")
     async def event_generator():
         from documorph.core.database import SessionLocal
         last_keepalive = time.time()
@@ -681,6 +688,8 @@ async def stream_progress(job_id: str, request: Request):
 @app.get("/api/download/{job_id}")
 async def download_file(job_id: str, db: Session = Depends(get_db)):
     """Serves the output file in its native format (.pdf, .txt, .md, .json) with Content-Disposition header"""
+    if not job_id or not re.match(r'^[a-zA-Z0-9_\-]+$', job_id) or ".." in job_id:
+        raise HTTPException(status_code=400, detail="Invalid job identifier format")
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -882,7 +891,8 @@ def get_donation_stats(db: Session = Depends(get_db)):
     
     total_raised = 0
     for d in donations:
-        digits = "".join([c for c in d.amount if c.isdigit()])
+        amt_str = str(d.amount or "")
+        digits = "".join([c for c in amt_str if c.isdigit()])
         if digits:
             total_raised += int(digits)
             
@@ -1008,9 +1018,13 @@ async def submit_donation_utr(
         tier=tier,
         status="verified"
     )
-    db.add(new_record)
-    db.commit()
-    db.refresh(new_record)
+    try:
+        db.add(new_record)
+        db.commit()
+        db.refresh(new_record)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="This UPI UTR reference has already been recorded on the Wall of Fame.")
     
     return {
         "ok": True,
@@ -1033,7 +1047,22 @@ if os.path.exists("frontend/dist"):
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         # Serve the API routes normally, but serve index.html for all other routes (React Router support)
-        if full_path.startswith("api/") or full_path.startswith("data/"):
+        clean = full_path.lower().strip()
+        system_prefixes = ("etc", "windows", "win.ini", "proc", "sys", "var", "dev", "bin", "boot", "usr", "root", "secret")
+        system_extensions = (".ini", ".conf", ".env", ".sh", ".bash", ".log", ".bak", ".sql", ".py", ".db")
+        
+        if (
+            clean.startswith("api/") 
+            or clean.startswith("data/")
+            or ".." in clean 
+            or "\\" in clean
+            or any(clean.startswith(p) for p in system_prefixes)
+            or any(clean.endswith(ext) for ext in system_extensions)
+        ):
             raise HTTPException(status_code=404, detail="Not Found")
-        with open("frontend/dist/index.html") as f:
-            return HTMLResponse(f.read())
+            
+        index_file = "frontend/dist/index.html"
+        if os.path.exists(index_file):
+            with open(index_file, "r", encoding="utf-8") as f:
+                return HTMLResponse(f.read())
+        raise HTTPException(status_code=404, detail="Not Found")
