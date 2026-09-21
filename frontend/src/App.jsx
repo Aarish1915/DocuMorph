@@ -17,9 +17,20 @@ import ExtractTextPage from './components/pages/ExtractTextPage';
 import TranslatePage from './components/pages/TranslatePage';
 import PrivacyPage from './components/pages/PrivacyPage';
 import TermsPage from './components/pages/TermsPage';
+import FAQPage from './components/pages/FAQPage';
 import CookieConsent from './components/common/CookieConsent';
+import DonationModal from './components/common/DonationModal';
+import SubmitUtrModal from './components/common/SubmitUtrModal';
 import NotFoundView from './components/common/NotFoundView';
 import InteractiveProofViewer from './components/common/InteractiveProofViewer';
+import HeaderBanner from './components/common/HeaderBanner';
+import BackersPage from './components/pages/BackersPage';
+import AcademicScoreboard from './components/home/AcademicScoreboard';
+import MetricsStatGrid from './components/home/MetricsStatGrid';
+import HowItWorksThreePass from './components/home/HowItWorksThreePass';
+import AspirantTestimonials from './components/home/AspirantTestimonials';
+import PopularToolsFooter from './components/common/PopularToolsFooter';
+import './styles/homeComponents.css';
 
 const STAGES = [
   { icon: '📄', label: 'Reading',    desc: 'Loading PDF' },
@@ -144,6 +155,7 @@ export default function App() {
   const [jobHistory, setJobHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
+  const [activeNode, setActiveNode] = useState(null);
 
   // Admin Dashboard (Route Segregation)
   const [showAdmin, setShowAdmin] = useState(() => {
@@ -154,6 +166,8 @@ export default function App() {
     return false;
   });
   const [toasts, setToasts] = useState([]);
+  const [showDonation, setShowDonation] = useState(false);
+  const [showSubmitUtr, setShowSubmitUtr] = useState(false);
 
   // Theme Engine (System auto-detect + localStorage + manual toggle)
   const [themeMode, setThemeMode] = useState(() => {
@@ -198,12 +212,14 @@ export default function App() {
     }
   };
 
-  // Dedicated Tool View Routing: 'home' | 'clean' | 'compress' | 'extract' | 'translate'
+  // Dedicated Tool View Routing: 'home' | 'clean' | 'compress' | 'extract' | 'translate' | 'privacy' | 'terms' | 'faq'
   const getInitialView = () => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.replace('#', '');
-      if (['clean', 'compress', 'extract', 'translate', 'privacy', 'terms', 'home'].includes(hash)) {
-        return hash;
+      const path = window.location.pathname.replace(/^\/+/, '');
+      const candidate = hash || path;
+      if (['clean', 'compress', 'extract', 'translate', 'privacy', 'terms', 'faq', 'backers', 'home'].includes(candidate)) {
+        return candidate;
       }
     }
     return 'home';
@@ -213,8 +229,8 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      const path = typeof window !== 'undefined' ? window.location.pathname : '';
-      if (hash === 'admin' || path === '/admin') {
+      const path = typeof window !== 'undefined' ? window.location.pathname.replace(/^\/+/, '') : '';
+      if (hash === 'admin' || path === 'admin') {
         setShowAdmin(true);
       } else if (hash === 'processing') {
         // Active processing screen
@@ -223,10 +239,11 @@ export default function App() {
         setStep(1);
         setFile(null);
         setJobStatus(null);
-        if (['clean', 'compress', 'extract', 'translate', 'privacy', 'terms'].includes(hash)) {
-          setActiveView(hash);
-          if (VIEW_TO_SERVICE_MAP[hash]) {
-            setServiceType(VIEW_TO_SERVICE_MAP[hash]);
+        const candidate = hash || path;
+        if (['clean', 'compress', 'extract', 'translate', 'privacy', 'terms', 'faq', 'backers'].includes(candidate)) {
+          setActiveView(candidate);
+          if (VIEW_TO_SERVICE_MAP[candidate]) {
+            setServiceType(VIEW_TO_SERVICE_MAP[candidate]);
           }
         } else {
           setActiveView('home');
@@ -689,6 +706,15 @@ export default function App() {
     }
   };
 
+  const handleClearHistory = () => {
+    setJobHistory([]);
+    try {
+      localStorage.removeItem('activeJobId');
+      sessionStorage.clear();
+    } catch {}
+    addToast('Session history wiped clean. Zero trace left on this device.', 'info');
+  };
+
   const isProcessing = Boolean(
     isSubmitting || (jobStatus && ['QUEUED', 'PROCESSING', 'QUEUED_REPROCESS'].includes(jobStatus.status) && step === 4)
   );
@@ -722,6 +748,12 @@ export default function App() {
 
   return (
     <div className="app-layout">
+      {/* ── TOP LIVE ANNOUNCEMENT TICKER BANNER ── */}
+      <HeaderBanner
+        onNavigateBackers={() => navigateView('backers')}
+        onOpenDonation={() => setShowDonation(true)}
+      />
+
       {/* ── UNIFIED MINIMAL HEADER ── */}
       <Header
         step={step}
@@ -734,6 +766,7 @@ export default function App() {
         historyCount={jobHistory.length}
         appliedTheme={appliedTheme}
         onToggleTheme={toggleTheme}
+        onOpenDonation={() => setShowDonation(true)}
       />
 
       {/* ── HISTORY DRAWER ── */}
@@ -743,6 +776,7 @@ export default function App() {
         jobHistory={jobHistory}
         loading={historyLoading}
         onReprocess={handleReprocess}
+        onClearHistory={handleClearHistory}
       />
 
       {/* ── UNIFIED PSYCHOLOGY-DRIVEN WORKSPACE & DEDICATED TOOL PAGES ── */}
@@ -763,6 +797,9 @@ export default function App() {
         ) : activeView === 'terms' ? (
           /* ── DEDICATED VIEW: TERMS OF SERVICE ── */
           <TermsPage onNavigateHome={() => navigateView('home')} />
+        ) : activeView === 'faq' ? (
+          /* ── DEDICATED VIEW: FAQ & AEO KNOWLEDGE HUB ── */
+          <FAQPage onNavigateHome={() => navigateView('home')} />
         ) : activeView === 'clean' ? (
           /* ── DEDICATED VIEW: CLEAN & FORMAT ── */
           <CleanFormatPage
@@ -827,17 +864,24 @@ export default function App() {
             }}
             isProcessing={isProcessing}
           />
+        ) : activeView === 'backers' ? (
+          /* ── DEDICATED VIEW: HALL OF FAME & SERVER FUEL HUB ── */
+          <BackersPage
+            onNavigateHome={() => navigateView('home')}
+            onOpenDonation={() => setShowDonation(true)}
+          />
         ) : activeView === 'home' ? (
-          /* ── SCREEN 1: HOME HUB TOOL DIRECTORY & QUALITY SHOWCASE ── */
+          /* ── SCREEN 1: HOME HUB TOOL DIRECTORY & ACADEMIC PROOF ── */
           <>
-            <HeroSection />
+            <HeroSection onSelectTool={(tool) => navigateView(tool)} />
             <ToolDirectory
               activeTool={activeView}
               onSelectTool={(tool) => navigateView(tool)}
             />
+            <AcademicScoreboard />
             <section className="home-showcase-section">
               <div className="home-showcase-header">
-                <h2 className="home-showcase-title">Quality Preview</h2>
+                <h2 className="home-showcase-title">Interactive Quality Preview</h2>
               </div>
               <InteractiveProofViewer
                 title="Live Quality Test"
@@ -847,6 +891,10 @@ export default function App() {
                 afterLabel="Cleaned Note"
               />
             </section>
+            <MetricsStatGrid />
+            <HowItWorksThreePass />
+            <AspirantTestimonials />
+            <PopularToolsFooter onNavigateView={(v) => navigateView(v)} />
           </>
         ) : (
           /* ── CUSTOM 404 FALLBACK (Checklist Item 15) ── */
@@ -857,7 +905,45 @@ export default function App() {
       {/* ── FOOTER WITH DEDICATED PAGE LINKS ── */}
       <footer className="site-footer" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '24px 16px', maxWidth: '860px', margin: '0 auto', fontSize: '13px', color: 'var(--text-muted)' }}>
         <span>DocuMorph • 100% Private &amp; Free for Students. Files are never stored.</span>
-        <div style={{ display: 'flex', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button
+            type="button"
+            onClick={() => setShowDonation(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-amber, #d97706)',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: 0
+            }}
+          >
+            ☕ Support Server Fuel
+          </button>
+          <a
+            href="#backers"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateView('backers');
+            }}
+            style={{ color: 'var(--text-muted)', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            🏆 Hall of Fame
+          </a>
+          <a
+            href="#faq"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateView('faq');
+            }}
+            style={{ color: 'var(--text-muted)', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            FAQ
+          </a>
           <a
             href="#privacy"
             onClick={(e) => {
@@ -880,6 +966,22 @@ export default function App() {
           </a>
         </div>
       </footer>
+
+      {/* ── DONATION MODAL ── */}
+      <DonationModal 
+        isOpen={showDonation} 
+        onClose={() => setShowDonation(false)} 
+        onOpenUtrModal={() => setShowSubmitUtr(true)}
+      />
+
+      {/* ── SUBMIT UPI UTR MODAL ── */}
+      <SubmitUtrModal
+        isOpen={showSubmitUtr}
+        onClose={() => setShowSubmitUtr(false)}
+        onDonationRecorded={(donor) => {
+          addToast(`🎉 Verified ${donor.name} on the Wall of Fame!`, 'success');
+        }}
+      />
 
       {/* ── COOKIE STORAGE NOTICE ── */}
       <CookieConsent onOpenPrivacy={() => navigateView('privacy')} />

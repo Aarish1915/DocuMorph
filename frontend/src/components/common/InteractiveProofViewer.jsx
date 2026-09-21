@@ -160,181 +160,88 @@ export default function InteractiveProofViewer({
   }, [phase, isInteracting, viewMode, displayMode, prefersReducedMotion, setSplitDOM]);
 
   return (
-    <div className="proof-viewer-card">
-      {/* Top Bar with Mode Controls */}
-      <div className="proof-viewer-top-bar">
-        <div className="proof-status-indicator">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--color-primary, #2563eb)' }}>
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="16" x2="12" y2="12"></line>
-            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-          </svg>
-          <span className="proof-title-text">{title}</span>
-        </div>
-
-        <div className="proof-controls-right">
-          {/* Comparison Mode: Split Slider vs Side-by-Side */}
-          <div className="proof-display-mode-switch" role="radiogroup" aria-label="Comparison View Mode">
-            <button
-              type="button"
-              className={`proof-mode-btn ${displayMode === 'split' ? 'active' : ''}`}
-              onClick={() => setDisplayMode('split')}
-              title="Interactive Draggable Split Slider"
-              aria-checked={displayMode === 'split'}
-              role="radio"
-            >
-              <span>⚡</span> Split Slider
-            </button>
-            <button
-              type="button"
-              className={`proof-mode-btn ${displayMode === 'side' ? 'active' : ''}`}
-              onClick={() => setDisplayMode('side')}
-              title="View Both Full Pages Side by Side"
-              aria-checked={displayMode === 'side'}
-              role="radio"
-            >
-              <span>⊞</span> Side-by-Side
-            </button>
-          </div>
-
-          {displayMode === 'split' && (
-            <div className="proof-preset-bar" role="group" aria-label="Slider Position Presets">
-              <button
-                type="button"
-                className={`proof-preset-chip ${viewMode === 'before' ? 'selected' : ''}`}
-                onClick={() => handleModeToggle('before')}
-                title="Show full original scan"
-              >
-                <span className="dot red" /> {beforeLabel ? beforeLabel.split(' ')[0] : 'Before'}
-              </button>
-              <button
-                type="button"
-                className={`proof-preset-chip ${viewMode === 'split' ? 'selected' : ''}`}
-                onClick={() => handleModeToggle('split')}
-                title="Reset split position to 50/50"
-              >
-                50/50
-              </button>
-              <button
-                type="button"
-                className={`proof-preset-chip proof-preset-chip--highlight ${viewMode === 'after' ? 'selected' : ''}`}
-                onClick={() => handleModeToggle('after')}
-                title="Show full cleaned document"
-                aria-pressed={viewMode === 'after'}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginRight: '2px' }}>
-                  <path d="M12 2l2.4 7.2L21.6 12l-7.2 2.8L12 22l-2.4-7.2L2.4 12l7.2-2.8L12 2z"/>
-                </svg>
-                {afterLabel ? afterLabel.split(' ')[0] : 'Clean'}
-              </button>
-            </div>
-          )}
+    <div className="studio-specimen-desk">
+      {/* Floating Glass Pill Switcher */}
+      <div className="specimen-floating-toolbar">
+        <div className="specimen-pill-group" role="group" aria-label="Specimen view modes">
+          <button
+            type="button"
+            className={`specimen-pill ${viewMode === 'before' ? 'active' : ''}`}
+            onClick={() => handleModeToggle('before')}
+            title="View original scanned photocopy"
+          >
+            <span className="specimen-dot dot-scan" />
+            <span>Scan</span>
+          </button>
+          <button
+            type="button"
+            className={`specimen-pill ${viewMode === 'split' ? 'active' : ''}`}
+            onClick={() => handleModeToggle('split')}
+            title="Interactive 50/50 Split Lens"
+          >
+            <span>50/50 Lens</span>
+          </button>
+          <button
+            type="button"
+            className={`specimen-pill specimen-pill--highlight ${viewMode === 'after' ? 'active' : ''}`}
+            onClick={() => handleModeToggle('after')}
+            title="View cleaned, bright printable notes"
+          >
+            <span className="specimen-dot dot-clean" />
+            <span>Clean ✨</span>
+          </button>
         </div>
       </div>
 
-      {/* ── MODE 1: INTERACTIVE SPLIT SLIDER (True A4 Ratio, Zero Cropping) ── */}
-      {displayMode === 'split' ? (
-        <div className="proof-split-container">
-          <div
-            className="proof-canvas-stage true-a4-canvas"
-            ref={viewportRef}
-            style={{ '--split-pct': '50%' }}
-            onMouseDown={(e) => startInteraction(e.clientX)}
-            onMouseMove={(e) => isInteracting && handleMove(e.clientX)}
-            onMouseUp={endInteraction}
-            onMouseLeave={() => isInteracting && endInteraction()}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-            title="Drag left or right to compare full page"
-          >
-            {/* Floating Badges */}
-            <div className="proof-status-overlay">
-              <span className="status-chip before">
-                <span className="dot red" /> {beforeLabel || 'Before'}
-              </span>
-              <span className="status-chip after">
-                <span className="dot green" /> {afterLabel || 'After'}
-              </span>
-            </div>
+      {/* Frameless A4 Illuminated Stage */}
+      <div
+        className="specimen-a4-viewport"
+        ref={viewportRef}
+        style={{ '--split-pct': '50%' }}
+        onMouseDown={(e) => startInteraction(e.clientX)}
+        onMouseMove={(e) => isInteracting && handleMove(e.clientX)}
+        onMouseUp={endInteraction}
+        onMouseLeave={() => isInteracting && endInteraction()}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        title="Slide or drag across to inspect clean note quality"
+      >
+        {/* Layer Before: Scanned Photocopy */}
+        <div className="specimen-layer layer-before">
+          <img
+            src={beforeImg}
+            alt="Original scan"
+            className="specimen-img"
+            draggable="false"
+          />
+        </div>
 
-            {/* Layer Before: Whole Scanned Page */}
-            <div className="proof-layer layer-before">
-              <img
-                src={beforeImg}
-                alt="Original scan full page"
-                className="proof-full-page-img"
-                draggable="false"
-              />
-            </div>
+        {/* Layer After: Cleaned Note */}
+        <div className="specimen-layer layer-after">
+          <img
+            src={afterImg}
+            alt="Cleaned note"
+            className="specimen-img"
+            draggable="false"
+          />
+        </div>
 
-            {/* Layer After: Whole Cleaned Page */}
-            <div className="proof-layer layer-after">
-              <img
-                src={afterImg}
-                alt="Cleaned full page"
-                className="proof-full-page-img"
-                draggable="false"
-              />
-            </div>
-
-            {/* Draggable Laser Split Divider */}
-            <div className="proof-split-divider">
-              <div className="divider-laser" />
-              <div className="divider-knob" title="Drag to compare full page">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
-                  <polyline points="7 8 3 12 7 16" />
-                  <polyline points="17 8 21 12 17 16" />
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                </svg>
-              </div>
-            </div>
+        {/* 1px Neon Laser Sweep Divider */}
+        <div className="specimen-laser-divider">
+          <div className="laser-beam" />
+          <div className="laser-handle" title="Drag to inspect">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <polyline points="7 8 3 12 7 16" />
+              <polyline points="17 8 21 12 17 16" />
+            </svg>
           </div>
         </div>
-      ) : (
-        /* ── MODE 2: DUAL FULL-PAGE SIDE-BY-SIDE (CamScanner & vFlat Standard) ── */
-        <div className="proof-side-by-side-grid">
-          {/* Left: Original Scan Document */}
-          <div className="side-doc-card">
-            <div className="side-doc-header before">
-              <span className="dot red" />
-              <span className="side-doc-title">{beforeLabel || 'Before'}</span>
-            </div>
-            <div className="side-doc-stage">
-              <img
-                src={beforeImg}
-                alt="Original full scan"
-                className="proof-full-page-img"
-                draggable="false"
-              />
-            </div>
-          </div>
+      </div>
 
-          {/* Right: Cleaned Document */}
-          <div className="side-doc-card">
-            <div className="side-doc-header after">
-              <span className="dot green" />
-              <span className="side-doc-title">{afterLabel || 'After'}</span>
-            </div>
-            <div className="side-doc-stage">
-              <img
-                src={afterImg}
-                alt="Cleaned full page"
-                className="proof-full-page-img"
-                draggable="false"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Proof Viewer Bottom Value Strip */}
-      <div className="proof-viewer-footer">
-        <div className="proof-labels-row">
-          <span className="footer-side before">{beforeLabel}</span>
-          <span className="footer-arrow">➔</span>
-          <span className="footer-side after">{afterLabel}</span>
-        </div>
+      {/* Micro Caption Hint */}
+      <div className="specimen-caption-hint">
+        <span>Drag laser to inspect text sharpness &amp; stamp removal</span>
       </div>
     </div>
   );

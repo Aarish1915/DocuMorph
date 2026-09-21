@@ -32,8 +32,11 @@ export default function DropZone({
 
       {!file ? (
         <div
-          className={`main-dropzone ${isDragging ? 'dragging' : ''}`}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          className={`modern-dropzone ${isDragging ? 'is-dragging' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
@@ -46,44 +49,54 @@ export default function DropZone({
             }
           }}
         >
-          <div className="dropzone-inner-content">
-            <div className="dropzone-action-pill">
-              <span className="dropzone-icon">📂</span>
-              <span className="dropzone-btn-text">Choose PDF File</span>
+          <div className="dropzone-content">
+            <div className="dropzone-icon-container">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+                <path d="M12 12v9" />
+                <path d="m8 16 4-4 4 4" />
+              </svg>
             </div>
-            <p className="dropzone-sub-text">
-              or drag &amp; drop your PDF here <span className="dropzone-limit">• up to 50MB</span>
+            <h3 className="dropzone-heading">
+              Drop your PDF here, or <span className="dropzone-highlight">browse</span>
+            </h3>
+            <p className="dropzone-description">
+              Scanned notes, photocopies &amp; study materials up to 50MB
             </p>
+            <div className="dropzone-btn-row">
+              <button
+                type="button"
+                className="dropzone-browse-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+              >
+                <span>📂</span>
+                <span>Choose PDF File</span>
+              </button>
+            </div>
           </div>
         </div>
       ) : (
-        <div className="file-ready-card">
-          <div className="file-ready-left">
-            <div className="file-pdf-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
-            </div>
-            <div className="file-ready-details">
-              <span className="file-ready-name">{file.name}</span>
-              <span className="file-ready-meta">
-                {formatBytes(file.size)} • PDF Ready
-              </span>
+        <div className="file-capsule-card">
+          <div className="file-capsule-left">
+            <div className="file-pdf-badge">PDF</div>
+            <div className="file-capsule-meta">
+              <span className="file-capsule-name" title={file.name}>{file.name}</span>
+              <span className="file-size-tag font-mono">{formatBytes(file.size)}</span>
             </div>
           </div>
           <button
             type="button"
-            className="btn-change-file"
+            className="btn-capsule-change"
             onClick={(e) => {
               e.stopPropagation();
               setFile(null);
               if (fileInputRef.current) fileInputRef.current.value = '';
             }}
-            title="Remove or choose another file"
+            title="Choose a different PDF"
+            aria-label="Remove or change PDF"
           >
             ✕ Change
           </button>

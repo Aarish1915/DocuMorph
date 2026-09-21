@@ -7,6 +7,7 @@ export default function Sidebar({
   jobHistory = [],
   loading = false,
   onReprocess,
+  onClearHistory,
 }) {
   if (!isOpen) return null;
 
@@ -58,7 +59,7 @@ export default function Sidebar({
             <div className="history-empty-state">
               <div className="empty-icon">📂</div>
               <p className="empty-title">No documents yet</p>
-              <p className="empty-desc">Processed documents from this session will appear here.</p>
+              <p className="empty-desc">Processed documents appear here for quick access.</p>
             </div>
           ) : (
             <div className="history-items-list">
@@ -136,6 +137,33 @@ export default function Sidebar({
             </div>
           )}
         </div>
+
+        {jobHistory.length > 0 && onClearHistory && (
+          <div className="sidebar-footer" style={{ padding: '16px 20px', borderTop: '1px solid var(--border-default)', textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={onClearHistory}
+              style={{
+                width: '100%',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-default)',
+                background: 'var(--surface-subtle)',
+                color: 'var(--color-danger, #ef4444)',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>🗑️</span>
+              <span>Clear Session History (Leave No Trace)</span>
+            </button>
+          </div>
+        )}
       </aside>
     </div>
   );

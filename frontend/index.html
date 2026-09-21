@@ -24,13 +24,82 @@
     <!-- Theme colour (browser chrome on mobile) -->
     <meta name="theme-color" content="#2563eb" />
 
-    <!-- Preconnect for Google Fonts (loaded in CSS) -->
+    <!-- Preconnect and Google Fonts: Outfit, Plus Jakarta Sans, JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Canonical & Geo-Targeting Hreflang Tags -->
+    <link rel="canonical" href="https://documorph.vercel.app/" />
+    <link rel="alternate" hreflang="en-IN" href="https://documorph.vercel.app/" />
+    <link rel="alternate" hreflang="hi-IN" href="https://documorph.vercel.app/#translate" />
+    <link rel="alternate" hreflang="x-default" href="https://documorph.vercel.app/" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Schema.org Structured Data (AEO & GEO Optimization) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "@id": "https://documorph.vercel.app/#webapp",
+          "name": "DocuMorph AI",
+          "url": "https://documorph.vercel.app/",
+          "applicationCategory": "EducationalApplication",
+          "operatingSystem": "All",
+          "browserRequirements": "Requires JavaScript. Requires HTML5.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "INR"
+          },
+          "description": "AI-powered study notes restoration engine. Clean handwritten and scanned notes, remove dark photocopy shadows and promo banners, protect LaTeX math equations, compress pages by 50%, and translate into Hindi.",
+          "featureList": [
+            "Smart Paper Brightening & Watermark Removal",
+            "LaTeX Mathematical & Chemical Formula Shielding",
+            "50-60% Physical Page Compaction to save Xerox costs",
+            "Structured Markdown Table & Text Extraction",
+            "Fluent English to Hindi & Regional Language Translation",
+            "Zero-Retention 100% Student Data Privacy"
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://documorph.vercel.app/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Is using DocuMorph legal for student notes and coaching materials?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. DocuMorph is 100% legal for students and educators under Section 52(1)(a) of the Indian Copyright Act, 1957 (Fair Dealing for private study and research) and US Fair Use (17 U.S.C. § 107). DocuMorph operates as an accessibility and print-efficiency tool, never distributing or republishing files."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Are my uploaded PDF files or personal study notes stored on your servers?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. DocuMorph operates on a strict Zero-Retention Privacy Architecture compliant with India's DPDP Act, 2023. All uploaded files and temporary images are permanently deleted within 30 minutes. We never store or use notes to train AI."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does DocuMorph protect mathematical formulas and equations?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "DocuMorph uses a Universal Math Siphon and AST shielding. It isolates LaTeX inline and display math formulas ($...$ and $$...$$), preserving fractions, superscripts, subscripts, and symbols without character corruption."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,62 +1,241 @@
 /* =====================================================
-   DocuMorph Clean Hero Section
-   Balanced typography with dark and light theme support
+   DocuMorph Ultra-Modern Hero Section
+   Outfit display typography, glowing badges & trust grid
    ===================================================== */
 
 .hero-section {
+  position: relative;
   max-width: 900px;
   margin: 0 auto;
   text-align: center;
-  padding: 32px 16px 20px 16px;
+  padding: 44px 16px 32px 16px;
+  overflow: hidden;
+}
+
+.hero-ambient-glow {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 240px;
+  background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.18) 0%, rgba(6, 182, 212, 0.08) 50%, transparent 70%);
+  filter: blur(40px);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .hero-headline-group {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.hero-title {
-  font-size: clamp(28px, 4vw, 46px);
-  font-weight: 850;
-  line-height: 1.18;
-  letter-spacing: -0.035em;
+.hero-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   color: var(--text-main);
-  margin: 0 0 10px 0;
-  font-family: var(--font-family, sans-serif);
-  max-width: 780px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px -2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(99, 102, 241, 0.12);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hero-pill-badge:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 16px -2px rgba(99, 102, 241, 0.2);
+}
+
+.hero-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulseLiveDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseLiveDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.hero-title {
+  font-size: clamp(32px, 5vw, 54px);
+  font-weight: 850;
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+  color: var(--text-main);
+  margin: 0 0 16px 0;
+  font-family: var(--font-display);
+  max-width: 840px;
 }
 
 .title-gradient {
-  background: linear-gradient(135deg, #2563eb 0%, #38bdf8 100%);
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 45%, #06b6d4 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 [data-theme="dark"] .title-gradient {
-  background: linear-gradient(135deg, #60a5fa 0%, #38bdf8 100%);
+  background: linear-gradient(135deg, #a5b4fc 0%, #818cf8 40%, #38bdf8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .hero-description {
-  margin: 0 auto;
+  margin: 0 auto 26px auto;
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--text-muted);
   font-weight: 450;
-  max-width: 620px;
+  max-width: 680px;
+}
+
+/* ── Hero Action CTAs (Silicon Valley Benchmark) ── */
+.hero-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 0 auto 28px auto;
+  flex-wrap: wrap;
+}
+
+.hero-primary-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 26px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 750;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.3);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: -0.01em;
+}
+
+.hero-primary-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(99, 102, 241, 0.55), 0 0 0 1px rgba(129, 140, 248, 0.5);
+  filter: brightness(1.06);
+}
+
+.hero-primary-cta:active {
+  transform: translateY(0);
+}
+
+.hero-cta-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.hero-cta-label {
+  font-family: var(--font-display);
+}
+
+.hero-cta-pill {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.hero-secondary-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 22px;
+  border-radius: var(--radius-full);
+  background: var(--surface-card);
+  color: var(--text-main);
+  font-size: 14.5px;
+  font-weight: 650;
+  border: 1.5px solid var(--border-default);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-secondary-cta:hover {
+  transform: translateY(-1px);
+  border-color: rgba(99, 102, 241, 0.4);
+  background: var(--surface-card-hover);
+  color: var(--tool-primary, #6366f1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.hero-secondary-cta:active {
+  transform: translateY(0);
+}
+
+.hero-trust-grid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.trust-pill-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.trust-pill-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: var(--text-main);
+  background: var(--surface-card-hover);
+}
+
+.trust-pill-icon {
+  font-size: 13px;
+  line-height: 1;
 }
 
 @media (max-width: 640px) {
   .hero-section {
-    padding: 24px 14px 16px 14px;
+    padding: 28px 14px 20px 14px;
   }
   .hero-title {
-    font-size: 26px;
-    line-height: 1.22;
+    font-size: 28px;
+    line-height: 1.18;
   }
   .hero-description {
-    font-size: 14px;
+    font-size: 14.5px;
+  }
+  .hero-trust-grid {
+    gap: 8px;
+  }
+  .trust-pill-card {
+    font-size: 11.5px;
+    padding: 5px 11px;
   }
 }

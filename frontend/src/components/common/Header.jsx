@@ -11,6 +11,7 @@ export default function Header({
   historyCount = 0,
   appliedTheme = 'light',
   onToggleTheme,
+  onOpenDonation,
 }) {
   return (
     <header className="site-header">
@@ -20,6 +21,7 @@ export default function Header({
           <div className="header-left">
             {activeView !== 'home' && (
               <button 
+                type="button"
                 className="back-button" 
                 onClick={() => onNavigateView ? onNavigateView('home') : onNewJob()} 
                 aria-label="Back to all tools"
@@ -31,19 +33,39 @@ export default function Header({
                 </svg>
               </button>
             )}
-            <div className="brand-logo" onClick={() => onNavigateView ? onNavigateView('home') : onNewJob()} role="button" tabIndex={0}>
-              <div className="brand-icon">D</div>
-              <span className="brand-name">DocuMorph</span>
+            <div 
+              className="brand-logo" 
+              onClick={() => onNavigateView ? onNavigateView('home') : onNewJob()} 
+              role="button" 
+              tabIndex={0}
+              title="DocuMorph Home"
+            >
+              <div className="brand-icon-modern">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <defs>
+                    <linearGradient id="dm-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#6366f1" />
+                      <stop offset="50%" stopColor="#4f46e5" />
+                      <stop offset="100%" stopColor="#06b6d4" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="2" y="2" width="20" height="20" rx="6" fill="url(#dm-grad)" />
+                  <path d="M7 7H12.5C14.9853 7 17 9.01472 17 11.5C17 13.9853 14.9853 16 12.5 16H7V7Z" stroke="#ffffff" strokeWidth="2.2" strokeLinejoin="round" />
+                  <circle cx="15.5" cy="8.5" r="1.5" fill="#34d399" />
+                </svg>
+              </div>
+              <span className="brand-name">DocuMorph <span className="brand-badge-ai">AI</span></span>
             </div>
           </div>
         ) : (
-          /* Step 2-4: Back Header */
+          /* Step 2-4: Cockpit & Back Header */
           <div className="header-left">
             <button 
+              type="button"
               className="back-button" 
               onClick={onBack} 
-              aria-label="Go back to previous step"
-              title="Back"
+              aria-label={step === 4 ? "Back to all tools" : "Go back to previous step"}
+              title={step === 4 ? "Back to Tools" : "Back"}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="19" y1="12" x2="5" y2="12"></line>
@@ -52,49 +74,69 @@ export default function Header({
             </button>
             <div className="step-title-group">
               <span className="service-heading">{serviceTitle}</span>
-              <span className="step-indicator-text">Step {step} of 4</span>
+              {step === 4 ? (
+                <span className="cockpit-status-badge">
+                  <span className="cockpit-status-dot"></span>
+                  <span>AI Transformation Cockpit</span>
+                </span>
+              ) : (
+                <span className="step-indicator-text">Step {step} of 4</span>
+              )}
             </div>
           </div>
         )}
 
+        {/* Desktop Tool Navigation */}
         {step === 1 && onNavigateView && (
           <nav className="header-nav-tools" aria-label="Tool Navigation">
             <button
+              type="button"
               className={`nav-tool-link ${activeView === 'home' ? 'active' : ''}`}
               onClick={() => onNavigateView('home')}
             >
               All Tools
             </button>
             <button
+              type="button"
               className={`nav-tool-link ${activeView === 'clean' ? 'active' : ''}`}
               onClick={() => onNavigateView('clean')}
             >
-              <span>✨</span> Clean
+              <span>✨</span> Clean &amp; Format
             </button>
             <button
+              type="button"
               className={`nav-tool-link ${activeView === 'compress' ? 'active' : ''}`}
               onClick={() => onNavigateView('compress')}
             >
               <span>📉</span> Compress
             </button>
             <button
+              type="button"
               className={`nav-tool-link ${activeView === 'extract' ? 'active' : ''}`}
               onClick={() => onNavigateView('extract')}
             >
               <span>📋</span> Extract
             </button>
             <button
+              type="button"
               className={`nav-tool-link ${activeView === 'translate' ? 'active' : ''}`}
               onClick={() => onNavigateView('translate')}
             >
               <span>🌐</span> Translate
             </button>
+            <button
+              type="button"
+              className={`nav-tool-link ${activeView === 'backers' ? 'active' : ''}`}
+              onClick={() => onNavigateView('backers')}
+            >
+              <span>🏆</span> Backers
+            </button>
           </nav>
         )}
 
         <div className="header-right">
-          {step > 1 && (
-            /* 4-dash Progress Bar on Steps 2-4 */
+          {step > 1 && step < 4 && (
+            /* 4-dash Progress Bar only on intermediate wizard steps */
             <div className="step-dash-bar" aria-label={`Step ${step} of 4`}>
               {[1, 2, 3, 4].map((dashStep) => (
                 <div
@@ -107,6 +149,7 @@ export default function Header({
 
           {/* Theme Toggle (Sun / Moon) */}
           <button 
+            type="button"
             className="header-icon-btn theme-toggle-btn" 
             onClick={onToggleTheme}
             title={appliedTheme === 'dark' ? 'Switch to Light theme' : 'Switch to Dark theme'}
@@ -131,10 +174,23 @@ export default function Header({
             )}
           </button>
 
-
           {/* Quick Action Utility Group */}
+          {onOpenDonation && (
+            <button 
+              type="button"
+              className="header-action-btn fuel-support-header-btn"
+              onClick={onOpenDonation}
+              title="Support free server fuel with a chai (UPI)"
+              aria-label="Support DocuMorph"
+            >
+              <span>☕</span>
+              <span className="btn-label">Support</span>
+            </button>
+          )}
+
           <button 
-            className="header-action-btn" 
+            type="button"
+            className="header-action-btn history-header-btn" 
             onClick={onToggleHistory}
             title="Recent Document Transformations"
             aria-label={`Recent Jobs history (${historyCount})`}
@@ -148,6 +204,40 @@ export default function Header({
           </button>
         </div>
       </div>
+
+      {/* Mobile Tool Navigation: All 4 tools fitted evenly across screen */}
+      {step === 1 && onNavigateView && (
+        <nav className="mobile-tool-scroller" aria-label="Mobile Tool Navigation">
+          <button
+            type="button"
+            className={`mobile-nav-chip ${activeView === 'clean' ? 'active' : ''}`}
+            onClick={() => onNavigateView('clean')}
+          >
+            <span>✨</span> Clean
+          </button>
+          <button
+            type="button"
+            className={`mobile-nav-chip ${activeView === 'compress' ? 'active' : ''}`}
+            onClick={() => onNavigateView('compress')}
+          >
+            <span>📉</span> Compress
+          </button>
+          <button
+            type="button"
+            className={`mobile-nav-chip ${activeView === 'extract' ? 'active' : ''}`}
+            onClick={() => onNavigateView('extract')}
+          >
+            <span>📋</span> Extract
+          </button>
+          <button
+            type="button"
+            className={`mobile-nav-chip ${activeView === 'translate' ? 'active' : ''}`}
+            onClick={() => onNavigateView('translate')}
+          >
+            <span>🌐</span> Translate
+          </button>
+        </nav>
+      )}
     </header>
   );
 }

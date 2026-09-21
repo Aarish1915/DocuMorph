@@ -30,12 +30,13 @@ export default function CookieConsent({ onOpenPrivacy }) {
       aria-label="Privacy & Storage Notice"
       style={{
         position: 'fixed',
-        bottom: '20px',
-        left: '50%',
-        transform: 'translateX(-50%)',
+        bottom: '24px',
+        right: '24px',
+        left: 'auto',
+        transform: 'none',
         zIndex: 9990,
-        width: 'calc(100% - 32px)',
-        maxWidth: '560px',
+        width: 'calc(100% - 48px)',
+        maxWidth: '420px',
         background: 'var(--bg-elevated, #ffffff)',
         color: 'var(--text-main, #0f172a)',
         border: '1px solid var(--border-color, #e2e8f0)',

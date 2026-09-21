@@ -1,55 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-const LANGUAGE_MODES = [
-  {
-    id: 'auto',
-    badge: '🌐',
-    short: 'Bilingual',
-    title: 'Dual (Hindi + English) + Formulas',
-    tip: 'Keeps both languages side-by-side with all math formulas.',
-  },
-  {
-    id: 'en+math',
-    badge: '🇬🇧',
-    short: 'English',
-    title: 'English + Maths (JEE / NEET / STEM)',
-    tip: 'English notes + formulas. Omits duplicate Hindi translations to save paper.',
-  },
-  {
-    id: 'math+hindi',
-    badge: '🇮🇳',
-    short: 'Hindi',
-    title: 'Hindi + Maths (हिंदी + गणित)',
-    tip: 'Devanagari Hindi + formulas. Omits duplicate English paragraphs.',
-  },
-  {
-    id: 'only_english',
-    badge: '🔤',
-    short: 'Eng Only',
-    title: 'Only English (Law, CLAT, Bare Acts)',
-    tip: 'Clean English text + all formulas, reasoning math & tables. Strips photocopy shadows and duplicate Hindi.',
-  },
-  {
-    id: 'only_hindi',
-    badge: 'अ',
-    short: 'हिंदी Only',
-    title: 'Only Hindi (केवल हिंदी)',
-    tip: 'Pure Hindi notes without parallel English text.',
-  },
-  {
-    id: 'only_math',
-    badge: '∑',
-    short: 'Math Only',
-    title: 'Only Maths & Formulas',
-    tip: 'Extracts formulas, equations and problem sets only.',
-  },
-];
-
-const EXAM_SHORTCUTS = [
-  { label: 'JEE / NEET', mode: 'en+math' },
-  { label: 'Law / CLAT', mode: 'only_english' },
-  { label: 'UPSC / SSC', mode: 'auto' },
-  { label: 'Hindi STEM', mode: 'math+hindi' },
+const COMPACT_MODES = [
+  { id: 'auto', label: '⚡ Auto (All / STEM)', desc: 'Detect language & preserve math' },
+  { id: 'math+hindi', label: '📐 Hindi + Math', desc: 'हिंदी + गणित / JEE / NEET' },
+  { id: 'only_english', label: '⚖️ English Only', desc: 'Standard text & notes' },
+  { id: 'en+math', label: '🔬 STEM (En + Math)', desc: 'Pure science & formulas' },
 ];
 
 export default function StudentExamLanguageSelector({
@@ -58,87 +13,28 @@ export default function StudentExamLanguageSelector({
   onChange,
   onChangeMode,
 }) {
-  const [showTip, setShowTip] = useState(false);
   const activeMode = languageMode || selectedMode || 'auto';
   const handleChange = onChange || onChangeMode || (() => {});
-  const currentOpt = LANGUAGE_MODES.find((m) => m.id === activeMode) || LANGUAGE_MODES[0];
 
   return (
-    <div className="compact-lang-selector">
-      {/* Top row: Label + Exam quick presets + Info button */}
-      <div className="compact-lang-header">
-        <div className="compact-header-left">
-          <span className="compact-lang-title">Language &amp; Formulas:</span>
-          <div className="compact-exam-pills">
-            {EXAM_SHORTCUTS.map((exam) => (
-              <button
-                key={exam.label}
-                type="button"
-                className={`compact-exam-chip ${activeMode === exam.mode ? 'active' : ''}`}
-                onClick={() => handleChange(exam.mode)}
-                title={`Quick select for ${exam.label}`}
-              >
-                {exam.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className={`compact-info-btn ${showTip ? 'open' : ''}`}
-          onClick={() => setShowTip(!showTip)}
-          aria-expanded={showTip}
-          aria-label="Toggle language filtering guidance"
-          title="Why filter languages? Click to learn"
-        >
-          💡 Tip
-        </button>
-      </div>
-
-      {/* Main compact pill selector */}
-      <div className="compact-pills-row">
-        {LANGUAGE_MODES.map((mode) => {
-          const isSelected = activeMode === mode.id;
+    <div className="compact-language-section">
+      <span className="compact-lang-title">Language &amp; Context:</span>
+      <div className="compact-lang-grid">
+        {COMPACT_MODES.map((mode) => {
+          const isActive = activeMode === mode.id;
           return (
             <button
               key={mode.id}
               type="button"
-              className={`compact-lang-pill ${isSelected ? 'selected' : ''}`}
+              className={`compact-lang-pill ${isActive ? 'active' : ''}`}
               onClick={() => handleChange(mode.id)}
-              title={mode.title}
+              title={mode.desc}
             >
-              <span className="compact-pill-badge">{mode.badge}</span>
-              <span className="compact-pill-text">{mode.short}</span>
+              <span className="compact-lang-pill-text">{mode.label}</span>
             </button>
           );
         })}
       </div>
-
-      {/* Micro-hint / Collapsible coaching notes guidance */}
-      {showTip && (
-        <div className="compact-tip-box">
-          <span>
-            💡 <strong>Coaching Notes Anti-Duplicate:</strong> Allen, Drishti IAS &amp; Resonance modules print English &amp; Hindi side-by-side. Selecting <strong>En+Math</strong> or <strong>Hi+Math</strong> cuts duplicate text and saves up to 40% paper!
-          </span>
-          <button
-            type="button"
-            className="compact-tip-close"
-            onClick={() => setShowTip(false)}
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* Active Selection Subtitle (1 clean line) */}
-      {!showTip && (
-        <div className="compact-active-indicator">
-          <span className="active-dot" />
-          <span className="active-label">{currentOpt.title}:</span>
-          <span className="active-desc">{currentOpt.tip}</span>
-        </div>
-      )}
     </div>
   );
 }

@@ -33,7 +33,17 @@ export default function ProgressCard({
   const [elapsedSec, setElapsedSec] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
   const [downloading, setDownloading] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewComment, setReviewComment] = useState('');
+  const isIOS = typeof navigator !== 'undefined' && (
+    /iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+
   const [canShare] = useState(() => {
+    if (isIOS) return true;
     try {
       if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && typeof File === 'function') {
         const dummyFile = new File([''], 'doc.pdf', { type: 'application/pdf' });
@@ -67,6 +77,30 @@ export default function ProgressCard({
     return () => clearInterval(tipInterval);
   }, [jobStatus, isComplete, isError]);
 
+  // Smooth micro-stepping / synthetic lerp state: strictly cap at 92% until complete
+  const targetProgress = Math.max(0, Math.min(100, Number(jobStatus?.progress) || 0));
+  const [displayProgress, setDisplayProgress] = useState(targetProgress);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDisplayProgress((prev) => {
+        if (isComplete) return 100;
+        // Freeze guard: never exceed 92% until status === 'COMPLETED'
+        const cappedTarget = Math.min(92, targetProgress);
+        if (prev < cappedTarget) {
+          const step = Math.max(0.3, (cappedTarget - prev) * 0.15);
+          return Math.min(cappedTarget, prev + step);
+        }
+        // Micro-creep while backend typesets
+        if (!isComplete && !isError && prev < 92) {
+          return Math.min(92, prev + 0.1);
+        }
+        return prev;
+      });
+    }, 80);
+    return () => clearInterval(interval);
+  }, [targetProgress, isComplete, isError]);
+
   if (!jobStatus) return null;
 
   const serviceType = jobStatus.service_type || 'clean_format';
@@ -94,7 +128,8 @@ export default function ProgressCard({
     return Math.min(100, Math.round(((progress - 90) / 10) * 100));
   };
 
-  const stageProgress = jobStatus.progress > 0 ? getStagePercentage(jobStatus.progress) : 0;
+  const currentDisplayPct = Math.round(displayProgress);
+  const stageProgress = displayProgress > 0 ? getStagePercentage(displayProgress) : 0;
 
   // Calculate compression statistics
   const origSize = jobStatus.original_file_size || 0;
@@ -115,38 +150,24 @@ export default function ProgressCard({
     return 'cleaned_document.pdf';
   };
 
-  const handleDownload = async (e) => {
+  const handleDownload = (e) => {
     if (e) e.preventDefault();
     if (!downloadUrl) return;
 
-    try {
-      setDownloading(true);
-      const res = await fetch(downloadUrl);
-      if (!res.ok) throw new Error('Download failed');
-      const blob = await res.blob();
-      const filename = getTargetFilename();
-
-      // Same-origin blob URL download trigger:
-      // In iOS Safari, cross-origin <a> links ignore the download attribute and open a viewer tab.
-      // But triggering a click on a same-origin blob: URL forces iOS Safari to show the native
-      // "Do you want to download 'filename'?" prompt and saves directly into phone local Downloads!
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.style.display = 'none';
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(() => {
-        if (link.parentNode) link.parentNode.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-      }, 10000);
-    } catch (err) {
-      console.warn('Direct blob download fallback:', err);
-      window.location.href = downloadUrl;
-    } finally {
-      setDownloading(false);
-    }
+    // Direct HTTP download trigger:
+    // With our clean RFC-compliant Content-Disposition attachment header,
+    // window.location.assign(downloadUrl) triggers the device's native download manager
+    // (iOS Safari "Do you want to download 'cleaned_document.pdf'?", Android Chrome download manager,
+    // and desktop browsers), saving directly into device storage without blob detachment errors.
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = getTargetFilename();
+    link.target = '_self';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (link.parentNode) link.parentNode.removeChild(link);
+    }, 2000);
   };
 
   const handleNativeShare = async () => {
@@ -165,7 +186,7 @@ export default function ProgressCard({
           title: filename,
         });
       } else {
-        await handleDownload();
+        handleDownload();
       }
     } catch (err) {
       console.warn('Native share cancelled or failed:', err);
@@ -174,29 +195,110 @@ export default function ProgressCard({
     }
   };
 
-  return (
-    <div className="progress-screen-container">
-      <div className="progress-card">
+  const handleRatingSubmit = async (stars, commentText) => {
+    setRating(stars);
+    setReviewSubmitted(true);
+    try {
+      await fetch(`${API_BASE}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          job_id: jobStatus?.id || '',
+          rating: stars,
+          comment: commentText || ''
+        })
+      });
+    } catch {
+      // Offline graceful ignore
+    }
+  };
 
-        {/* Header */}
-        <div className="progress-header">
-          <span className="progress-title">
-            {isComplete
-              ? 'Processing Complete'
-              : isError
-              ? 'Processing Failed'
-              : jobStatus.status === 'UPLOADING'
-              ? 'Uploading Document to Engine...'
-              : 'Processing Document'}
-          </span>
-          {jobStatus.progress >= 0 && !isComplete && (
-            <span className="progress-pct">
-              {jobStatus.status === 'UPLOADING' ? (jobStatus.upload_pct ?? Math.round(jobStatus.progress)) : Math.round(jobStatus.progress)}%
+  const getServicePresetLabel = () => {
+    if (serviceType === 'compress') return '📉 Smart Page Compaction';
+    if (serviceType === 'extract_text') return '📋 Text & Table Extraction';
+    if (serviceType === 'translate') return '🌐 Multilingual Translation';
+    return '✨ Clean & Print Beautify';
+  };
+
+  const getDocDisplayName = () => {
+    return jobStatus.file_name || jobStatus.original_filename || 'Active_Lecture_Notes.pdf';
+  };
+
+  return (
+    <div className="progress-screen-container cockpit-stage-container">
+      <div className="cockpit-ambient-aura" />
+      <div className="progress-card progress-cockpit-card">
+
+        {/* 1. Document Telemetry Status Strip */}
+        <div className="cockpit-telemetry-bar">
+          <div className="telemetry-item file-item" title={getDocDisplayName()}>
+            <span className="telemetry-icon">📄</span>
+            <span className="telemetry-label">{getDocDisplayName()}</span>
+          </div>
+          <div className="telemetry-divider" />
+          <div className="telemetry-item">
+            <span className="telemetry-icon">📑</span>
+            <span className="telemetry-val">
+              {jobStatus.total_pages ? `${jobStatus.total_pages} Pages` : 'Multi-Page PDF'}
             </span>
+          </div>
+          <div className="telemetry-divider" />
+          <div className="telemetry-item mode-item">
+            <span className="telemetry-val">{getServicePresetLabel()}</span>
+          </div>
+          {!isComplete && !isError && (
+            <>
+              <div className="telemetry-divider" />
+              <div className="telemetry-item timer-item">
+                <span className="telemetry-icon">⏱️</span>
+                <span className="telemetry-val timer-val">
+                  {Math.floor(elapsedSec / 60)}:{(elapsedSec % 60).toString().padStart(2, '0')}
+                </span>
+              </div>
+            </>
           )}
         </div>
 
-        {/* Real-Time Upload Bandwidth Badge */}
+        {/* 2. Cockpit Hero Header */}
+        <div className="cockpit-hero-header">
+          <div className="cockpit-hero-left">
+            <div className={`cockpit-pulse-ring-wrap ${isComplete ? 'complete' : isError ? 'error' : 'active'}`}>
+              <span className="pulse-ring-wave"></span>
+              <span className="pulse-ring-core">
+                {isComplete ? '✓' : isError ? '!' : '⚡'}
+              </span>
+            </div>
+            <div className="cockpit-title-group">
+              <h2 className="cockpit-main-title">
+                {isComplete
+                  ? 'Document Ready for Download'
+                  : isError
+                  ? 'Processing Interrupted'
+                  : jobStatus.status === 'UPLOADING'
+                  ? 'Uploading Document to Engine...'
+                  : 'AI Transformation Cockpit'}
+              </h2>
+              <span className="cockpit-sub-title">
+                {isComplete
+                  ? 'Processed with zero-retention privacy & LaTeX formula preservation.'
+                  : isError
+                  ? 'We encountered an issue during document transformation.'
+                  : 'Multi-part vision reading, layout profiling & typesetting active.'}
+              </span>
+            </div>
+          </div>
+
+          {jobStatus.progress >= 0 && !isComplete && (
+            <div className="cockpit-pct-badge">
+              <span className="cockpit-pct-num">
+                {jobStatus.status === 'UPLOADING' ? (jobStatus.upload_pct ?? currentDisplayPct) : currentDisplayPct}
+              </span>
+              <span className="cockpit-pct-sym">%</span>
+            </div>
+          )}
+        </div>
+
+        {/* Real-Time Upload Bandwidth Badge (when uploading) */}
         {jobStatus.status === 'UPLOADING' && (
           <div
             style={{
@@ -222,43 +324,51 @@ export default function ProgressCard({
           </div>
         )}
 
-        {/* Progress Bar (during active processing) */}
+        {/* 3. Progress Bar (during active processing) */}
         {!isComplete && !isError && (
-          <div className="pbar-track">
+          <div className="pbar-track cockpit-pbar-track">
             <div 
-              className={`pbar-fill ${jobStatus.progress >= 80 ? 'pbar-fill--pulsing' : ''}`} 
-              style={{ width: `${Math.max(5, jobStatus.progress)}%` }} 
+              className={`pbar-fill ${displayProgress >= 80 ? 'pbar-fill--pulsing' : ''}`} 
+              style={{ width: `${Math.max(5, displayProgress)}%`, transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }} 
             />
           </div>
         )}
 
-        {/* Active Stage Indicators */}
+        {/* 4. Connected Stages Pipeline */}
         {!isComplete && !isError && (
-          <div className="stages">
-            {STAGES.map((s, i) => {
-              const isActive = stageIdx === i;
-              const isDone = stageIdx > i;
-              return (
-                <div key={i} className={`stage ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
-                  {isActive ? (
-                    <>
-                      <CircularRing progress={stageProgress} icon={s.icon} />
-                      <div className="stage-name active">{s.label}</div>
-                      <div className="stage-pct-label">{stageProgress}%</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="stage-bubble">{isDone ? '✓' : s.icon}</div>
-                      <div className="stage-name">{s.label}</div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
+          <div className="stages-cockpit-track">
+            <div className="stages-beam-line">
+              <div 
+                className="stages-beam-fill" 
+                style={{ width: `${Math.min(100, Math.max(0, (stageIdx / (STAGES.length - 1)) * 100))}%` }} 
+              />
+            </div>
+            <div className="stages">
+              {STAGES.map((s, i) => {
+                const isActive = stageIdx === i;
+                const isDone = stageIdx > i;
+                return (
+                  <div key={i} className={`stage ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
+                    {isActive ? (
+                      <div className="stage-active-container">
+                        <CircularRing progress={stageProgress} icon={s.icon} />
+                        <div className="stage-name active">{s.label}</div>
+                        <div className="stage-pct-label">{stageProgress}%</div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="stage-bubble">{isDone ? '✓' : s.icon}</div>
+                        <div className="stage-name">{s.label}</div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {/* Live Status Message */}
+        {/* 5. Live Status Message */}
         <div className="status-msg-box">
           {isComplete && (
             <div className="complete-banner">
@@ -268,8 +378,8 @@ export default function ProgressCard({
                 </svg>
               </div>
               <div className="success-text">
-                <span className="success-title">Your document is ready!</span>
-                <span className="success-desc">Processed with 100% data privacy.</span>
+                <span className="success-title">Your document is completely transformed!</span>
+                <span className="success-desc">Processed with 100% data privacy • Zero file retention.</span>
               </div>
             </div>
           )}
@@ -282,9 +392,12 @@ export default function ProgressCard({
           )}
 
           {!isComplete && !isError && (
-            <div className="active-msg">
-              <span className="pulse-dot"></span>
-              <span>{jobStatus.message || jobStatus.status}</span>
+            <div className="cockpit-live-console">
+              <span className="console-radar-dot"></span>
+              <div className="console-body">
+                <span className="console-prefix">ENGINE STATE:</span>
+                <span className="console-text">{jobStatus.message || jobStatus.status || 'Profiling layout & math equations...'}</span>
+              </div>
             </div>
           )}
         </div>
@@ -366,15 +479,14 @@ export default function ProgressCard({
               type="button"
               onClick={handleDownload}
               className="btn-download-result"
-              disabled={downloading}
-              style={{ border: 'none', cursor: downloading ? 'wait' : 'pointer' }}
+              style={{ border: 'none', cursor: 'pointer' }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              <span>{downloading ? 'Preparing Download...' : getDownloadButtonLabel()}</span>
+              <span>{getDownloadButtonLabel()}</span>
             </button>
 
             {canShare && (
@@ -383,14 +495,14 @@ export default function ProgressCard({
                 onClick={handleNativeShare}
                 className="btn-share-result"
                 disabled={downloading}
-                title="Save directly to phone or share via AirDrop / WhatsApp"
+                title="Share via WhatsApp, AirDrop or other apps"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
                   <polyline points="16 6 12 2 8 6"/>
                   <line x1="12" y1="2" x2="12" y2="15"/>
                 </svg>
-                <span>📱 Save to iPhone / Share</span>
+                <span>Share Document</span>
               </button>
             )}
 
@@ -401,6 +513,69 @@ export default function ProgressCard({
             >
               Process another document
             </button>
+          </div>
+        )}
+
+        {/* Student Satisfaction Review Widget */}
+        {isComplete && (
+          <div className="cockpit-review-strip" style={{ marginTop: '20px', padding: '16px 20px', background: 'var(--surface-subtle)', borderRadius: '14px', border: '1px solid var(--border-default)', textAlign: 'center' }}>
+            {reviewSubmitted ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13.5px', color: 'var(--color-success)', fontWeight: 600 }}>
+                <span>🎉</span>
+                <span>Thank you! Your feedback helps us keep DocuMorph sharp for all students.</span>
+              </div>
+            ) : (
+              <div>
+                <span style={{ display: 'block', fontSize: '13px', fontWeight: 650, color: 'var(--text-main)', marginBottom: '8px' }}>
+                  How did your cleaned document turn out?
+                </span>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: rating > 0 ? '12px' : '0' }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => {
+                        setRating(star);
+                        if (star === 5) handleRatingSubmit(5, '');
+                      }}
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '24px',
+                        cursor: 'pointer',
+                        color: (hoverRating || rating) >= star ? '#f59e0b' : 'var(--text-subtle, #cbd5e1)',
+                        transition: 'transform 0.15s ease, color 0.15s ease',
+                        transform: (hoverRating || rating) >= star ? 'scale(1.15)' : 'scale(1)',
+                        padding: '2px'
+                      }}
+                      aria-label={`Rate ${star} stars`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+                {rating > 0 && !reviewSubmitted && (
+                  <div style={{ display: 'flex', gap: '8px', maxWidth: '400px', margin: '0 auto' }}>
+                    <input
+                      type="text"
+                      placeholder="Quick note (e.g. formulas intact, clean text)..."
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      style={{ flex: 1, padding: '8px 12px', fontSize: '12.5px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--surface-card)' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRatingSubmit(rating, reviewComment)}
+                      style={{ padding: '8px 14px', fontSize: '12.5px', fontWeight: 600, borderRadius: '8px', background: 'var(--color-primary)', color: '#ffffff', border: 'none', cursor: 'pointer' }}
+                    >
+                      Submit
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

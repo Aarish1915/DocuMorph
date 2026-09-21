@@ -1,6 +1,29 @@
+# DocuMorph AI Robots Configuration
+# https://documorph.vercel.app/robots.txt
+
 User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /admin
+Disallow: /data/
+
+# Generative AI & Search Engine Crawlers (AEO & GEO Discovery)
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
 
 Sitemap: https://documorph.vercel.app/sitemap.xml
