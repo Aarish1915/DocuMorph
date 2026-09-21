@@ -231,7 +231,7 @@ export default function InteractiveProofViewer({
         <div className="specimen-laser-divider">
           <div className="laser-beam" />
           <div className="laser-handle" title="Drag to inspect">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" aria-hidden="true">
               <polyline points="7 8 3 12 7 16" />
               <polyline points="17 8 21 12 17 16" />
             </svg>

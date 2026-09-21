@@ -12,7 +12,8 @@
   --font-family: var(--font-body);
 
   /* Precise Type Scale */
-  --font-2xs: 11px;
+  /* Precise Type Scale (Min 12px WCAG compliant) */
+  --font-2xs: 12px;
   --font-xs: 12.5px;
   --font-sm: 13.5px;
   --font-base: 15px;
@@ -28,12 +29,11 @@
   --lh-normal: 1.5;
   --lh-relaxed: 1.65;
 
-  /* Corner Radii (Usability Heuristics standard) */
+  /* Corner Radii (Usability Heuristics standard: max 4 scales + full) */
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
-  --radius-xl: 22px;
   --radius-full: 9999px;
 
   /* Color Tokens - Editorial Snow Light Theme */

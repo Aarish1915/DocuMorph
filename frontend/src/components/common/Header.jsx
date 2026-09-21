@@ -174,20 +174,6 @@ export default function Header({
             )}
           </button>
 
-          {/* Quick Action Utility Group */}
-          {onOpenDonation && (
-            <button 
-              type="button"
-              className="header-action-btn fuel-support-header-btn"
-              onClick={onOpenDonation}
-              title="Support free server fuel with a chai (UPI)"
-              aria-label="Support DocuMorph"
-            >
-              <span>☕</span>
-              <span className="btn-label">Support</span>
-            </button>
-          )}
-
           <button 
             type="button"
             className="header-action-btn history-header-btn" 

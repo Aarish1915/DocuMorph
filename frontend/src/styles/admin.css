@@ -225,7 +225,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.metric-label {
+.telemetry-metric-card .metric-label {
   font-size: 11.5px;
   font-weight: 600;
   color: var(--text-muted);

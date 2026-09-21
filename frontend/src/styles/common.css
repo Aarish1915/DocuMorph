@@ -64,14 +64,20 @@
 /* Back Button */
 .back-button {
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-subtle, transparent);
   color: var(--text-muted);
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm);
-  display: flex;
+  min-height: 38px;
+  min-width: 38px;
+  width: auto;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm, 8px);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  font-size: var(--font-sm, 13.5px);
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.15s ease;
 }
