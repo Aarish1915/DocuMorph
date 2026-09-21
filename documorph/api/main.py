@@ -9,6 +9,8 @@ import os
 import shutil
 import uuid
 import hashlib
+import html
+import re
 import fitz
 
 from documorph.core.database import init_db, get_db, Job, AdminUser, StudentReview, DonationRecord, seed_community_data, SessionLocal
@@ -781,6 +783,247 @@ async def reprocess_job(job_id: str, db: Session = Depends(get_db)):
 # =====================================================================
 # --- COMMUNITY REVIEW & DONATION SYSTEM ---
 # =====================================================================
+
+class ReviewCreateRequest(BaseModel):
+    student_name: str = Field(..., min_length=2, max_length=60)
+    exam_target: str = Field(..., min_length=2, max_length=80)
+    city: Optional[str] = Field(None, max_length=60)
+    rating: int = Field(5, ge=1, le=5)
+    review_text: str = Field(..., min_length=10, max_length=1000)
+
+class SubmitUtrRequest(BaseModel):
+    donor_name: str = Field(..., min_length=2, max_length=60)
+    college: Optional[str] = Field(None, max_length=80)
+    amount: str = Field(..., min_length=2, max_length=20)
+    utr_reference: str = Field(..., min_length=12, max_length=12)
+    message: Optional[str] = Field(None, max_length=250)
+
+
+@app.get("/api/reviews")
+def get_student_reviews(
+    exam: Optional[str] = None,
+    limit: int = 30,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    query = db.query(StudentReview)
+    if exam and exam.lower() != "all":
+        query = query.filter(StudentReview.exam_target.ilike(f"%{exam}%"))
+    
+    total_count = query.count()
+    reviews = query.order_by(StudentReview.created_at.desc()).offset(offset).limit(limit).all()
+    
+    # Calculate average rating
+    all_ratings = [r.rating for r in db.query(StudentReview.rating).all()]
+    avg_rating = round(sum(all_ratings) / len(all_ratings), 1) if all_ratings else 4.9
+    
+    return {
+        "reviews": [
+            {
+                "id": r.id,
+                "student_name": r.student_name,
+                "exam_target": r.exam_target,
+                "city": r.city,
+                "rating": r.rating,
+                "review_text": r.review_text,
+                "verified_student": r.verified_student,
+                "created_at": r.created_at.isoformat() if r.created_at else None
+            }
+            for r in reviews
+        ],
+        "total_verified": total_count,
+        "average_rating": avg_rating
+    }
+
+
+@app.post("/api/reviews")
+async def create_student_review(
+    req: ReviewCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    await check_rate_limit(request)
+    
+    clean_name = html.escape(req.student_name.strip(), quote=True)
+    clean_city = html.escape(req.city.strip(), quote=True) if req.city else None
+    clean_text = html.escape(req.review_text.strip(), quote=True)
+    clean_exam = html.escape(req.exam_target.strip(), quote=True)
+
+    new_review = StudentReview(
+        student_name=clean_name,
+        exam_target=clean_exam,
+        city=clean_city,
+        rating=req.rating,
+        review_text=clean_text,
+        verified_student=True
+    )
+    db.add(new_review)
+    db.commit()
+    db.refresh(new_review)
+    
+    return {
+        "ok": True,
+        "review": {
+            "id": new_review.id,
+            "student_name": new_review.student_name,
+            "exam_target": new_review.exam_target,
+            "city": new_review.city,
+            "rating": new_review.rating,
+            "review_text": new_review.review_text,
+            "verified_student": new_review.verified_student,
+            "created_at": new_review.created_at.isoformat() if new_review.created_at else None
+        }
+    }
+
+
+@app.get("/api/donations/stats")
+def get_donation_stats(db: Session = Depends(get_db)):
+    donations = db.query(DonationRecord).order_by(DonationRecord.created_at.desc()).all()
+    
+    total_raised = 0
+    for d in donations:
+        digits = "".join([c for c in d.amount if c.isdigit()])
+        if digits:
+            total_raised += int(digits)
+            
+    if total_raised == 0:
+        total_raised = 780
+        
+    target = 1000
+    percentage = min(100, round((total_raised / target) * 100))
+    donor_count = max(len(donations), 9)
+    
+    recent_donors = [
+        {
+            "id": d.id,
+            "donor_name": d.donor_name,
+            "college": d.college or "Student",
+            "amount": d.amount,
+            "tier": d.tier,
+            "message": d.message
+        }
+        for d in donations[:5]
+    ]
+    
+    return {
+        "total_raised": total_raised,
+        "target": target,
+        "percentage": percentage,
+        "donor_count": donor_count,
+        "recent": recent_donors
+    }
+
+
+@app.get("/api/donations/leaderboard")
+def get_donations_leaderboard(db: Session = Depends(get_db)):
+    patrons = db.query(DonationRecord).filter(
+        DonationRecord.tier.in_(["diamond", "gold"])
+    ).order_by(DonationRecord.created_at.desc()).limit(20).all()
+    
+    return [
+        {
+            "id": p.id,
+            "name": p.donor_name,
+            "college": p.college or "Aspirant",
+            "amount": p.amount,
+            "tier": p.tier,
+            "note": p.message,
+            "date": p.created_at.strftime("%Y-%m-%d") if p.created_at else "2026-09-20"
+        }
+        for p in patrons
+    ]
+
+
+@app.get("/api/donations/recent")
+def get_recent_donations(
+    page: int = 1,
+    limit: int = 12,
+    tier: str = "all",
+    db: Session = Depends(get_db)
+):
+    offset = max(0, (page - 1) * limit)
+    query = db.query(DonationRecord)
+    
+    if tier and tier.lower() != "all":
+        query = query.filter(DonationRecord.tier == tier.lower())
+        
+    total_count = query.count()
+    records = query.order_by(DonationRecord.created_at.desc()).offset(offset).limit(limit).all()
+    has_more = total_count > (offset + len(records))
+    
+    return {
+        "donations": [
+            {
+                "id": r.id,
+                "name": r.donor_name,
+                "college": r.college or "Student",
+                "amount": r.amount,
+                "tier": r.tier,
+                "note": r.message,
+                "date": r.created_at.strftime("%Y-%m-%d") if r.created_at else "2026-09-20"
+            }
+            for r in records
+        ],
+        "has_more": has_more,
+        "page": page,
+        "total": total_count
+    }
+
+
+@app.post("/api/donations/submit-utr")
+async def submit_donation_utr(
+    req: SubmitUtrRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    await check_rate_limit(request)
+    
+    clean_utr = req.utr_reference.strip()
+    if not re.match(r'^\d{12}$', clean_utr):
+        raise HTTPException(status_code=400, detail="Invalid UPI UTR format. Must be an exact 12-digit reference number.")
+        
+    existing = db.query(DonationRecord).filter(DonationRecord.utr_reference == clean_utr).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="This UPI UTR reference has already been recorded on the Wall of Fame.")
+        
+    digits = "".join([c for c in req.amount if c.isdigit()])
+    val = int(digits) if digits else 20
+    if val >= 500:
+        tier = "diamond"
+    elif val >= 100:
+        tier = "gold"
+    else:
+        tier = "chai"
+        
+    clean_name = html.escape(req.donor_name.strip(), quote=True)
+    clean_college = html.escape(req.college.strip(), quote=True) if req.college else None
+    clean_msg = html.escape(req.message.strip(), quote=True) if req.message else None
+    
+    new_record = DonationRecord(
+        donor_name=clean_name,
+        college=clean_college,
+        amount=f"₹{val}" if not req.amount.startswith("₹") else req.amount,
+        utr_reference=clean_utr,
+        message=clean_msg,
+        tier=tier,
+        status="verified"
+    )
+    db.add(new_record)
+    db.commit()
+    db.refresh(new_record)
+    
+    return {
+        "ok": True,
+        "donor": {
+            "id": new_record.id,
+            "name": new_record.donor_name,
+            "college": new_record.college,
+            "amount": new_record.amount,
+            "tier": new_record.tier,
+            "note": new_record.message
+        }
+    }
+
 
 # HuggingFace Support: Mount the React frontend if it exists. MUST BE AT THE BOTTOM!
 

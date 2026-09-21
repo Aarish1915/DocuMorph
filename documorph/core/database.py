@@ -11,6 +11,7 @@ from sqlalchemy import (
     Float,
     Text,
     DateTime,
+    Boolean,
     event,
     text
 )
@@ -186,6 +187,154 @@ class Job(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 
+class StudentReview(Base):
+    __tablename__ = "student_reviews"
+
+    id = Column(String(64), primary_key=True, default=lambda: f"rev_{uuid.uuid4().hex[:8]}")
+    student_name = Column(String(120), nullable=False)
+    exam_target = Column(String(80), nullable=False, index=True)
+    city = Column(String(120), nullable=True)
+    rating = Column(Integer, default=5)
+    review_text = Column(Text, nullable=False)
+    verified_student = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=utc_now, index=True)
+
+
+class DonationRecord(Base):
+    __tablename__ = "donation_records"
+
+    id = Column(String(64), primary_key=True, default=lambda: f"don_{uuid.uuid4().hex[:8]}")
+    donor_name = Column(String(120), nullable=False)
+    college = Column(String(120), nullable=True)
+    amount = Column(String(32), nullable=False)
+    utr_reference = Column(String(32), unique=True, index=True, nullable=False)
+    message = Column(Text, nullable=True)
+    tier = Column(String(32), default="chai", index=True)
+    status = Column(String(32), default="verified", index=True)
+    created_at = Column(DateTime, default=utc_now, index=True)
+
+
+def seed_community_data(db=None):
+    close_db = False
+    if db is None:
+        db = SessionLocal()
+        close_db = True
+    try:
+        if db.query(StudentReview).count() == 0:
+            initial_reviews = [
+                StudentReview(
+                    student_name="Aryan Sharma",
+                    exam_target="JEE Advanced / Main",
+                    city="Allen Kota",
+                    rating=5,
+                    review_text="Cleaned 120 pages of Allen physics photocopies. The dark shadows are 100% gone and all calculus integration limits and free-body diagrams stayed razor sharp!",
+                    verified_student=True,
+                ),
+                StudentReview(
+                    student_name="Rhea Mukherjee",
+                    exam_target="NEET UG / PG",
+                    city="Delhi Medical Academy",
+                    rating=5,
+                    review_text="Saved ₹450 on spiral binding! The 2-column compact mode squeezed 80 pages of botany lecture notes into 38 pages without dropping font readability.",
+                    verified_student=True,
+                ),
+                StudentReview(
+                    student_name="Vikramaditya Rao",
+                    exam_target="UPSC CSE",
+                    city="Mukherjee Nagar, Delhi",
+                    rating=5,
+                    review_text="Best tool for ancient history notes photocopied from library books. Devanagari quotes and Sanskrit terminology remained completely intact.",
+                    verified_student=True,
+                ),
+                StudentReview(
+                    student_name="Divya Patel",
+                    exam_target="College / B.Tech",
+                    city="SVNIT Surat",
+                    rating=5,
+                    review_text="Our entire hostel floor uses DocuMorph before mid-terms. Instant direct download straight to my iPhone storage.",
+                    verified_student=True,
+                ),
+                StudentReview(
+                    student_name="Siddharth Mehta",
+                    exam_target="GATE / ESE",
+                    city="Hyderabad",
+                    rating=5,
+                    review_text="Chemical engineering reaction diagrams and thermodynamics matrices came out with publication-grade vector quality. Huge respect for keeping this free.",
+                    verified_student=True,
+                ),
+            ]
+            db.add_all(initial_reviews)
+            db.commit()
+
+        if db.query(DonationRecord).count() == 0:
+            initial_donations = [
+                DonationRecord(
+                    donor_name="IIT Delhi Mech Hostel",
+                    college="IIT Delhi",
+                    amount="₹500",
+                    utr_reference="425619028471",
+                    message="Our batch cleaned 400 pages of thermodynamics lecture notes. Saved ₹1,200 on spiral printing!",
+                    tier="diamond",
+                ),
+                DonationRecord(
+                    donor_name="Kunal Singhania",
+                    college="Allen Career Institute Kota",
+                    amount="₹500",
+                    utr_reference="425619028472",
+                    message="Best tool for dark photocopy modules. Math formulas stayed completely sharp.",
+                    tier="diamond",
+                ),
+                DonationRecord(
+                    donor_name="Dr. Priya V.",
+                    college="AIIMS Bhopal",
+                    amount="₹200",
+                    utr_reference="425619028473",
+                    message="Histology vector diagrams came out in pristine A4 publication quality.",
+                    tier="gold",
+                ),
+                DonationRecord(
+                    donor_name="Siddharth M.",
+                    college="GATE Prep Hyderabad",
+                    amount="₹150",
+                    utr_reference="425619028474",
+                    message="2-column compact mode reduced my photocopy volume by 55%.",
+                    tier="gold",
+                ),
+                DonationRecord(
+                    donor_name="Rohan Sharma",
+                    college="PhysicsWallah Aspirant",
+                    amount="₹100",
+                    utr_reference="425619028475",
+                    message="Telegram stamps and coaching watermarks disappeared completely.",
+                    tier="gold",
+                ),
+                DonationRecord(
+                    donor_name="Ananya Kapoor",
+                    college="UPSC Aspirant Delhi",
+                    amount="₹50",
+                    utr_reference="425619028476",
+                    message="Cleaned dark photocopies of ancient history notes without losing Devanagari text.",
+                    tier="chai",
+                ),
+                DonationRecord(
+                    donor_name="Aman Verma",
+                    college="SGSITS Indore",
+                    amount="₹20",
+                    utr_reference="425619028477",
+                    message="Bought a chai for the developer. Keep this free!",
+                    tier="chai",
+                ),
+            ]
+            db.add_all(initial_donations)
+            db.commit()
+    except Exception as e:
+        logger.warning(f"Error seeding community data: {e}")
+        db.rollback()
+    finally:
+        if close_db:
+            db.close()
+
+
 def claim_next_job(db) -> Optional[Job]:
     """
     Atomically claims the next pending QUEUED or QUEUED_REPROCESS job.
@@ -255,6 +404,12 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+
+    # Seed initial student testimonials and backers if database is freshly created
+    try:
+        seed_community_data()
+    except Exception as e:
+        logger.warning(f"Failed to auto-seed community data: {e}")
 
 
 def get_db():

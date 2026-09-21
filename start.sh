@@ -7,7 +7,7 @@ mkdir -p data data/uploads data/output data/output/needs_review
 python -c "from documorph.core.database import init_db; init_db()"
 
 # Ensure Playwright browser binary exists
-if ! python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); p.chromium.launch(); p.stop()" 2>/dev/null; then
+if ! python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); p.chromium.launch(args=['--no-sandbox', '--disable-setuid-sandbox']); p.stop()" 2>/dev/null; then
     echo "Playwright chromium missing. Running pre-flight installation..."
     python -m playwright install chromium || true
 fi
