@@ -11,7 +11,10 @@ import uuid
 import hashlib
 import fitz
 
-from documorph.core.database import init_db, get_db, Job
+from documorph.core.database import init_db, get_db, Job, AdminUser, StudentReview, DonationRecord, seed_community_data, SessionLocal
+from documorph.core.auth import get_current_admin
+from pydantic import BaseModel, Field
+from typing import Optional, List
 import time
 from collections import defaultdict
 
@@ -23,7 +26,11 @@ RATE_LIMIT_WINDOW = 60  # Per minute
 rate_limits = defaultdict(lambda: {"tokens": RATE_LIMIT_TOKENS, "last_refill": time.time()})
 
 async def check_rate_limit(request: Request):
-    client_ip = request.client.host
+    client_ip = (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
     now = time.time()
     bucket = rate_limits[client_ip]
     
@@ -34,7 +41,7 @@ async def check_rate_limit(request: Request):
         bucket["last_refill"] = now
         
     if bucket["tokens"] < 1:
-        raise HTTPException(status_code=429, detail="Rate limit exceeded (15 per min). Please wait.")
+        raise HTTPException(status_code=429, detail="Rate limit exceeded (15 uploads per min). Please wait.")
         
     bucket["tokens"] -= 1
 
@@ -129,6 +136,12 @@ app.include_router(admin_router)
 async def lifespan(app: FastAPI):
     global _embedded_worker_thread
     init_db()
+    try:
+        db_seed = SessionLocal()
+        seed_community_data(db_seed)
+        db_seed.close()
+    except Exception as e:
+        logger.warning(f"Failed to seed community data: {e}")
     cleanup_old_files()
     
     # Auto-spawn queue worker in background daemon thread if not running standalone
@@ -160,9 +173,12 @@ async def health_check():
     }
 
 @app.get("/api/admin/status")
-async def get_admin_status(db: Session = Depends(get_db)):
+async def get_admin_status(
+    db: Session = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
     """
-    Developer & Admin Telemetry Endpoint:
+    Developer & Admin Telemetry Endpoint (Guarded):
     Provides live RAM, CPU, Queue Metrics, and in-memory log buffer for real-time monitoring.
     """
     now = time.time()
@@ -223,7 +239,9 @@ async def get_admin_status(db: Session = Depends(get_db)):
     }
 
 @app.get("/api/admin/audits")
-async def get_audit_vault_records():
+async def get_audit_vault_records(
+    current_admin: AdminUser = Depends(get_current_admin)
+):
     """
     Quality Audit Vault Endpoint:
     Returns the 25 most recent job records so developers can inspect student inputs, prompts, and outputs.
@@ -260,7 +278,10 @@ async def get_audit_vault_records():
     return {"audits": records}
 
 @app.get("/api/admin/audits/{job_id}")
-async def get_audit_vault_detail(job_id: str):
+async def get_audit_vault_detail(
+    job_id: str,
+    current_admin: AdminUser = Depends(get_current_admin)
+):
     """
     Returns full raw & final markdown for a specific audited document.
     """
@@ -276,13 +297,18 @@ async def get_audit_vault_detail(job_id: str):
     raise HTTPException(status_code=404, detail="Audit record not found")
 
 @app.post("/api/settings")
-async def update_settings(settings: dict):
+async def update_settings(
+    settings: dict,
+    current_admin: AdminUser = Depends(get_current_admin)
+):
     with open("config.json", "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=4)
     return {"status": "Settings updated"}
 
 @app.get("/api/settings")
-async def get_settings():
+async def get_settings(
+    current_admin: AdminUser = Depends(get_current_admin)
+):
     if os.path.exists("config.json"):
         with open("config.json", "r", encoding="utf-8") as f:
             return json.load(f)
@@ -301,6 +327,7 @@ async def process_pdf(
     custom_prompt: str = Form(None),
     db: Session = Depends(get_db)
 ):
+    await check_rate_limit(request)
     job_id = f"job_{uuid.uuid4().hex[:8]}"
     
     # Save uploaded file with strict path traversal sanitization
@@ -311,7 +338,22 @@ async def process_pdf(
         clean_filename += ".pdf"
     file_path = os.path.join("data", "uploads", f"{job_id}_{clean_filename}")
     
-    file_bytes = await file.read()
+    # --- SECURITY: CHUNKED STREAM READ WITH 50MB MEMORY CEILING (Prevents OOM DoS) ---
+    MAX_FILE_SIZE = 50 * 1024 * 1024 # 50 MB
+    chunks = []
+    total_size = 0
+    while True:
+        chunk = await file.read(1024 * 1024) # 1MB chunk
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="File too large. Maximum PDF size is 50MB to protect system stability."
+            )
+        chunks.append(chunk)
+    file_bytes = b"".join(chunks)
     
     # --- SECURITY: CONTENT TYPE & MAGIC NUMBER VALIDATION ---
     if file.content_type != "application/pdf":
@@ -325,15 +367,6 @@ async def process_pdf(
             status_code=400,
             detail="Security violation: Uploaded file is not a valid PDF document (magic number mismatch)."
         )
-    
-    # --- SECURITY: HARD SIZE LIMIT ---
-    MAX_FILE_SIZE = 50 * 1024 * 1024 # 50 MB
-    
-    if len(file_bytes) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Please upload PDFs under 50MB to prevent server memory exhaustion."
-        )
 
     try:
         doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -344,12 +377,22 @@ async def process_pdf(
                 detail="This PDF is password-protected. Please remove the password before uploading."
             )
         page_count = len(doc)
-        doc.close()
         if page_count > 55:
+            doc.close()
             raise HTTPException(
                 status_code=400, 
                 detail=f"Limit exceeded: Your document has {page_count} pages. To ensure fast processing, please upload PDFs under 55 pages or select a page range."
             )
+        # --- SECURITY: DECOMPRESSION & PIXEL BOMB DEFENSE ---
+        for p_idx in range(min(page_count, 10)):
+            p = doc[p_idx]
+            if p.rect.width > 3500 or p.rect.height > 3500:
+                doc.close()
+                raise HTTPException(
+                    status_code=400,
+                    detail="Abnormal page dimensions detected (possible pixel bomb). Standard A4/Letter size only."
+                )
+        doc.close()
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
@@ -398,10 +441,10 @@ async def process_pdf(
     else:
         output_fmt = "pdf"
     
-    # Semantic Caching: Check if we've processed this exact file with these exact parameters
+    # Semantic Caching & Idempotency: Check if we've already received/processed this exact file with these exact parameters
     existing_job = db.query(Job).filter(
         Job.file_hash == file_hash,
-        Job.status == "COMPLETED",
+        Job.status.in_(["COMPLETED", "PROCESSING", "QUEUED", "QUEUED_REPROCESS"]),
         Job.service_type == service_type,
         Job.config_options == config_options,
         Job.language_mode == language_mode,
@@ -411,8 +454,19 @@ async def process_pdf(
     ).first()
     
     if existing_job:
-        # Zero API Cost, Zero RAM usage! Return the cached result instantly.
-        return {"job_id": existing_job.id, "cached": True}
+        if existing_job.status == "COMPLETED":
+            # Zero API Cost, Zero RAM usage! Return the cached result instantly.
+            return {"job_id": existing_job.id, "cached": True}
+        queue_pos = db.query(Job).filter(
+            Job.status.in_(["QUEUED", "QUEUED_REPROCESS"]),
+            Job.created_at <= existing_job.created_at
+        ).count()
+        return {
+            "job_id": existing_job.id,
+            "status": existing_job.status,
+            "queue_position": queue_pos,
+            "deduplicated": True
+        }
         
     with open(file_path, "wb") as buffer:
         buffer.write(file_bytes)
@@ -449,11 +503,40 @@ async def process_pdf(
     }
 
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class ReprocessRequest(BaseModel):
     job_id: str
     pages: List[int]
+
+class FeedbackRequest(BaseModel):
+    job_id: Optional[str] = None
+    rating: int
+    comment: Optional[str] = None
+
+@app.post("/api/feedback")
+async def submit_student_feedback(req: FeedbackRequest, request: Request):
+    """
+    Captures student satisfaction ratings (1-5 stars) and feedback comments.
+    Appends anonymously to data/student_reviews.jsonl for product analytics.
+    """
+    await check_rate_limit(request)
+    try:
+        os.makedirs("data", exist_ok=True)
+        entry = {
+            "timestamp": time.time(),
+            "datetime": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "job_id": req.job_id,
+            "rating": max(1, min(5, int(req.rating))),
+            "comment": (req.comment or "").strip()[:500]
+        }
+        with open("data/student_reviews.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+        logger.info(f"Student review recorded: {req.rating} stars - {req.comment}")
+        return {"status": "success", "message": "Thank you for your review!"}
+    except Exception as e:
+        logger.warning(f"Failed to record feedback: {e}")
+        return {"status": "success"}
 
 @app.post("/api/reprocess")
 async def reprocess_pages(req: ReprocessRequest, db: Session = Depends(get_db)):
@@ -528,11 +611,15 @@ async def poll_progress(job_id: str, db: Session = Depends(get_db)):
     )
 
 @app.get("/api/progress/{job_id}")
-async def stream_progress(job_id: str):
+async def stream_progress(job_id: str, request: Request):
     async def event_generator():
         from documorph.core.database import SessionLocal
         last_keepalive = time.time()
         while True:
+            # Ghost connection protection: stop loop and release resources if client disconnected
+            if await request.is_disconnected():
+                logger.debug(f"Client disconnected from SSE stream for job {job_id}")
+                break
             db = SessionLocal()
             try:
                 job = db.query(Job).filter(Job.id == job_id).first()
@@ -617,13 +704,14 @@ async def download_file(job_id: str, db: Session = Depends(get_db)):
         filename=filename,
         content_disposition_type="attachment",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
             "Access-Control-Expose-Headers": "Content-Disposition"
         }
     )
 
 @app.post("/api/admin/clear-memory")
-async def manual_clear_memory():
+async def manual_clear_memory(
+    current_admin: AdminUser = Depends(get_current_admin)
+):
     """Immediately triggers gc.collect() and glibc malloc_trim(0) to release RAM to the OS."""
     from documorph.worker.queue_worker import reclaim_system_memory
     reclaim_system_memory()
@@ -688,6 +776,11 @@ async def reprocess_job(job_id: str, db: Session = Depends(get_db)):
         "original_job_id": job_id,
         "message": "Job re-queued. Poll /api/status/{new_job_id} for progress."
     }
+
+
+# =====================================================================
+# --- COMMUNITY REVIEW & DONATION SYSTEM ---
+# =====================================================================
 
 # HuggingFace Support: Mount the React frontend if it exists. MUST BE AT THE BOTTOM!
 

@@ -212,28 +212,35 @@ def get_job_telemetry_report(
     file_name = os.path.basename(job.file_path) if job.file_path else f"{job.id}.pdf"
     base_name = os.path.splitext(file_name)[0]
     
-    report_md = None
+    report_md = getattr(job, "report_markdown", None) or ""
     telemetry_data = {}
-
-    vault_matches = glob.glob(f"data/audit_vault/*{job_id}*.json")
-    if vault_matches:
+    if getattr(job, "telemetry_json", None):
         try:
-            with open(vault_matches[0], "r", encoding="utf-8") as vf:
-                audit = json.load(vf)
-                telemetry_data = audit.get("telemetry", {})
+            telemetry_data = json.loads(job.telemetry_json)
         except Exception:
-            pass
+            telemetry_data = {}
 
-    report_matches = glob.glob(f"data/output/**/REPORT_*{base_name}*.md", recursive=True)
-    if not report_matches:
-        report_matches = glob.glob(f"data/output/**/REPORT_*{job_id}*.md", recursive=True)
+    if not telemetry_data:
+        vault_matches = glob.glob(f"data/audit_vault/*{job_id}*.json")
+        if vault_matches:
+            try:
+                with open(vault_matches[0], "r", encoding="utf-8") as vf:
+                    audit = json.load(vf)
+                    telemetry_data = audit.get("telemetry", {})
+            except Exception:
+                pass
 
-    if report_matches:
-        try:
-            with open(report_matches[0], "r", encoding="utf-8") as rf:
-                report_md = rf.read()
-        except Exception:
-            pass
+    if not report_md:
+        report_matches = glob.glob(f"data/output/**/REPORT_*{base_name}*.md", recursive=True)
+        if not report_matches:
+            report_matches = glob.glob(f"data/output/**/REPORT_*{job_id}*.md", recursive=True)
+
+        if report_matches:
+            try:
+                with open(report_matches[0], "r", encoding="utf-8") as rf:
+                    report_md = rf.read()
+            except Exception:
+                pass
 
     orig_kb = round((job.original_file_size or 0) / 1024, 1)
     out_kb = round((job.compressed_file_size or job.original_file_size or 0) / 1024, 1)
@@ -313,36 +320,43 @@ def get_job_telemetry_report(
     except Exception as pe:
         logger.warning(f"Could not load PageResults for job {job.id}: {pe}")
 
-    # 2. Discover extracted diagram image crops
+    # 2. Discover extracted diagram image crops (First check Neon DB persistent column, then disk fallback)
     diagrams_list = []
-    try:
-        diag_patterns = [
-            f"data/output/**/{job_id}*.png",
-            f"data/output/images/*{job_id}*.png",
-            f"data/uploads/extracted_diagrams/*{job_id}*.png"
-        ]
-        found_paths = set()
-        for pat in diag_patterns:
-            for p in glob.glob(pat, recursive=True):
-                found_paths.add(p)
+    if getattr(job, "diagrams_data", None):
+        try:
+            diagrams_list = json.loads(job.diagrams_data)
+        except Exception:
+            diagrams_list = []
 
-        for p in sorted(list(found_paths))[:16]:
-            try:
-                size_kb = round(os.path.getsize(p) / 1024, 1)
-                fname = os.path.basename(p)
-                b64 = None
-                if size_kb <= 350:
-                    with open(p, "rb") as img_f:
-                        b64 = f"data:image/png;base64,{base64.b64encode(img_f.read()).decode('ascii')}"
-                diagrams_list.append({
-                    "filename": fname,
-                    "size_kb": size_kb,
-                    "data_url": b64
-                })
-            except Exception:
-                pass
-    except Exception as de:
-        logger.warning(f"Could not load diagram images for job {job.id}: {de}")
+    if not diagrams_list:
+        try:
+            diag_patterns = [
+                f"data/output/**/{job_id}*.png",
+                f"data/output/images/*{job_id}*.png",
+                f"data/uploads/extracted_diagrams/*{job_id}*.png"
+            ]
+            found_paths = set()
+            for pat in diag_patterns:
+                for p in glob.glob(pat, recursive=True):
+                    found_paths.add(p)
+
+            for p in sorted(list(found_paths))[:16]:
+                try:
+                    size_kb = round(os.path.getsize(p) / 1024, 1)
+                    fname = os.path.basename(p)
+                    b64 = None
+                    if size_kb <= 350:
+                        with open(p, "rb") as img_f:
+                            b64 = f"data:image/png;base64,{base64.b64encode(img_f.read()).decode('ascii')}"
+                    diagrams_list.append({
+                        "filename": fname,
+                        "size_kb": size_kb,
+                        "data_url": b64
+                    })
+                except Exception:
+                    pass
+        except Exception as de:
+            logger.warning(f"Could not load diagram images for job {job.id}: {de}")
 
     # 3. Before & After comparison info
     before_after = {
