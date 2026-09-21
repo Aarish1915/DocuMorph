@@ -147,5 +147,6 @@ export function getApiBaseSync() {
 
 // Backward-compatible export
 export const API_BASE = getApiBaseSync();
+export const API_BASE_URL = getApiBaseSync();
 
 
