@@ -176,6 +176,12 @@ class Job(Base):
     custom_api_key = Column(String, nullable=True)
     custom_prompt = Column(String, nullable=True)
     
+    # Persistent Telemetry, Diagram Metadata & Idempotency
+    telemetry_json = Column(Text, default="{}")
+    report_markdown = Column(Text, default="")
+    diagrams_data = Column(Text, default="[]")
+    idempotency_hash = Column(String, nullable=True, index=True)
+    
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
@@ -197,7 +203,8 @@ def claim_next_job(db) -> Optional[Job]:
 
     if job:
         job.status = "PROCESSING"
-        job.progress_msg = "Initializing..."
+        job.progress_pct = 5
+        job.progress_msg = "Job claimed by worker"
         job.updated_at = utc_now()
         db.commit()
         db.refresh(job)
@@ -205,37 +212,49 @@ def claim_next_job(db) -> Optional[Job]:
 
 
 def init_db():
-    """Initializes schema and runs safe migrations."""
     Base.metadata.create_all(bind=engine)
-    
-    if engine.dialect.name == "sqlite":
-        with engine.connect() as conn:
+    with engine.connect() as conn:
+        is_sqlite = engine.dialect.name == "sqlite"
+        if is_sqlite:
             try:
                 conn.execute(text("PRAGMA journal_mode=WAL;"))
+                conn.execute(text("PRAGMA synchronous=NORMAL;"))
                 conn.execute(text("PRAGMA busy_timeout=30000;"))
                 conn.commit()
             except Exception:
                 pass
-            # Automatic column migration for existing SQLite databases
-            for col_name, col_type in [
-                ("service_type", "VARCHAR DEFAULT 'clean_format'"),
-                ("config_options", "TEXT DEFAULT '{}'"),
-                ("output_format", "VARCHAR DEFAULT 'pdf'"),
-                ("original_file_size", "INTEGER"),
-                ("compressed_file_size", "INTEGER"),
-                ("file_key", "VARCHAR"),
-                ("output_key", "VARCHAR"),
-            ]:
-                try:
-                    conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {col_name} {col_type}"))
-                    conn.commit()
-                except Exception:
-                    pass
+        
+        # Universal column migration for both SQLite and PostgreSQL (Neon)
+        migration_cols = [
+            ("service_type", "VARCHAR DEFAULT 'clean_format'"),
+            ("config_options", "TEXT DEFAULT '{}'"),
+            ("output_format", "VARCHAR DEFAULT 'pdf'"),
+            ("original_file_size", "INTEGER"),
+            ("compressed_file_size", "INTEGER"),
+            ("file_key", "VARCHAR"),
+            ("output_key", "VARCHAR"),
+            ("telemetry_json", "TEXT DEFAULT '{}'"),
+            ("report_markdown", "TEXT DEFAULT ''"),
+            ("diagrams_data", "TEXT DEFAULT '[]'"),
+            ("idempotency_hash", "VARCHAR(64)"),
+        ]
+        for col_name, col_type in migration_cols:
             try:
-                conn.execute(text("ALTER TABLE page_results ADD COLUMN markdown_key VARCHAR"))
+                if is_sqlite:
+                    conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {col_name} {col_type}"))
+                else:
+                    conn.execute(text(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_name} {col_type}"))
                 conn.commit()
             except Exception:
                 pass
+        try:
+            if is_sqlite:
+                conn.execute(text("ALTER TABLE page_results ADD COLUMN markdown_key VARCHAR"))
+            else:
+                conn.execute(text("ALTER TABLE page_results ADD COLUMN IF NOT EXISTS markdown_key VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass
 
 
 def get_db():

@@ -73,7 +73,7 @@ export async function probeBackend(forceRefresh = false) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 350);
-      const res = await fetch('http://localhost:8000/api/settings', { signal: controller.signal });
+      const res = await fetch('http://localhost:8000/api/health', { signal: controller.signal });
       clearTimeout(timer);
       if (res.ok) {
         cachedActiveBase = 'http://localhost:8000';
@@ -94,7 +94,7 @@ export async function probeBackend(forceRefresh = false) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 1600);
-      const res = await fetch(`${config.laptopUrl}/api/settings`, {
+      const res = await fetch(`${config.laptopUrl}/api/health`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -147,4 +147,5 @@ export function getApiBaseSync() {
 
 // Backward-compatible export
 export const API_BASE = getApiBaseSync();
+
 
