@@ -40,6 +40,20 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
   const [loadingReport, setLoadingReport] = useState(false);
   const [copiedReport, setCopiedReport] = useState(false);
 
+  // Student Reviews Moderation
+  const [adminReviews, setAdminReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [reviewActionMsg, setReviewActionMsg] = useState('');
+  const [newReview, setNewReview] = useState({
+    student_name: '',
+    exam_target: 'JEE Advanced / Main',
+    city: '',
+    rating: 5,
+    review_text: '',
+    verified_student: true,
+  });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
   // Engine routing settings
   const [config, setConfig] = useState(() => getStoredConfig());
   const [customKey, setCustomKey] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('documorph_custom_api_key') || '' : ''));
@@ -240,6 +254,114 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
     } finally {
       setIsSweeping(false);
       setTimeout(() => setSweepMsg(''), 5000);
+    }
+  };
+
+  // Load Admin Reviews
+  const loadAdminReviews = async (authToken = token, silent = false) => {
+    if (!authToken) return;
+    if (!silent) setLoadingReviews(true);
+    try {
+      const activeNode = await probeBackend();
+      const base = activeNode.url || getTargetApiUrl();
+      const res = await fetch(`${base}/api/internal/admin/reviews`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminReviews(data.reviews || []);
+      } else if (res.status === 401) {
+        handleLogout();
+      }
+    } catch (e) {
+      console.error('Failed to load admin reviews:', e);
+    } finally {
+      if (!silent) setLoadingReviews(false);
+    }
+  };
+
+  // Delete Review
+  const handleDeleteReview = async (reviewId) => {
+    if (!token) return;
+    if (!window.confirm(`Are you sure you want to permanently delete review ${reviewId}?`)) return;
+    try {
+      const activeNode = await probeBackend();
+      const base = activeNode.url || getTargetApiUrl();
+      const res = await fetch(`${base}/api/internal/admin/reviews/${reviewId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setReviewActionMsg(`Deleted review ${reviewId} successfully!`);
+        setTimeout(() => setReviewActionMsg(''), 4000);
+        loadAdminReviews(token, true);
+      } else {
+        alert('Failed to delete review');
+      }
+    } catch (e) {
+      alert('Network error deleting review: ' + e.message);
+    }
+  };
+
+  // Emergency Purge Leaked Keys
+  const handleEmergencyPurge = async () => {
+    if (!token) return;
+    if (!window.confirm('Run emergency purge of any reviews containing API keys, mcpServers, or credentials?')) return;
+    try {
+      const activeNode = await probeBackend();
+      const base = activeNode.url || getTargetApiUrl();
+      const res = await fetch(`${base}/api/internal/admin/reviews/purge-leaks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReviewActionMsg(`Purged ${data.purged_count} review(s) containing credentials!`);
+        setTimeout(() => setReviewActionMsg(''), 5000);
+        loadAdminReviews(token, true);
+      } else {
+        alert('Failed to run emergency purge');
+      }
+    } catch (e) {
+      alert('Purge error: ' + e.message);
+    }
+  };
+
+  // Create Review from Admin Panel
+  const handleCreateReview = async (e) => {
+    if (e) e.preventDefault();
+    if (!token || !newReview.student_name || !newReview.review_text) return;
+    setIsSubmittingReview(true);
+    try {
+      const activeNode = await probeBackend();
+      const base = activeNode.url || getTargetApiUrl();
+      const res = await fetch(`${base}/api/internal/admin/reviews`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newReview),
+      });
+      if (res.ok) {
+        setReviewActionMsg(`Added verified review for ${newReview.student_name}!`);
+        setNewReview({
+          student_name: '',
+          exam_target: 'JEE Advanced / Main',
+          city: '',
+          rating: 5,
+          review_text: '',
+          verified_student: true,
+        });
+        setTimeout(() => setReviewActionMsg(''), 4000);
+        loadAdminReviews(token, true);
+      } else {
+        alert('Failed to create review');
+      }
+    } catch (e) {
+      alert('Error creating review: ' + e.message);
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -455,6 +577,12 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                   onClick={() => setActiveTab('engine')}
                 >
                   ⚙️ Server & Routing Controls
+                </button>
+                <button 
+                  className={`admin-tab-btn ${activeTab === 'reviews' ? 'active' : ''}`}
+                  onClick={() => { setActiveTab('reviews'); loadAdminReviews(); }}
+                >
+                  ⭐ Student Reviews ({adminReviews.length})
                 </button>
               </div>
 
@@ -1279,6 +1407,231 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                       Save Key
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 4: Student Reviews Moderation */}
+            {activeTab === 'reviews' && (
+              <div className="admin-tab-content">
+                {/* Header Action Bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h3 className="section-title" style={{ margin: 0 }}>Student Reviews & Wall of Fame</h3>
+                    <p className="section-desc" style={{ margin: '4px 0 0' }}>
+                      Inspect, moderate, add, and purge student testimonials live on the website.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={handleEmergencyPurge}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        color: '#f87171',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🚨 Emergency Purge Leaked Keys
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => loadAdminReviews(token)}
+                      disabled={loadingReviews}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#fff',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {loadingReviews ? 'Refreshing...' : '🔄 Refresh'}
+                    </button>
+                  </div>
+                </div>
+
+                {reviewActionMsg && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    color: '#34d399',
+                    fontSize: '0.85rem',
+                    marginBottom: '16px'
+                  }}>
+                    {reviewActionMsg}
+                  </div>
+                )}
+
+                {/* Add Review Form */}
+                <div style={{
+                  padding: '16px',
+                  borderRadius: '12px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  marginBottom: '20px'
+                }}>
+                  <h4 style={{ margin: '0 0 12px', fontSize: '0.95rem', color: '#fff' }}>+ Add Verified Student Review</h4>
+                  <form onSubmit={handleCreateReview} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px' }}>Student Name</label>
+                      <input
+                        type="text"
+                        required
+                        className="admin-input-text"
+                        placeholder="e.g. Aryan Sharma"
+                        value={newReview.student_name}
+                        onChange={e => setNewReview({ ...newReview, student_name: e.target.value })}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px' }}>Exam Target</label>
+                      <select
+                        className="admin-input-text"
+                        value={newReview.exam_target}
+                        onChange={e => setNewReview({ ...newReview, exam_target: e.target.value })}
+                        style={{ width: '100%', background: '#1e293b', color: '#fff' }}
+                      >
+                        <option value="JEE Advanced / Main">JEE Advanced / Main</option>
+                        <option value="NEET UG">NEET UG</option>
+                        <option value="UPSC CSE">UPSC CSE</option>
+                        <option value="GATE / ESE">GATE / ESE</option>
+                        <option value="College / B.Tech">College / B.Tech</option>
+                        <option value="SSC CGL / State PSC">SSC CGL / State PSC</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px' }}>City / Institute</label>
+                      <input
+                        type="text"
+                        className="admin-input-text"
+                        placeholder="e.g. Kota, Rajasthan"
+                        value={newReview.city}
+                        onChange={e => setNewReview({ ...newReview, city: e.target.value })}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px' }}>Rating (Stars)</label>
+                      <select
+                        className="admin-input-text"
+                        value={newReview.rating}
+                        onChange={e => setNewReview({ ...newReview, rating: Number(e.target.value) })}
+                        style={{ width: '100%', background: '#1e293b', color: '#fff' }}
+                      >
+                        <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                        <option value="4">⭐⭐⭐⭐ (4/5)</option>
+                        <option value="3">⭐⭐⭐ (3/5)</option>
+                      </select>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px' }}>Review Feedback</label>
+                      <textarea
+                        required
+                        className="admin-input-text"
+                        rows={2}
+                        placeholder="Genuine aspirant experience with LaTeX formulas, scan cleaning, or page saving..."
+                        value={newReview.review_text}
+                        onChange={e => setNewReview({ ...newReview, review_text: e.target.value })}
+                        style={{ width: '100%', resize: 'vertical' }}
+                      />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        type="submit"
+                        disabled={isSubmittingReview}
+                        style={{
+                          padding: '8px 20px',
+                          borderRadius: '8px',
+                          background: 'var(--primary-accent, #3b82f6)',
+                          color: '#fff',
+                          border: 'none',
+                          fontWeight: '600',
+                          fontSize: '0.85rem',
+                          cursor: isSubmittingReview ? 'wait' : 'pointer'
+                        }}
+                      >
+                        {isSubmittingReview ? 'Adding Review...' : 'Publish Verified Review ✨'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Reviews List Table */}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8', textAlign: 'left' }}>
+                        <th style={{ padding: '10px' }}>Student</th>
+                        <th style={{ padding: '10px' }}>Exam & City</th>
+                        <th style={{ padding: '10px' }}>Rating</th>
+                        <th style={{ padding: '10px' }}>Review Feedback</th>
+                        <th style={{ padding: '10px' }}>Created</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminReviews.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+                            {loadingReviews ? 'Loading reviews...' : 'No student reviews found.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        adminReviews.map(rev => (
+                          <tr key={rev.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                            <td style={{ padding: '10px', color: '#fff', fontWeight: '500' }}>
+                              {rev.student_name}
+                              {rev.verified_student && <span style={{ marginLeft: '4px', color: '#3b82f6' }}>✓</span>}
+                            </td>
+                            <td style={{ padding: '10px', color: '#cbd5e1' }}>
+                              {rev.exam_target}
+                              {rev.city && <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>{rev.city}</span>}
+                            </td>
+                            <td style={{ padding: '10px', color: '#fbbf24' }}>
+                              {'★'.repeat(rev.rating)}
+                            </td>
+                            <td style={{ padding: '10px', color: '#94a3b8', maxWidth: '360px', wordBreak: 'break-word' }}>
+                              {rev.review_text}
+                            </td>
+                            <td style={{ padding: '10px', color: '#64748b', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                              {rev.created_at ? new Date(rev.created_at).toLocaleDateString() : '—'}
+                            </td>
+                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReview(rev.id)}
+                                title="Permanently delete review"
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  color: '#f87171',
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                🗑️ Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}

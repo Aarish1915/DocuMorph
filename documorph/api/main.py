@@ -142,9 +142,24 @@ async def lifespan(app: FastAPI):
     try:
         db_seed = SessionLocal()
         seed_community_data(db_seed)
+        # Security Auto-Purge: Immediately delete any student review containing leaked API keys or credentials
+        from documorph.core.database import StudentReview
+        from sqlalchemy import or_
+        purged = db_seed.query(StudentReview).filter(
+            or_(
+                StudentReview.review_text.ilike("%AQ.Ab%"),
+                StudentReview.review_text.ilike("%mcpServers%"),
+                StudentReview.review_text.ilike("%stitch%"),
+                StudentReview.review_text.ilike("%AIzaSy%"),
+                StudentReview.review_text.ilike("%X-Goog-Api-Key%")
+            )
+        ).delete(synchronize_session=False)
+        if purged > 0:
+            db_seed.commit()
+            logger.warning(f"SECURITY PURGE: Deleted {purged} review(s) containing sensitive API keys/credentials.")
         db_seed.close()
     except Exception as e:
-        logger.warning(f"Failed to seed community data: {e}")
+        logger.warning(f"Failed to seed community data or run security purge: {e}")
     cleanup_old_files()
     
     # Auto-spawn queue worker in background daemon thread if not running standalone

@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from documorph.core.database import get_db, Job, PageResult, AdminUser, engine, utc_now
+from documorph.core.database import get_db, Job, PageResult, AdminUser, StudentReview, engine, utc_now
 from documorph.core.auth import (
     verify_password,
     create_access_token,
@@ -40,6 +40,15 @@ LOCKOUT_WINDOW_SECONDS = 60
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class AdminReviewCreateRequest(BaseModel):
+    student_name: str
+    exam_target: str
+    city: Optional[str] = None
+    rating: int = 5
+    review_text: str
+    verified_student: bool = True
 
 
 class LoginResponse(BaseModel):
@@ -454,4 +463,114 @@ def get_job_full_details(
     and diagram image crops.
     """
     return get_job_telemetry_report(job_id=job_id, admin=admin, db=db)
+
+
+# ==========================================
+# Student Reviews Moderation & Management
+# ==========================================
+
+@admin_router.get("/admin/reviews")
+def list_admin_reviews(
+    admin: Dict[str, Any] = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns all student reviews for admin dashboard inspection.
+    """
+    reviews = db.query(StudentReview).order_by(StudentReview.created_at.desc()).all()
+    return {
+        "reviews": [
+            {
+                "id": r.id,
+                "student_name": r.student_name,
+                "exam_target": r.exam_target,
+                "city": r.city,
+                "rating": r.rating,
+                "review_text": r.review_text,
+                "verified_student": r.verified_student,
+                "created_at": r.created_at.isoformat() if r.created_at else None
+            }
+            for r in reviews
+        ],
+        "total": len(reviews)
+    }
+
+
+@admin_router.delete("/admin/reviews/{review_id}")
+def delete_admin_review(
+    review_id: str,
+    admin: Dict[str, Any] = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Deletes a specific student review by ID (e.g. spam, leaked API keys, or inappropriate content).
+    """
+    review = db.query(StudentReview).filter(StudentReview.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail=f"Review '{review_id}' not found")
+    
+    db.delete(review)
+    db.commit()
+    logger.info(f"Admin '{admin.get('sub', 'owner')}' deleted review {review_id}")
+    return {"ok": True, "deleted_id": review_id}
+
+
+@admin_router.post("/admin/reviews")
+def create_admin_review(
+    payload: AdminReviewCreateRequest,
+    admin: Dict[str, Any] = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Adds a verified student review directly from the admin panel.
+    """
+    new_rev = StudentReview(
+        student_name=payload.student_name.strip(),
+        exam_target=payload.exam_target.strip(),
+        city=payload.city.strip() if payload.city else None,
+        rating=max(1, min(5, payload.rating)),
+        review_text=payload.review_text.strip(),
+        verified_student=payload.verified_student
+    )
+    db.add(new_rev)
+    db.commit()
+    db.refresh(new_rev)
+    logger.info(f"Admin '{admin.get('sub', 'owner')}' created review {new_rev.id}")
+    return {
+        "ok": True,
+        "review": {
+            "id": new_rev.id,
+            "student_name": new_rev.student_name,
+            "exam_target": new_rev.exam_target,
+            "city": new_rev.city,
+            "rating": new_rev.rating,
+            "review_text": new_rev.review_text,
+            "verified_student": new_rev.verified_student,
+            "created_at": new_rev.created_at.isoformat() if new_rev.created_at else None
+        }
+    }
+
+
+@admin_router.post("/admin/reviews/purge-leaks")
+def purge_leaked_credentials(
+    admin: Dict[str, Any] = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Emergency purge endpoint: deletes any review containing API keys, mcpServers, or secrets.
+    """
+    from sqlalchemy import or_
+    purged_count = db.query(StudentReview).filter(
+        or_(
+            StudentReview.review_text.ilike("%AQ.Ab%"),
+            StudentReview.review_text.ilike("%mcpServers%"),
+            StudentReview.review_text.ilike("%stitch%"),
+            StudentReview.review_text.ilike("%AIzaSy%"),
+            StudentReview.review_text.ilike("%X-Goog-Api-Key%")
+        )
+    ).delete(synchronize_session=False)
+    db.commit()
+    logger.warning(f"Admin triggered security purge: deleted {purged_count} review(s).")
+    return {"ok": True, "purged_count": purged_count}
+
 
