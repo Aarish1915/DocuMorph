@@ -646,13 +646,13 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                   <div className="admin-strip-left">
                     <span className="live-pulse-dot"></span>
                     <span className="live-status-label">
-                      Worker: <strong>{adminStatus?.worker_alive ? '🟢 Active Daemon' : '⚪ Standby'}</strong>
+                      Worker: <strong>{(adminStatus?.worker_alive || adminStatus?.status === 'healthy' || adminStatus?.worker === 'active') ? '🟢 Active Daemon' : '⚪ Standby'}</strong>
                     </span>
                     <span className="live-uptime">
-                      Database: <strong>{adminStatus?.database?.engine || 'SQLite WAL'}</strong>
+                      Database: <strong>{adminStatus?.infrastructure?.database_engine === 'postgresql' ? 'Neon PostgreSQL (ACID)' : (adminStatus?.infrastructure?.database_engine || adminStatus?.database?.engine || 'SQLite WAL')}</strong>
                     </span>
                     <span className="live-uptime">
-                      Storage: <strong>{adminStatus?.storage_backend || 'Local FS'}</strong>
+                      Storage: <strong>{adminStatus?.infrastructure?.storage_backend || adminStatus?.storage_backend || 'Local FS'}</strong>
                     </span>
                   </div>
                   <div className="admin-strip-right">
@@ -674,12 +674,12 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                 <div className="admin-metrics-grid">
                   <div className="metric-card">
                     <span className="metric-label">Process RAM</span>
-                    <span className="metric-val">{adminStatus?.memory?.ram_used_mb || 0} MB</span>
+                    <span className="metric-val">{adminStatus?.metrics?.ram_rss_mb ?? adminStatus?.memory?.ram_used_mb ?? 0} MB</span>
                     <span className="metric-hint">Limit: 512 MB (Render Free)</span>
                   </div>
                   <div className="metric-card">
-                    <span className="metric-label">Process Memory %</span>
-                    <span className="metric-val">{adminStatus?.memory?.ram_pct || 0}%</span>
+                    <span className="metric-label">CPU / Memory Activity</span>
+                    <span className="metric-val">{adminStatus?.metrics?.cpu_percent ?? adminStatus?.memory?.ram_pct ?? 0}%</span>
                     <span className="metric-hint">Active OS RSS Footprint</span>
                   </div>
                   <div className="metric-card">

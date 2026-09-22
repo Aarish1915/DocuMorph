@@ -64,11 +64,23 @@ class BatchVisionEngine:
             or os.getenv("OMNIROUTE_BASE_URL")
             or "http://localhost:20128/v1"
         ).rstrip("/")
-        self.omniroute_enabled = os.getenv("OMNIROUTE_ENABLED", "true").lower() in ("true", "1", "yes")
+        # Safe detection: only enable if explicitly set to true or if localhost:20128 is listening
+        if os.getenv("OMNIROUTE_ENABLED", "").lower() in ("true", "1", "yes"):
+            self.omniroute_enabled = True
+        elif os.getenv("OMNIROUTE_ENABLED", "").lower() in ("false", "0", "no"):
+            self.omniroute_enabled = False
+        else:
+            # Quick 0.2s probe to see if local OmniRoute daemon is running
+            try:
+                with socket.create_connection(("127.0.0.1", 20128), timeout=0.2):
+                    self.omniroute_enabled = True
+            except Exception:
+                self.omniroute_enabled = False
+
         self.omniroute_model = os.getenv("OMNIROUTE_VISION_MODEL", "omniroute/auto")
         self.omniroute_text_model = os.getenv("OMNIROUTE_TEXT_MODEL", "omniroute/auto")
 
-        logger.info(f"Initialized BatchVisionEngine with model: {self.model_name}. API Keys available: {self.router.get_total_keys()}. OmniRoute gateway: {self.omniroute_url} (enabled={self.omniroute_enabled})")
+        logger.info(f"Initialized BatchVisionEngine with model: {self.model_name}. API Keys available: {self.router.get_total_keys()}. OmniRoute gateway: {self.omniroute_url} (active={self.omniroute_enabled})")
 
     def _get_prompt(self, is_full_page: bool = False) -> str:
         # Guard against frontend boolean bugs
@@ -223,7 +235,8 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 "Authorization": f"Bearer {api_key}"
             }
 
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            timeout = httpx.Timeout(connect=2.0, read=45.0, write=10.0, pool=2.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 res = await client.post(
                     f"{self.omniroute_url}/chat/completions",
                     json=payload,
@@ -241,7 +254,8 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 else:
                     logger.warning(f"OmniRoute gateway returned HTTP {res.status_code}: {res.text[:200]}")
         except Exception as e:
-            logger.info(f"OmniRoute Vision Gateway unavailable ({e}). Gracefully falling back to Google GenAI SDK...")
+            self.omniroute_enabled = False
+            logger.info(f"OmniRoute Vision Gateway offline/unreachable ({e}). Automatically switching to Google GenAI SDK...")
         return None
 
     async def _call_omniroute_text(self, prompt: str) -> Optional[str]:
@@ -265,7 +279,8 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}"
             }
-            async with httpx.AsyncClient(timeout=45.0) as client:
+            timeout = httpx.Timeout(connect=2.0, read=30.0, write=10.0, pool=2.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 res = await client.post(
                     f"{self.omniroute_url}/chat/completions",
                     json=payload,
@@ -280,7 +295,8 @@ Output the raw markdown for each image in the exact order they appear. If multip
                             logger.info(f"OmniRoute Text Gateway returned completion via model: {data.get('model', self.omniroute_text_model)}")
                             return content.strip()
         except Exception as e:
-            logger.info(f"OmniRoute Text Gateway unavailable ({e}). Falling back to Google GenAI SDK...")
+            self.omniroute_enabled = False
+            logger.info(f"OmniRoute Text Gateway offline ({e}). Switching to Google GenAI SDK...")
         return None
 
     async def process_images_batch(self, image_paths: List[str], batch_index: int = 1) -> Dict[int, str]:

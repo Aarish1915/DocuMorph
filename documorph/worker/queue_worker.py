@@ -37,6 +37,20 @@ def schedule_delayed_memory_sweep(delay_seconds: int = 25):
 def run_worker():
     logger.info("DocuMorph Worker started. Polling database queue for jobs...")
     
+    # Startup Recovery: Reset any orphaned jobs left in PROCESSING from prior container restarts
+    try:
+        with SessionLocal() as boot_db:
+            stuck_jobs = boot_db.query(Job).filter(Job.status == "PROCESSING").all()
+            if stuck_jobs:
+                logger.warning(f"Worker startup: Found {len(stuck_jobs)} zombie jobs in PROCESSING. Resetting to FAILED.")
+                for sj in stuck_jobs:
+                    sj.status = "FAILED"
+                    sj.error_msg = "Server instance recycled or container restarted during processing. Please re-run."
+                    sj.progress_pct = -1
+                boot_db.commit()
+    except Exception as boot_err:
+        logger.warning(f"Could not reset zombie jobs on startup: {boot_err}")
+    
     while True:
         try:
             # 1. Atomically claim next job in short-lived session

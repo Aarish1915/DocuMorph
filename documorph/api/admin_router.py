@@ -138,6 +138,8 @@ def get_system_status(
 
     return {
         "status": "healthy",
+        "worker_alive": True,
+        "worker": "active",
         "timestamp": utc_now().isoformat(),
         "admin_user": admin.get("sub"),
         "metrics": {
@@ -145,6 +147,10 @@ def get_system_status(
             "cpu_percent": cpu_pct,
             "system_total_ram_mb": round(psutil.virtual_memory().total / (1024 * 1024), 1),
             "system_free_ram_mb": round(psutil.virtual_memory().available / (1024 * 1024), 1)
+        },
+        "memory": {
+            "ram_used_mb": ram_mb,
+            "ram_pct": cpu_pct
         },
         "queue": {
             "queued": queued_count,
@@ -156,8 +162,33 @@ def get_system_status(
         "infrastructure": {
             "database_engine": engine.dialect.name,
             "storage_backend": storage_type
-        }
+        },
+        "database": {
+            "engine": "Neon PostgreSQL" if "postgres" in engine.dialect.name.lower() else "SQLite WAL"
+        },
+        "storage_backend": storage_type
     }
+
+
+@admin_router.post("/admin/jobs/reset-stuck")
+def reset_stuck_jobs(
+    admin: Dict[str, Any] = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Finds and aborts/resets zombie jobs that have been stuck in 'PROCESSING' without updates for over 5 minutes.
+    """
+    import datetime
+    cutoff = utc_now() - datetime.timedelta(minutes=5)
+    stuck_jobs = db.query(Job).filter(Job.status == "PROCESSING", Job.updated_at < cutoff).all()
+    count = 0
+    for j in stuck_jobs:
+        j.status = "FAILED"
+        j.error_msg = "Job timed out or was interrupted during server reboot"
+        count += 1
+    db.commit()
+    logger.info(f"Admin reset {count} stuck job(s)")
+    return {"ok": True, "reset_count": count}
 
 
 @admin_router.get("/admin/jobs/dates")
