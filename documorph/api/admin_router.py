@@ -117,9 +117,11 @@ def get_system_status(
     ram_mb = round(memory_info.rss / (1024 * 1024), 1)
     cpu_pct = psutil.cpu_percent(interval=0.1)
 
+    today_start = utc_now().replace(hour=0, minute=0, second=0, microsecond=0)
     queued_count = db.query(Job).filter(Job.status.in_(["QUEUED", "QUEUED_REPROCESS"])).count()
     processing_count = db.query(Job).filter(Job.status == "PROCESSING").count()
-    completed_today = db.query(Job).filter(Job.status == "COMPLETED").count()
+    completed_today = db.query(Job).filter(Job.status == "COMPLETED", Job.created_at >= today_start).count()
+    completed_total = db.query(Job).filter(Job.status == "COMPLETED").count()
     failed_count = db.query(Job).filter(Job.status == "FAILED").count()
 
     storage = get_storage()
@@ -139,6 +141,7 @@ def get_system_status(
             "queued": queued_count,
             "processing": processing_count,
             "completed": completed_today,
+            "completed_total": completed_total,
             "failed": failed_count
         },
         "infrastructure": {
@@ -148,33 +151,76 @@ def get_system_status(
     }
 
 
-@admin_router.get("/admin/jobs")
-def list_admin_jobs(
-    limit: int = 50,
+@admin_router.get("/admin/jobs/dates")
+def list_admin_job_dates(
     admin: Dict[str, Any] = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
     """
-    Returns recent jobs with metadata, execution progress, and file stats.
+    Returns distinct calendar dates with total job counts across all users.
     """
-    jobs = db.query(Job).order_by(Job.created_at.desc()).limit(limit).all()
+    from sqlalchemy import func
+    date_col = func.date(Job.created_at)
+    results = (
+        db.query(date_col.label("job_date"), func.count(Job.id).label("total_jobs"))
+        .group_by(date_col)
+        .order_by(date_col.desc())
+        .all()
+    )
     return [
-        {
-            "id": j.id,
-            "file_path": os.path.basename(j.file_path),
-            "status": j.status,
-            "progress_pct": j.progress_pct,
-            "progress_msg": j.progress_msg,
-            "service_type": j.service_type,
-            "language_mode": j.language_mode,
-            "original_size": j.original_file_size,
-            "compressed_size": j.compressed_file_size,
-            "created_at": j.created_at.isoformat() if j.created_at else None,
-            "updated_at": j.updated_at.isoformat() if j.updated_at else None,
-            "result_url": j.result_url
-        }
-        for j in jobs
+        {"date": str(r.job_date), "count": r.total_jobs}
+        for r in results if r.job_date is not None
     ]
+
+
+@admin_router.get("/admin/jobs")
+def list_admin_jobs(
+    date: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
+    admin: Dict[str, Any] = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns paginated jobs with metadata, execution progress, and date filtering.
+    """
+    import re
+    from sqlalchemy import func
+    query = db.query(Job)
+    if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date):
+        query = query.filter(func.date(Job.created_at) == date)
+        
+    total_count = query.count()
+    safe_limit = max(1, min(limit, 100))
+    safe_page = max(1, page)
+    offset = (safe_page - 1) * safe_limit
+
+    jobs = query.order_by(Job.created_at.desc()).offset(offset).limit(safe_limit).all()
+    has_more = (offset + len(jobs)) < total_count
+
+    return {
+        "jobs": [
+            {
+                "id": j.id,
+                "file_path": os.path.basename(j.file_path),
+                "status": j.status,
+                "progress_pct": j.progress_pct,
+                "progress_msg": j.progress_msg,
+                "service_type": j.service_type,
+                "language_mode": j.language_mode,
+                "original_size": j.original_file_size,
+                "compressed_size": j.compressed_file_size,
+                "created_at": j.created_at.isoformat() if j.created_at else None,
+                "updated_at": j.updated_at.isoformat() if j.updated_at else None,
+                "result_url": j.result_url
+            }
+            for j in jobs
+        ],
+        "total": total_count,
+        "page": safe_page,
+        "limit": safe_limit,
+        "has_more": has_more
+    }
 
 
 @admin_router.post("/admin/reclaim-ram")

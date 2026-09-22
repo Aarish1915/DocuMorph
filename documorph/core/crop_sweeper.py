@@ -18,25 +18,26 @@ class LightningSweeper:
     def sweep(self) -> Dict[int, str]:
         """
         Returns a dict mapping page index to classification: 'clean', 'complex', or 'corrupted'.
+        Prioritizes the Digital Fast-Path so native documents process locally in ~15ms/page,
+        reserving multi-modal Vision AI strictly for true scanned photocopies and corrupted layers.
         """
         classifications = {}
         
         for i in range(len(self.doc)):
             page = self.doc[i]
             
-            # 1. Check for text corruption
+            # 1. Inspect text layer
             text = page.get_text("text")
             total_chars = len(text.strip())
-            readable_chars = sum(1 for ch in text if ch.isascii() or ch.isalnum())
+            # Support Latin, numeric, and full Devanagari (Hindi) Unicode range \u0900-\u097F
+            readable_chars = sum(
+                1 for ch in text 
+                if ch.isascii() or ch.isalnum() or ('\u0900' <= ch <= '\u097F')
+            )
+            readable_ratio = (readable_chars / max(1, total_chars))
             
+            # 1.a Check for corrupted font layers (KrutiDev / non-Unicode Devanagari mappings)
             if total_chars > 50:
-                # 1.a Low alphanumeric ratio check
-                if (readable_chars / total_chars) < 0.70:
-                    classifications[i] = "corrupted"
-                    logger.info(f"Page {i}: Classified as CORRUPTED (Garbled text layer).")
-                    continue
-                
-                # 1.b Corrupted font layer check (KrutiDev / non-Unicode Devanagari mappings)
                 # Word-initial short-i (\u093f) is impossible in valid Devanagari orthography
                 has_bad_matras = len(re.findall(r'(?:^|\s)\u093f', text)) >= 2
                 # Embedded Latin phonetic / IPA glyphs (e.g. ɟ, ɡ, ɞ) substituted for consonants
@@ -49,31 +50,54 @@ class LightningSweeper:
                     logger.info(f"Page {i}: Classified as CORRUPTED (Corrupted Hindi font / KrutiDev substitution).")
                     continue
                 
-            # 2. Check Layout Complexity (Vectors and Images)
-            vector_area = 0
-            image_area = 0
-            total_area = page.rect.width * page.rect.height
-            
-            crop_count = 0
-            
-            # Images (raster)
+                # Low readability ratio only on non-math text (garbled binary streams)
+                if readable_ratio < 0.60 and total_chars > 120:
+                    classifications[i] = "corrupted"
+                    logger.info(f"Page {i}: Classified as CORRUPTED (Garbled text layer: {readable_ratio:.2f} readable ratio).")
+                    continue
+
+            # 2. Check images for full-page background scans
             images = page.get_images()
-            for img in images:
-                crop_count += 1
+            total_area = max(1.0, page.rect.width * page.rect.height)
+            image_area = 0.0
+            for img in images[:5]:
                 try:
-                    # Get actual bounding box area of the image to factor into complexity
                     rects = page.get_image_rects(img[0])
                     for rect in rects:
                         image_area += abs(rect.width * rect.height)
                 except Exception as e:
                     logger.debug(f"Could not calculate rect for image: {e}")
-                # Rough area estimate not available directly without get_image_bbox, 
-                # but we count the raw number of image blocks
-                
-            # Vectors (Tables/Colored Fills)
+            image_ratio = image_area / total_area
+
+            # True Scanned Page: Dominant background photo/scan image covering >= 35% AND low selectable text
+            if image_ratio >= 0.35 and total_chars < 120:
+                classifications[i] = "complex"
+                logger.info(f"Page {i}: Classified as COMPLEX (Scanned document without digital text: {image_ratio:.2f} image ratio).")
+                continue
+
+            # Check for true CamScanner / OKEN Scanner OCR noise patterns (repeated colon-dash sequences).
+            # Do NOT match standard markdown rules '---' or table pipes '|---|'.
+            has_repeating_ocr_noise = bool(re.search(r'(?::\s*-\s*:){2,}|(?:\(\s*\)\s*-\s*:){2,}', text))
+            if has_repeating_ocr_noise and total_chars < 150:
+                classifications[i] = "corrupted"
+                logger.info(f"Page {i}: Classified as CORRUPTED (Detected CamScanner/OKEN repeating OCR noise).")
+                continue
+
+            # 3. DIGITAL FAST-PATH (<15ms/page):
+            # If the page has rich, valid digital text (>= 80 chars) and no dominating scan image,
+            # it is definitively a digital native document. Use fast local PyMuPDF extraction!
+            if total_chars >= 80 and readable_ratio >= 0.65:
+                classifications[i] = "clean"
+                logger.info(f"Page {i}: Classified as CLEAN ({total_chars} chars, digital native fast-path).")
+                continue
+
+            # 4. Check Layout Complexity for low-text or drawing-heavy pages
+            vector_area = 0
+            crop_count = len(images)
             try:
                 drawings = page.get_drawings()
-                for p in drawings:
+                # Bound drawings inspection to max 400 paths to prevent CPU lockup
+                for p in drawings[:400]:
                     if p.get("fill") is not None and p.get("fill_opacity", 0) > 0:
                         r = p["rect"]
                         # Ignore decorative header/footer banners (top 8% and bottom 8%)
@@ -88,32 +112,15 @@ class LightningSweeper:
                 classifications[i] = "corrupted"
                 continue
                 
-            image_ratio = image_area / total_area if total_area > 0 else 0
             vector_ratio = vector_area / total_area if total_area > 0 else 0
             combined_ratio = image_ratio + vector_ratio
-            
-            # Check for OCR separator line noise (characteristic of CamScanner / OKEN Scanner invisible text)
-            has_ocr_noise = bool(re.search(r'[-:]{3,}|(?::\s*-\s*:)|(?:\(\s*\)\s*-\s*:)', text))
-            
-            # Breakeven Math Threshold:
-            # 1. Scanned notes have background images covering >= 25% of the page.
-            # 2. OCR-corrupted pages have separator artifacts (:- - - :).
-            # 3. High vector/diagram density (tables/fills covering >= 20% or > 5 crops).
-            # These must be read natively by Vision AI to preserve tables and clean formatting.
-            if image_ratio > 0.25:
+
+            # Low-text page with significant drawings/images requires Vision AI
+            if total_chars < 80 and (combined_ratio > 0.20 or crop_count >= 3):
                 classifications[i] = "complex"
-                logger.info(f"Page {i}: Classified as COMPLEX (Scanned document: {image_ratio:.2f} image ratio).")
-            elif has_ocr_noise:
-                classifications[i] = "corrupted"
-                logger.info(f"Page {i}: Classified as CORRUPTED (Detected CamScanner/OKEN OCR noise).")
-            elif vector_ratio > 0.20 or crop_count >= 5:
-                classifications[i] = "complex"
-                logger.info(f"Page {i}: Classified as COMPLEX (High vector density: {vector_ratio:.2f} ratio, {crop_count} crops).")
-            elif total_chars < 200 and combined_ratio > 0.15:
-                classifications[i] = "complex"
-                logger.info(f"Page {i}: Classified as COMPLEX (Low text, high visual elements).")
+                logger.info(f"Page {i}: Classified as COMPLEX (Low text {total_chars}c, high visual elements: {combined_ratio:.2f}).")
             else:
                 classifications[i] = "clean"
-                logger.info(f"Page {i}: Classified as CLEAN ({total_chars} chars, digital native text).")
+                logger.info(f"Page {i}: Classified as CLEAN ({total_chars} chars).")
                 
         return classifications

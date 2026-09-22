@@ -728,11 +728,50 @@ async def manual_clear_memory(
     reclaim_system_memory()
     return {"status": "ok", "message": "RAM cleared and glibc heap trimmed to OS"}
 
+@app.get("/api/jobs/dates")
+async def get_job_dates(db: Session = Depends(get_db)):
+    """Returns distinct calendar dates with total job counts across all users."""
+    from sqlalchemy import func
+    date_col = func.date(Job.created_at)
+    results = (
+        db.query(date_col.label("job_date"), func.count(Job.id).label("total_jobs"))
+        .group_by(date_col)
+        .order_by(date_col.desc())
+        .all()
+    )
+    return [
+        {"date": str(r.job_date), "count": r.total_jobs}
+        for r in results if r.job_date is not None
+    ]
+
 @app.get("/api/jobs")
-async def get_recent_jobs(db: Session = Depends(get_db)):
-    """Returns the 10 most recent jobs for the Job History tab"""
-    jobs = db.query(Job).order_by(Job.created_at.desc()).limit(10).all()
-    return [{
+async def get_recent_jobs(
+    date: Optional[str] = None,
+    page: Optional[int] = None,
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Returns jobs across all users.
+    If page or date query parameters are provided, returns a paginated dict with has_more metadata.
+    If called without pagination parameters, returns the recent list for backwards compatibility.
+    """
+    from sqlalchemy import func
+    query = db.query(Job)
+    if date and re.match(r'^\d{4}-\d{2}-\d{2}$', date):
+        query = query.filter(func.date(Job.created_at) == date)
+
+    total_count = query.count()
+    is_paginated_request = page is not None or date is not None or (limit is not None and limit != 10)
+
+    safe_limit = max(1, min(limit or 15, 50))
+    safe_page = max(1, page or 1)
+    offset = (safe_page - 1) * safe_limit if is_paginated_request else 0
+    fetch_limit = safe_limit if is_paginated_request else (limit or 10)
+
+    jobs = query.order_by(Job.created_at.desc()).offset(offset).limit(fetch_limit).all()
+    
+    items = [{
         "id": j.id,
         "filename": os.path.basename(j.file_path).split('_', 2)[-1] if '_' in os.path.basename(j.file_path) else os.path.basename(j.file_path),
         "status": j.status,
@@ -743,8 +782,20 @@ async def get_recent_jobs(db: Session = Depends(get_db)):
         "output_format": j.output_format,
         "original_file_size": j.original_file_size,
         "compressed_file_size": j.compressed_file_size,
-        "created_at": j.created_at.isoformat()
+        "created_at": j.created_at.isoformat() if j.created_at else None
     } for j in jobs]
+
+    if is_paginated_request:
+        has_more = (offset + len(jobs)) < total_count
+        return {
+            "jobs": items,
+            "page": safe_page,
+            "limit": safe_limit,
+            "total": total_count,
+            "has_more": has_more,
+            "date": date
+        }
+    return items
 
 @app.post("/api/reprocess/{job_id}")
 async def reprocess_job(job_id: str, db: Session = Depends(get_db)):

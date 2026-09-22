@@ -260,9 +260,23 @@ class FormatFixer:
             processed_t.append(line)
         text = '\n'.join(processed_t)
 
-        # Ensure blank line before and after markdown tables WITHOUT inserting blank lines between rows
-        text = re.sub(r'([^\n|])\n(\|)', r'\1\n\n\2', text)
-        text = re.sub(r'(\|\n)([^|\n])', r'\1\n\2', text)
+        # Ensure clean blank line before and after markdown tables WITHOUT inserting blank lines between rows
+        lines = text.split('\n')
+        tbl_spaced = []
+        in_table = False
+        for l in lines:
+            ls = l.strip()
+            is_tbl_row = (ls.startswith('|') and ('|' in ls[1:])) or bool(re.match(r'^\|(?:\s*:?-+:?\s*\|)+$', ls))
+            if is_tbl_row:
+                if not in_table and tbl_spaced and tbl_spaced[-1].strip() != '':
+                    tbl_spaced.append('')
+                in_table = True
+            else:
+                if in_table and ls and tbl_spaced and tbl_spaced[-1].strip() != '':
+                    tbl_spaced.append('')
+                in_table = False
+            tbl_spaced.append(l)
+        text = '\n'.join(tbl_spaced)
 
         # 15. Fix glued punctuation and adjacent bilingual scripts (English and Devanagari)
         text = re.sub(r'([.!?])([\u0900-\u097F])', r'\1 \2', text)

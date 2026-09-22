@@ -346,6 +346,9 @@ class DocuMorphOrchestrator:
                     logger.info(f"TELEMETRY_CROPS: total={len(crops_to_batch)}, full_page={full_pages_count}, targeted={targeted_crops_count}")
                     
                     async def process_all_chunks():
+                        if not crops_to_batch:
+                            logger.info("No scanned pages or crops detected: digital native fast-path complete.")
+                            return
                         tasks = []
                         chunk_indices = []
                         for i in range(0, len(crops_to_batch), batch_size):
@@ -400,7 +403,7 @@ class DocuMorphOrchestrator:
                                             logger.info(f"Page {pnum + 1}: AI extraction empty; falling back to native text ({len(native_text)} chars).")
                                             if self.service_type == "translate":
                                                 try:
-                                                    extracted_text = asyncio.run(self.vision_engine.translate_text_direct(native_text, self.target_lang or "Hindi"))
+                                                    extracted_text = await self.vision_engine.translate_text_direct(native_text, self.target_lang or "Hindi")
                                                 except Exception as trans_ex:
                                                     logger.warning(f"Fallback translation error on page {pnum + 1}: {trans_ex}")
                                                     extracted_text = native_text
@@ -508,7 +511,7 @@ class DocuMorphOrchestrator:
                                                 try:
                                                     glossary_map = {}
                                                     if desc and len(desc.strip()) > 2 and not desc.lower().startswith("diagram"):
-                                                        trans_desc = asyncio.run(self.vision_engine.translate_text_direct(desc, self.target_lang or "Hindi"))
+                                                        trans_desc = await self.vision_engine.translate_text_direct(desc, self.target_lang or "Hindi")
                                                         glossary_map[desc] = trans_desc
                                                     glossary_html = self.diagram_extractor.generate_bilingual_glossary_html(glossary_map)
                                                 except Exception:

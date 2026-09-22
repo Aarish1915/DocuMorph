@@ -31,21 +31,34 @@ DATABASE_URL = (
     or os.getenv("NEON_URL")
 )
 
+from sqlalchemy.pool import NullPool
+
 if DATABASE_URL:
     DATABASE_URL = DATABASE_URL.strip().strip("'").strip('"')
     # Normalize legacy Heroku/Render postgres:// scheme to postgresql://
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
-    logger.info("Connecting to PostgreSQL database (Neon Serverless)...")
-    engine = create_engine(
-        DATABASE_URL,
-        pool_size=5,
-        max_overflow=10,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        connect_args={"connect_timeout": 15}
-    )
+    is_neon_pooler = "-pooler" in DATABASE_URL or ":6543" in DATABASE_URL
+    if is_neon_pooler:
+        logger.info("Connecting to Neon PostgreSQL via PgBouncer Pooler (using NullPool)...")
+        engine = create_engine(
+            DATABASE_URL,
+            poolclass=NullPool,
+            pool_pre_ping=True,
+            connect_args={"connect_timeout": 15}
+        )
+    else:
+        logger.info("Connecting to PostgreSQL database (high-concurrency QueuePool: size 25, overflow 35)...")
+        engine = create_engine(
+            DATABASE_URL,
+            pool_size=25,
+            max_overflow=35,
+            pool_timeout=10,
+            pool_pre_ping=True,
+            pool_recycle=60,
+            connect_args={"connect_timeout": 15}
+        )
 else:
     DB_PATH = "sqlite:///data/documorph_queue.db?timeout=30"
     logger.info("Using local SQLite database at data/documorph_queue.db")

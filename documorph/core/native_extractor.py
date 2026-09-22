@@ -50,7 +50,20 @@ class NativeExtractor:
             crop_rects.append(fitz.Rect(bbox))
             pad = 5
             padded_bbox = [max(0, bbox[0]-pad), max(0, bbox[1]-pad), min(page.rect.width, bbox[2]+pad), min(page.rect.height, bbox[3]+pad)]
-            elements.append((bbox[1], "crop", padded_bbox))
+            
+            # Direct native markdown extraction via PyMuPDF C++ parser (0ms, 100% exact, saves API call)
+            table_extracted = False
+            try:
+                if hasattr(tab, "to_markdown"):
+                    tab_md = tab.to_markdown()
+                    if tab_md and "|" in tab_md and len(tab_md.strip()) > 10:
+                        elements.append((bbox[1], "text", f"\n\n{tab_md.strip()}\n\n"))
+                        table_extracted = True
+            except Exception:
+                pass
+                
+            if not table_extracted:
+                elements.append((bbox[1], "crop", padded_bbox))
             
         # Using dict instead of blocks so we can measure font sizes and bold styles
         dict_data = page.get_text("dict")
@@ -81,7 +94,8 @@ class NativeExtractor:
         # 2a. Check for vector drawing diagrams (circuits, geometry, maps)
         try:
             drawings = page.get_drawings()
-            if drawings:
+            # If drawing primitives exceed 1,000, they are vector font glyphs or background shading, not standalone diagrams
+            if drawings and len(drawings) <= 1000:
                 for d in drawings:
                     d_rect = d.get("rect")
                     if d_rect:
@@ -162,12 +176,19 @@ class NativeExtractor:
                 continue
                 
             clean_text = "\n".join(block_lines).strip()
-            
             if self.is_math_block(clean_text):
+                # If clean_text already has clear digital math text, format directly as LaTeX block
+                # to eliminate expensive Vision API calls and latency
+                math_chars = set(['∫', '∑', '√', '±', '≠', '≈', '≤', '≥', '∝', '∞', 'θ', 'π', 'α', 'β', 'γ', 'Δ'])
+                has_math_symbols = any(c in clean_text for c in math_chars)
                 pad = 5
                 padded_bbox = [max(0, x0-pad), max(0, y0-pad), min(page.rect.width, x1+pad), min(page.rect.height, y1+pad)]
                 crop_rects.append(fitz.Rect(padded_bbox))
-                elements.append((y0, "crop", padded_bbox))
+                
+                if (has_math_symbols or any(op in clean_text for op in ('=', '+', '-', '^', '/'))) and len(clean_text) < 400:
+                    elements.append((y0, "text", f"\n\n$$\n{clean_text}\n$$\n\n"))
+                else:
+                    elements.append((y0, "crop", padded_bbox))
                 continue
 
         # 3. EXTRACT TEXT (Second Pass: Overlap Detection & Perfect Paragraphs)

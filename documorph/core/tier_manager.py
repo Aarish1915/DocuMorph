@@ -16,8 +16,8 @@ class TierManager:
             "max_polish_pages": 5,     # Output token limit protection
             "api_delay_seconds": 0.2,  # Rapid parallel dispatch without artificial stall
             "max_retries": 4,
-            "vision_model": "gemini-3.5-flash-lite",
-            "text_model": "gemini-3.5-flash-lite"
+            "vision_model": "gemini-3.6-flash",
+            "text_model": "gemini-3.6-flash"
         },
         "gemini_paid": {
             "max_crops_per_call": 30,  # Paid tiers can handle much larger native multi-part

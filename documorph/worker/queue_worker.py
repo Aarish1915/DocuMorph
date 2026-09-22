@@ -38,21 +38,34 @@ def run_worker():
     logger.info("DocuMorph Worker started. Polling database queue for jobs...")
     
     while True:
-        db = SessionLocal()
         try:
-            # Atomically claim the next job (SKIP LOCKED on Postgres, FIFO on SQLite)
-            job = claim_next_job(db)
-            
-            if not job:
-                # No jobs, sleep and poll again
-                db.close()
-                time.sleep(2)
-                continue
-                
-            logger.info(f"Picked up job {job.id} for file {job.file_path}")
-            
-            job_id = job.id
-            file_path = job.file_path
+            # 1. Atomically claim next job in short-lived session
+            job_id = None
+            file_path = None
+            service_type = "clean_format"
+            config_options = "{}"
+            language_mode = None
+            spam_words = None
+            ignore_images = False
+            custom_api_key = None
+            custom_prompt = None
+
+            with SessionLocal() as db:
+                job = claim_next_job(db)
+                if not job:
+                    time.sleep(2)
+                    continue
+                    
+                job_id = job.id
+                file_path = job.file_path
+                service_type = job.service_type or "clean_format"
+                config_options = job.config_options or "{}"
+                language_mode = job.language_mode
+                spam_words = job.spam_words
+                ignore_images = job.ignore_images
+                custom_api_key = job.custom_api_key
+                custom_prompt = job.custom_prompt
+                logger.info(f"Picked up job {job_id} for file {file_path}")
             
             # Throttled progress callback: avoids slamming remote Neon PostgreSQL with dozens of TCP commits
             last_progress_time = 0.0
@@ -65,52 +78,61 @@ def run_worker():
                 is_significant = abs(pct - last_progress_pct) >= 3 and (now - last_progress_time >= 1.2)
                 if is_terminal or is_significant or last_progress_pct == -1:
                     last_progress_time = now
-                    last_progress_pct = pct
-                    inner_db = SessionLocal()
-                    try:
-                        inner_job = inner_db.query(Job).filter(Job.id == job_id).first()
-                        if inner_job:
-                            inner_job.progress_pct = pct
-                            inner_job.progress_msg = msg
-                            inner_job.status = "PROCESSING"
-                            inner_db.commit()
-                    finally:
-                        inner_db.close()
+                    # Enforce strict monotonicity: progress must never drop backwards
+                    if pct > last_progress_pct or is_terminal:
+                        last_progress_pct = pct
+                        try:
+                            with SessionLocal() as inner_db:
+                                inner_job = inner_db.query(Job).filter(Job.id == job_id).first()
+                                if inner_job:
+                                    inner_job.progress_pct = pct
+                                    inner_job.progress_msg = msg
+                                    inner_job.status = "PROCESSING"
+                                    inner_db.commit()
+                        except Exception as cb_err:
+                            logger.warning(f"Could not persist progress callback for job {job_id}: {cb_err}")
             
+            # 2. Execute pipeline decoupled from any open DB connection
+            success = False
+            result_output = None
+            error_message = None
+
             try:
                 orchestrator = DocuMorphOrchestrator(
-                    job_id=job.id,
+                    job_id=job_id,
                     progress_callback=progress_callback,
-                    service_type=job.service_type or "clean_format",
-                    config_options=job.config_options or "{}",
-                    language_mode=job.language_mode,
-                    spam_words=job.spam_words,
-                    ignore_images=job.ignore_images,
-                    custom_api_key=job.custom_api_key,
-                    custom_prompt=job.custom_prompt
+                    service_type=service_type,
+                    config_options=config_options,
+                    language_mode=language_mode,
+                    spam_words=spam_words,
+                    ignore_images=ignore_images,
+                    custom_api_key=custom_api_key,
+                    custom_prompt=custom_prompt
                 )
                 result_output = orchestrator.process_file(file_path)
-                
-                # Mark as completed
-                job.status = "COMPLETED"
-                job.progress_pct = 100
-                job.progress_msg = "Completed successfully"
-                # Normalize result URL path with forward slashes
-                clean_url = result_output.replace("\\", "/").lstrip("/")
-                job.result_url = f"/{clean_url}"
-                
-                if job.service_type == "compress" and os.path.exists(result_output):
-                    job.compressed_file_size = os.path.getsize(result_output)
-                    
-                logger.info(f"Job {job.id} completed successfully. Result: {job.result_url}")
-                
+                success = True
             except Exception as e:
-                logger.error(f"Job {job.id} failed: {e}", exc_info=True)
-                job.status = "ERROR"
-                job.progress_pct = -1
-                job.error_msg = str(e)
-                
-            db.commit()
+                logger.error(f"Job {job_id} failed: {e}", exc_info=True)
+                error_message = str(e)
+            
+            # 3. Record final state in fresh short-lived session
+            with SessionLocal() as finish_db:
+                fin_job = finish_db.query(Job).filter(Job.id == job_id).first()
+                if fin_job:
+                    if success and result_output:
+                        fin_job.status = "COMPLETED"
+                        fin_job.progress_pct = 100
+                        fin_job.progress_msg = "Completed successfully"
+                        clean_url = result_output.replace("\\", "/").lstrip("/")
+                        fin_job.result_url = f"/{clean_url}"
+                        if fin_job.service_type == "compress" and os.path.exists(result_output):
+                            fin_job.compressed_file_size = os.path.getsize(result_output)
+                        logger.info(f"Job {job_id} completed successfully. Result: {fin_job.result_url}")
+                    else:
+                        fin_job.status = "ERROR"
+                        fin_job.progress_pct = -1
+                        fin_job.error_msg = error_message or "Unknown processing error"
+                    finish_db.commit()
 
             # Immediate RAM Reclamation + Delayed 25-30s Full Sweep for next user
             reclaim_system_memory()
@@ -119,8 +141,6 @@ def run_worker():
         except Exception as e:
             logger.error(f"Worker crashed during polling: {e}")
             time.sleep(5)
-        finally:
-            db.close()
 
 if __name__ == "__main__":
     # Ensure data directory exists before starting

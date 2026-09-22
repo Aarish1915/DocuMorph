@@ -183,23 +183,15 @@ Output the raw markdown for each image in the exact order they appear. If multip
         contents = [prompt]
         for img_path in image_paths:
             try:
-                # Fast-path: If image is already an optimized JPEG from PyMuPDF, read directly to avoid slow PIL LANCZOS CPU churn
-                if img_path.lower().endswith((".jpg", ".jpeg")):
-                    with open(img_path, "rb") as f:
-                        image_bytes = f.read()
-                else:
-                    is_full = os.path.basename(img_path).startswith("full_")
-                    scale = 0.85 if is_full else 0.70
-                    with Image.open(img_path) as img:
-                        new_width = max(1, int(img.width * scale))
-                        new_height = max(1, int(img.height * scale))
-                        resized_img = img.resize((new_width, new_height), Image.Resampling.BILINEAR)
-                        img_byte_arr = io.BytesIO()
-                        resized_img.save(img_byte_arr, format='JPEG', quality=80)
-                        image_bytes = img_byte_arr.getvalue()
-                    
-                mime = "image/jpeg"
-                contents.append(types.Part.from_bytes(data=image_bytes, mime_type=mime))
+                # Open with PIL directly - google-genai supports PIL Image natively with zero SSL socket EOF drops
+                img = Image.open(img_path)
+                # High-res clamp to max 1400px width: preserves formula sub-pixel clarity while slashing prefill latency
+                max_w = 1400
+                if img.width > max_w:
+                    ratio = max_w / float(img.width)
+                    new_h = int(img.height * ratio)
+                    img = img.resize((max_w, new_h), Image.Resampling.BILINEAR)
+                contents.append(img)
             except Exception as e:
                 logger.error(f"Failed to read image {img_path}: {e}")
                 
@@ -218,8 +210,11 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 current_key = self.router.get_next_key()
                 client = genai.Client(api_key=current_key)
                 
-                # Candidate model list to prevent hard failures on deprecated model names
-                candidate_models = [self.model_name, "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash"]
+                # Authoritative current Gemini models in 2026
+                candidate_models = ["gemini-3.6-flash", "gemini-2.5-flash"]
+                if self.model_name and self.model_name not in candidate_models:
+                    candidate_models.insert(0, self.model_name)
+
                 seen_models = set()
                 response = None
                 
@@ -272,7 +267,7 @@ Output the raw markdown for each image in the exact order they appear. If multip
             except Exception as e:
                 error_str = str(e).lower()
                 if "429" in error_str or "quota" in error_str or "503" in error_str or "500" in error_str or "ssl" in error_str or "disconnected" in error_str:
-                    wait_time = max(15, delay * (2 ** attempt)) # Exponential backoff
+                    wait_time = max(2.0, delay * (2 ** attempt)) # Rapid exponential retry (2s, 4s) instead of 15s freeze
                     self.total_retry_delay_seconds += wait_time
                     logger.warning(f"API Limit / Network Dropout: {e}. Retrying in {wait_time}s (Attempt {attempt+1}/{max_retries})")
                     await asyncio.sleep(wait_time)

@@ -25,6 +25,11 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
   const [adminStatus, setAdminStatus] = useState(null);
   const [adminJobs, setAdminJobs] = useState([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
+  const [adminDates, setAdminDates] = useState([]);
+  const [selectedAdminDate, setSelectedAdminDate] = useState(null);
+  const [adminPage, setAdminPage] = useState(1);
+  const [adminHasMore, setAdminHasMore] = useState(false);
+  const [adminLoadingMore, setAdminLoadingMore] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [sweepMsg, setSweepMsg] = useState('');
   const [isSweeping, setIsSweeping] = useState(false);
@@ -43,9 +48,9 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
     return API_BASE || 'http://localhost:8000';
   };
 
-  const handleViewReport = async (jobId) => {
+  const handleViewReport = async (jobId, silent = false) => {
     if (!token) return;
-    setLoadingReport(true);
+    if (!silent) setLoadingReport(true);
     try {
       const activeNode = await probeBackend();
       const base = activeNode.url || getTargetApiUrl();
@@ -55,14 +60,14 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
       if (res.ok) {
         const data = await res.json();
         setSelectedReport(data);
-        setReportDetailTab('telemetry');
-      } else {
+        if (!silent) setReportDetailTab('telemetry');
+      } else if (!silent) {
         alert('Could not fetch telemetry report for job ' + jobId);
       }
     } catch (e) {
-      console.error('Failed to load telemetry report:', e);
+      if (!silent) console.error('Failed to load telemetry report:', e);
     } finally {
-      setLoadingReport(false);
+      if (!silent) setLoadingReport(false);
     }
   };
 
@@ -144,28 +149,71 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
     }
   };
 
-  // Load All Jobs with JWT
-  const loadJobs = async (authToken = token) => {
+  // Load Admin Job Dates
+  const loadAdminDates = async (authToken = token) => {
     if (!authToken) return;
-    setLoadingJobs(true);
     try {
       const activeNode = await probeBackend();
       const base = activeNode.url || getTargetApiUrl();
-      const res = await fetch(`${base}/api/internal/admin/jobs`, {
+      const res = await fetch(`${base}/api/internal/admin/jobs/dates`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminDates(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error('Failed to load admin dates:', e);
+    }
+  };
+
+  // Load Paginated Jobs with JWT and Date Filtering
+  const loadJobs = async (authToken = token, targetDate = selectedAdminDate, page = 1, append = false, silent = false) => {
+    if (!authToken) return;
+    if (!silent) {
+      if (append) setAdminLoadingMore(true);
+      else setLoadingJobs(true);
+    }
+    try {
+      const activeNode = await probeBackend();
+      const base = activeNode.url || getTargetApiUrl();
+      const params = new URLSearchParams({ page: String(page), limit: '20' });
+      if (targetDate) params.append('date', targetDate);
+
+      const res = await fetch(`${base}/api/internal/admin/jobs?${params.toString()}`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
         const data = await res.json();
         const jobsList = Array.isArray(data) ? data : (data.jobs || []);
-        setAdminJobs(jobsList);
+        const hasMore = data.has_more ?? false;
+        setAdminJobs(prev => append ? [...prev, ...jobsList] : jobsList);
+        setAdminHasMore(hasMore);
+        setAdminPage(page);
+        setSelectedAdminDate(targetDate);
       } else if (res.status === 401) {
         handleLogout();
       }
     } catch (e) {
       console.error('Failed to load admin jobs:', e);
     } finally {
-      setLoadingJobs(false);
+      if (!silent) {
+        setLoadingJobs(false);
+        setAdminLoadingMore(false);
+      }
     }
+  };
+
+  const handleSelectAdminDate = (date) => {
+    setSelectedAdminDate(date);
+    setAdminPage(1);
+    loadJobs(token, date, 1, false);
+  };
+
+  const handleLoadMoreAdmin = () => {
+    if (adminLoadingMore || !adminHasMore) return;
+    const nextPage = adminPage + 1;
+    loadJobs(token, selectedAdminDate, nextPage, true);
   };
 
   // Immediate RAM Sweep with JWT
@@ -182,8 +230,8 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setSweepMsg(`Reclaimed: Before ${data.rss_before_mb}MB → After ${data.rss_after_mb}MB`);
-        loadStatus();
+        setSweepMsg(`Reclaimed: Before ${data.before_mb || data.rss_before_mb}MB → After ${data.after_mb || data.rss_after_mb}MB`);
+        loadStatus(token);
       } else {
         setSweepMsg('Failed to trigger RAM reclamation');
       }
@@ -202,32 +250,11 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
 
     const fetchInitialData = async () => {
       try {
-        const activeNode = await probeBackend();
-        const base = activeNode.url || getTargetApiUrl();
-        const [resStatus, resJobs] = await Promise.all([
-          fetch(`${base}/api/internal/admin/status`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${base}/api/internal/admin/jobs`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+        await Promise.all([
+          loadStatus(token),
+          loadAdminDates(token),
+          loadJobs(token, null, 1, false)
         ]);
-
-        if (cancelled) return;
-
-        if (resStatus.ok) {
-          const data = await resStatus.json();
-          setAdminStatus(data);
-        } else if (resStatus.status === 401) {
-          handleLogout();
-          return;
-        }
-
-        if (resJobs.ok) {
-          const data = await resJobs.json();
-          const jobsList = Array.isArray(data) ? data : (data.jobs || []);
-          setAdminJobs(jobsList);
-        }
       } catch (e) {
         console.error('Failed to load initial admin data:', e);
       }
@@ -239,21 +266,22 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
     };
   }, [token]);
 
-  // Auto-refresh timer: Real-time dual updates for both telemetry status and jobs queue
+  // Auto-refresh timer: Real-time telemetry status & jobs queue polling without UI flickering
   useEffect(() => {
     let interval;
     if (token && autoRefresh) {
       interval = setInterval(() => {
-        if (activeTab === 'monitoring') {
-          loadStatus(token);
-          loadJobs(token);
-        } else if (activeTab === 'jobs') {
-          loadJobs(token);
+        loadStatus(token);
+        if (activeTab === 'jobs' && adminPage === 1) {
+          loadJobs(token, selectedAdminDate, 1, false, true);
         }
-      }, 3000);
+        if (selectedReport && (selectedReport.status === 'PROCESSING' || selectedReport.status === 'QUEUED')) {
+          handleViewReport(selectedReport.job_id, true);
+        }
+      }, 2500);
     }
     return () => clearInterval(interval);
-  }, [token, autoRefresh, activeTab]);
+  }, [token, autoRefresh, activeTab, selectedAdminDate, adminPage, selectedReport]);
 
   const handleSaveEngine = (newPref) => {
     const updated = { ...config, preferred: newPref };
@@ -575,6 +603,54 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                     {loadingJobs ? 'Refreshing...' : '🔄 Refresh Jobs'}
                   </button>
                 </div>
+
+                {/* Calendar Date Filter Chips */}
+                {!selectedReport && adminDates && adminDates.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '14px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #94a3b8)', whiteSpace: 'nowrap' }}>Date:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAdminDate(null)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '16px',
+                        fontSize: '0.75rem',
+                        fontWeight: !selectedAdminDate ? '600' : '400',
+                        background: !selectedAdminDate ? 'var(--color-primary, #4f46e5)' : 'rgba(255,255,255,0.06)',
+                        color: !selectedAdminDate ? '#fff' : 'var(--text-secondary, #94a3b8)',
+                        border: !selectedAdminDate ? '1px solid transparent' : '1px solid rgba(255,255,255,0.1)',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      All Time
+                    </button>
+                    {adminDates.map(d => (
+                      <button
+                        key={d.date}
+                        type="button"
+                        onClick={() => handleSelectAdminDate(d.date)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '16px',
+                          fontSize: '0.75rem',
+                          fontWeight: selectedAdminDate === d.date ? '600' : '400',
+                          background: selectedAdminDate === d.date ? 'var(--color-primary, #4f46e5)' : 'rgba(255,255,255,0.06)',
+                          color: selectedAdminDate === d.date ? '#fff' : 'var(--text-secondary, #94a3b8)',
+                          border: selectedAdminDate === d.date ? '1px solid transparent' : '1px solid rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        📅 {d.date}
+                        <span style={{ fontSize: '0.7rem', opacity: 0.75 }}>({d.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {selectedReport ? (
                   /* Ground Reality & Telemetry Report & Intermediate Inspection View */
@@ -992,7 +1068,8 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                     No jobs recorded in database yet.
                   </div>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
+                  <>
+                    <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.1))', color: 'var(--text-secondary, #94a3b8)' }}>
@@ -1089,6 +1166,30 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                       </tbody>
                     </table>
                   </div>
+
+                  {adminHasMore && (
+                    <div style={{ textAlign: 'center', marginTop: '16px', paddingBottom: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={handleLoadMoreAdmin}
+                        disabled={adminLoadingMore}
+                        style={{
+                          padding: '8px 20px',
+                          borderRadius: '8px',
+                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          color: 'var(--text-primary, #fff)',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: adminLoadingMore ? 'wait' : 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {adminLoadingMore ? 'Loading More Jobs...' : '↓ Load More Jobs'}
+                      </button>
+                    </div>
+                  )}
+                </>
                 )}
               </div>
             )}
@@ -1099,7 +1200,7 @@ function AdminDashboardModalDialog({ onClose, standalone = false }) {
                 <div className="engine-controls-card">
                   <h3 className="section-title">Compute Node Routing Strategy</h3>
                   <p className="section-desc">
-                    Configure how DocuMorph directs OCR extraction and Playwright compiling workloads.
+                    Configure how CleanNotes directs OCR extraction and Playwright compiling workloads.
                   </p>
 
                   <div className="engine-radio-group">
