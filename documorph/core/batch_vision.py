@@ -17,8 +17,8 @@ from google import genai
 from google.genai import types
 from typing import Dict, Optional, List
 from PIL import Image
-import io
 import asyncio
+import httpx
 from dotenv import load_dotenv
 load_dotenv(override=True)
 
@@ -31,6 +31,7 @@ class BatchVisionEngine:
     """
     AI Engine: Processes multiple images natively in a single API call (Native Multi-Part Batching).
     No resolution loss. No stitching. Respects dynamic tier rate limits.
+    Supports OmniRoute Multi-Provider Gateway with auto-fallback to direct Google GenAI SDK.
     """
     def __init__(
         self, 
@@ -56,7 +57,18 @@ class BatchVisionEngine:
         self.total_api_calls = 0
         self.total_input_tokens = 0
         self.total_output_tokens = 0
-        logger.info(f"Initialized BatchVisionEngine with model: {self.model_name}. API Keys available: {self.router.get_total_keys()}")
+
+        # OmniRoute Multi-Provider AI Gateway Protocol
+        self.omniroute_url = (
+            os.getenv("OMNIROUTE_URL")
+            or os.getenv("OMNIROUTE_BASE_URL")
+            or "http://localhost:20128/v1"
+        ).rstrip("/")
+        self.omniroute_enabled = os.getenv("OMNIROUTE_ENABLED", "true").lower() in ("true", "1", "yes")
+        self.omniroute_model = os.getenv("OMNIROUTE_VISION_MODEL", "omniroute/auto")
+        self.omniroute_text_model = os.getenv("OMNIROUTE_TEXT_MODEL", "omniroute/auto")
+
+        logger.info(f"Initialized BatchVisionEngine with model: {self.model_name}. API Keys available: {self.router.get_total_keys()}. OmniRoute gateway: {self.omniroute_url} (enabled={self.omniroute_enabled})")
 
     def _get_prompt(self, is_full_page: bool = False) -> str:
         # Guard against frontend boolean bugs
@@ -169,16 +181,134 @@ Output the raw markdown for each image in the exact order they appear. If multip
             
         return prompt
 
+    async def _call_omniroute_vision(self, image_paths: List[str], prompt: str) -> Optional[str]:
+        """
+        Dispatches multi-image vision extraction to the local OmniRoute AI gateway
+        (http://localhost:20128/v1/chat/completions) with quota-aware routing across
+        359 providers / 150+ free tiers.
+        """
+        if not self.omniroute_enabled:
+            return None
+
+        try:
+            # Build OpenAI-standard vision content payload
+            content_list = [{"type": "text", "text": prompt}]
+            for img_path in image_paths:
+                try:
+                    with open(img_path, "rb") as f:
+                        b64_data = base64.b64encode(f.read()).decode("utf-8")
+                    ext = Path(img_path).suffix.lower().lstrip(".")
+                    mime = "image/jpeg" if ext in ("jpg", "jpeg") else ("image/png" if ext == "png" else "image/webp")
+                    content_list.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime};base64,{b64_data}",
+                            "detail": "high"
+                        }
+                    })
+                except Exception as read_err:
+                    logger.warning(f"Could not read image for OmniRoute payload: {img_path}: {read_err}")
+
+            payload = {
+                "model": self.omniroute_model,
+                "messages": [
+                    {"role": "user", "content": content_list}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 8192
+            }
+            api_key = os.getenv("OMNIROUTE_API_KEY", "sk-omniroute")
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                res = await client.post(
+                    f"{self.omniroute_url}/chat/completions",
+                    json=payload,
+                    headers=headers
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    choices = data.get("choices", [])
+                    if choices and "message" in choices[0]:
+                        msg_content = choices[0]["message"].get("content", "")
+                        if msg_content and msg_content.strip():
+                            logger.info(f"OmniRoute Vision Gateway extracted {len(image_paths)} images successfully via model: {data.get('model', self.omniroute_model)}")
+                            self.total_api_calls += 1
+                            return msg_content.strip()
+                else:
+                    logger.warning(f"OmniRoute gateway returned HTTP {res.status_code}: {res.text[:200]}")
+        except Exception as e:
+            logger.info(f"OmniRoute Vision Gateway unavailable ({e}). Gracefully falling back to Google GenAI SDK...")
+        return None
+
+    async def _call_omniroute_text(self, prompt: str) -> Optional[str]:
+        """
+        Dispatches direct text prompt to local OmniRoute AI gateway with multi-provider fallback.
+        """
+        if not self.omniroute_enabled:
+            return None
+
+        try:
+            payload = {
+                "model": self.omniroute_text_model,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 8192
+            }
+            api_key = os.getenv("OMNIROUTE_API_KEY", "sk-omniroute")
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                res = await client.post(
+                    f"{self.omniroute_url}/chat/completions",
+                    json=payload,
+                    headers=headers
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    choices = data.get("choices", [])
+                    if choices and "message" in choices[0]:
+                        content = choices[0]["message"].get("content", "")
+                        if content and content.strip():
+                            logger.info(f"OmniRoute Text Gateway returned completion via model: {data.get('model', self.omniroute_text_model)}")
+                            return content.strip()
+        except Exception as e:
+            logger.info(f"OmniRoute Text Gateway unavailable ({e}). Falling back to Google GenAI SDK...")
+        return None
+
     async def process_images_batch(self, image_paths: List[str], batch_index: int = 1) -> Dict[int, str]:
         """
         Sends an array of images to the AI natively. Returns a dict mapping index to extracted markdown.
         Now executes asynchronously using a round-robin API key.
+        Supports OmniRoute multi-provider gateway with auto-fallback to Google GenAI SDK.
         """
         if not image_paths:
             return {}
             
         logger.info(f"Processing batch {batch_index} of {len(image_paths)} native images...")
         prompt = self._get_prompt()
+
+        # Try OmniRoute Multi-Provider Gateway first (if running/enabled)
+        if self.omniroute_enabled:
+            omni_text = await self._call_omniroute_vision(image_paths, prompt)
+            if omni_text:
+                if len(image_paths) == 1:
+                    return {0: omni_text.replace("---PAGE_BREAK---", "").strip()}
+                parts = [p.strip() for p in omni_text.split("---PAGE_BREAK---")]
+                result_dict = {}
+                for i in range(len(image_paths)):
+                    if i < len(parts):
+                        result_dict[i] = parts[i]
+                    else:
+                        result_dict[i] = "<!-- EXTRACTION TRUNCATED BY AI -->"
+                return result_dict
         
         contents = [prompt]
         for img_path in image_paths:
@@ -294,6 +424,12 @@ Output the raw markdown for each image in the exact order they appear. If multip
             f"3. Return ONLY the translated Markdown. Do not include conversational greetings or explanations.\n\n"
             f"Source Text:\n{text}"
         )
+
+        if self.omniroute_enabled:
+            omni_translated = await self._call_omniroute_text(prompt)
+            if omni_translated:
+                return omni_translated
+
         current_key = self.router.get_next_key()
         client = genai.Client(api_key=current_key)
         candidate_models = [self.model_name, "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash"]
