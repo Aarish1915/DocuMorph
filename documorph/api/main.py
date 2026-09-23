@@ -464,6 +464,7 @@ async def process_pdf(
         Job.file_hash == file_hash,
         Job.status.in_(["COMPLETED", "PROCESSING", "QUEUED", "QUEUED_REPROCESS"]),
         Job.service_type == service_type,
+        Job.output_format == output_fmt,
         Job.config_options == config_options,
         Job.language_mode == language_mode,
         Job.spam_words == spam_words,
@@ -480,27 +481,14 @@ async def process_pdf(
             else:
                 logger.warning(
                     f"Cached job {existing_job.id} marked COMPLETED in DB, but result file "
-                    f"'{cached_rel}' is missing from disk (ephemeral reboot). Re-queuing job."
+                    f"'{cached_rel}' is missing from disk (ephemeral reboot). Recreating fresh job."
                 )
-                existing_job.status = "QUEUED"
-                existing_job.progress_pct = 0
-                existing_job.progress_msg = "Re-processing document..."
-                existing_job.result_url = None
-                existing_job.file_path = file_path
-                existing_job.original_file_size = len(file_bytes)
-                existing_job.output_format = output_fmt
-                with open(file_path, "wb") as buffer:
-                    buffer.write(file_bytes)
-                db.commit()
-                queue_pos = max(1, db.query(Job).filter(
-                    Job.status.in_(["QUEUED", "QUEUED_REPROCESS"]),
-                    Job.created_at <= existing_job.created_at
-                ).count())
-                return {
-                    "job_id": existing_job.id,
-                    "status": "QUEUED",
-                    "queue_position": queue_pos
-                }
+                try:
+                    db.delete(existing_job)
+                    db.commit()
+                except Exception as del_err:
+                    logger.warning(f"Could not delete stale cached job {existing_job.id}: {del_err}")
+                    db.rollback()
         else:
             queue_pos = db.query(Job).filter(
                 Job.status.in_(["QUEUED", "QUEUED_REPROCESS"]),
@@ -763,13 +751,27 @@ async def download_file(job_id: str, db: Session = Depends(get_db)):
                 recovered_content = re.sub(r'\s*\|\s*', '  |  ', recovered_content)
                 recovered_content = re.sub(r'\n{3,}', '\n\n', recovered_content).strip()
 
-            os.makedirs(os.path.dirname(file_rel) or "data/results", exist_ok=True)
-            with open(file_rel, "w", encoding="utf-8") as f:
-                f.write(recovered_content)
-            logger.info(f"Dynamically recovered result file '{file_rel}' from PostgreSQL database for job {job.id}.")
+                os.makedirs(os.path.dirname(file_rel) or "data/results", exist_ok=True)
+                with open(file_rel, "w", encoding="utf-8") as f:
+                    f.write(recovered_content)
+                logger.info(f"Dynamically recovered plain text file '{file_rel}' from PostgreSQL database for job {job.id}.")
+            elif ext == ".pdf":
+                try:
+                    from documorph.compilers.pdf_compiler import PDFCompiler
+                    os.makedirs(os.path.dirname(file_rel) or "data/results", exist_ok=True)
+                    compiler = PDFCompiler()
+                    compiler.compile(recovered_content, file_rel, compact_mode="standard")
+                    logger.info(f"Dynamically recompiled PDF '{file_rel}' from PostgreSQL report_markdown for job {job.id}.")
+                except Exception as comp_err:
+                    logger.error(f"Failed to dynamically recompile PDF for job {job.id}: {comp_err}")
+            else:
+                os.makedirs(os.path.dirname(file_rel) or "data/results", exist_ok=True)
+                with open(file_rel, "w", encoding="utf-8") as f:
+                    f.write(recovered_content)
+                logger.info(f"Dynamically recovered markdown file '{file_rel}' from PostgreSQL database for job {job.id}.")
 
         if not os.path.exists(file_rel):
-            raise HTTPException(status_code=404, detail="Result file not found on disk")
+            raise HTTPException(status_code=404, detail="Result file expired from server cache. Please re-run the job.")
         
     ext = os.path.splitext(file_rel)[1].lower()
     media_types = {
