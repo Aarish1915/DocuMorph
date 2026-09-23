@@ -29,10 +29,24 @@ class ExtractTextServiceHandler(BaseServiceHandler):
     ) -> str:
         out_fmt = str(config.get("output_format", "markdown")).lower()
 
-        if "raw" in out_fmt or "txt" in out_fmt:
-            plain_text = re.sub(r'#+\s*', '', processed_markdown)
-            plain_text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', plain_text)
-            plain_text = re.sub(r'<!--.*?-->', '', plain_text)
+        if any(k in out_fmt for k in ["raw", "txt", "plain", "text"]):
+            # 1. Strip Markdown headings
+            plain_text = re.sub(r'(?m)^#+\s*', '', processed_markdown)
+            # 2. Strip bold, italics, strikethroughs
+            plain_text = re.sub(r'[\*_]{1,3}(.*?)[\*_]{1,3}', r'\1', plain_text)
+            # 3. Strip HTML comments and tags
+            plain_text = re.sub(r'<!--.*?-->', '', plain_text, flags=re.DOTALL)
+            plain_text = re.sub(r'<[^>]+>', '', plain_text)
+            # 4. Clean Markdown links [text](url) -> text
+            plain_text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', plain_text)
+            # 5. Clean Markdown table separators and pipes
+            plain_text = re.sub(r'(?m)^\|(?:\s*:?-+:?\s*\|)+$', '', plain_text)
+            plain_text = re.sub(r'(?m)^\|\s*', '', plain_text)
+            plain_text = re.sub(r'\s*\|\s*$', '', plain_text)
+            plain_text = re.sub(r'\s*\|\s*', '  |  ', plain_text)
+            # 6. Normalize excessive blank lines
+            plain_text = re.sub(r'\n{3,}', '\n\n', plain_text)
+
             txt_path = os.path.join(self.orchestrator.output_dir, f"EXTRACTED_{timestamp}_{base_name}.txt")
             with open(txt_path, "w", encoding="utf-8") as f:
                 f.write(plain_text.strip())

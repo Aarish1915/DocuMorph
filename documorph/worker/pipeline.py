@@ -346,8 +346,11 @@ class DocuMorphOrchestrator:
                         batch_size = 2
                     elif total_crops <= 9:
                         batch_size = 3
-                    else:
+                    elif total_crops <= 19:
                         batch_size = 5
+                    else:
+                        # Hard 50-Page Scaling Rule: 50 pages / 10 = 5 API calls max ceiling
+                        batch_size = 10
                     
                     full_pages_count = sum(1 for c in crops_to_batch if c["type"] == "full_page")
                     targeted_crops_count = sum(1 for c in crops_to_batch if c["type"] == "crop")

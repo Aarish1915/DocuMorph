@@ -442,7 +442,7 @@ async def process_pdf(
 
     if service_type == "extract_text":
         raw_fmt = str(parsed_config.get("output_format", "markdown")).lower()
-        if "raw" in raw_fmt or "txt" in raw_fmt:
+        if any(k in raw_fmt for k in ["raw", "txt", "plain", "text"]):
             output_fmt = "txt"
         elif "json" in raw_fmt:
             output_fmt = "json"
@@ -473,18 +473,45 @@ async def process_pdf(
     
     if existing_job:
         if existing_job.status == "COMPLETED":
-            # Zero API Cost, Zero RAM usage! Return the cached result instantly.
-            return {"job_id": existing_job.id, "cached": True}
-        queue_pos = db.query(Job).filter(
-            Job.status.in_(["QUEUED", "QUEUED_REPROCESS"]),
-            Job.created_at <= existing_job.created_at
-        ).count()
-        return {
-            "job_id": existing_job.id,
-            "status": existing_job.status,
-            "queue_position": queue_pos,
-            "deduplicated": True
-        }
+            cached_rel = (existing_job.result_url or "").lstrip("/").replace("\\", "/")
+            if cached_rel and os.path.exists(cached_rel) and os.path.getsize(cached_rel) > 0:
+                # Zero API Cost, Zero RAM usage! Return the cached result instantly.
+                return {"job_id": existing_job.id, "cached": True}
+            else:
+                logger.warning(
+                    f"Cached job {existing_job.id} marked COMPLETED in DB, but result file "
+                    f"'{cached_rel}' is missing from disk (ephemeral reboot). Re-queuing job."
+                )
+                existing_job.status = "QUEUED"
+                existing_job.progress_pct = 0
+                existing_job.progress_msg = "Re-processing document..."
+                existing_job.result_url = None
+                existing_job.file_path = file_path
+                existing_job.original_file_size = len(file_bytes)
+                existing_job.output_format = output_fmt
+                with open(file_path, "wb") as buffer:
+                    buffer.write(file_bytes)
+                db.commit()
+                queue_pos = max(1, db.query(Job).filter(
+                    Job.status.in_(["QUEUED", "QUEUED_REPROCESS"]),
+                    Job.created_at <= existing_job.created_at
+                ).count())
+                return {
+                    "job_id": existing_job.id,
+                    "status": "QUEUED",
+                    "queue_position": queue_pos
+                }
+        else:
+            queue_pos = db.query(Job).filter(
+                Job.status.in_(["QUEUED", "QUEUED_REPROCESS"]),
+                Job.created_at <= existing_job.created_at
+            ).count()
+            return {
+                "job_id": existing_job.id,
+                "status": existing_job.status,
+                "queue_position": queue_pos,
+                "deduplicated": True
+            }
         
     with open(file_path, "wb") as buffer:
         buffer.write(file_bytes)
@@ -713,7 +740,23 @@ async def download_file(job_id: str, db: Session = Depends(get_db)):
     
     file_rel = job.result_url.lstrip("/").replace("\\", "/")
     if not os.path.exists(file_rel):
-        raise HTTPException(status_code=404, detail="Result file not found on disk")
+        # Database Fallback: Reconstruct text/markdown output from Neon PostgreSQL if container reboot wiped ephemeral disk
+        recovered_content = None
+        if job.service_type == "extract_text" or (job.report_markdown and len(job.report_markdown.strip()) > 0):
+            recovered_content = job.report_markdown
+            if not recovered_content:
+                pages = db.query(PageResult).filter(PageResult.job_id == job.id).order_by(PageResult.page_number).all()
+                if pages:
+                    recovered_content = "\n\n".join([p.raw_markdown or "" for p in pages if p.raw_markdown])
+        
+        if recovered_content:
+            os.makedirs(os.path.dirname(file_rel) or "data/results", exist_ok=True)
+            with open(file_rel, "w", encoding="utf-8") as f:
+                f.write(recovered_content)
+            logger.info(f"Dynamically recovered result file '{file_rel}' from PostgreSQL database for job {job.id}.")
+
+        if not os.path.exists(file_rel):
+            raise HTTPException(status_code=404, detail="Result file not found on disk")
         
     ext = os.path.splitext(file_rel)[1].lower()
     media_types = {

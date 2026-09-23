@@ -17,7 +17,7 @@ class PDFCompiler:
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def _generate_css(self, compact_mode: str = "standard", is_landscape: bool = False) -> str:
+    def _generate_css(self, compact_mode: str = "standard", is_landscape: bool = False, print_margins: bool = False) -> str:
         if is_landscape:
             page_margin = "14mm 20mm 14mm 20mm"
             body_font_size = "15.5pt"
@@ -37,6 +37,25 @@ class PDFCompiler:
             hr_margin = "1.2em 0"
             blockquote_margin = "1em 0"
             blockquote_padding = "0.8em 1.2em"
+        elif print_margins:
+            page_margin = "20mm 20mm 20mm 20mm"
+            body_font_size = "11.5pt"
+            body_line_height = "1.58"
+            p_margin_bottom = "0.55em"
+            h1_font_size = "18pt"
+            h1_margin = "0.8em 0 0.35em 0"
+            h2_font_size = "14.5pt"
+            h2_margin = "0.7em 0 0.25em 0"
+            h3_font_size = "12pt"
+            h3_margin = "0.5em 0 0.2em 0"
+            table_font_size = "9.5pt"
+            table_padding = "5px 8px"
+            table_margin = "0.7em 0"
+            list_margin = "0.2em 0 0.5em 0"
+            li_margin = "0.25em"
+            hr_margin = "0.8em 0"
+            blockquote_margin = "0.7em 0"
+            blockquote_padding = "0.5em 0.9em"
         elif compact_mode == "ultra_dense":
             page_margin = "8mm 10mm 10mm 10mm"
             body_font_size = "9pt"
@@ -471,7 +490,7 @@ class PDFCompiler:
             return match.group(0)
 
         html_content = re.sub(r'src=["\']([^"\']+)["\']', _resolve_img_src, html_content)
-        dynamic_css = self._generate_css(compact_mode, is_landscape=is_landscape)
+        dynamic_css = self._generate_css(compact_mode, is_landscape=is_landscape, print_margins=print_margins)
         
         mermaid_script = ""
         if "language-mermaid" in markdown_text:
