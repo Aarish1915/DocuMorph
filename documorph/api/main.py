@@ -332,10 +332,30 @@ async def get_settings(
             return json.load(f)
     return {"tier": "gemini_free", "model": "gemini-3.5-flash-lite"}
 
+@app.post("/api/inspect-pdf")
+async def inspect_pdf(file: UploadFile = File(...)):
+    """Fast pre-flight inspector: returns page count and auto-detection limits in <10ms."""
+    file_bytes = await file.read()
+    if not file_bytes.startswith(b'%PDF'):
+        raise HTTPException(status_code=400, detail="Invalid PDF file")
+    try:
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        count = len(doc)
+        doc.close()
+        return {
+            "page_count": count,
+            "exceeds_limit": count > 50,
+            "max_allowed": 50,
+            "notice": f"Document has {count} pages. First 50 pages will be processed automatically." if count > 50 else None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/api/process")
 async def process_pdf(
     request: Request,
-    file: UploadFile = File(...), 
+    file: UploadFile = File(...),
     service_type: str = Form("clean_format"),
     config_options: str = Form("{}"),
     language_mode: str = Form("auto"),
@@ -394,13 +414,23 @@ async def process_pdf(
                 status_code=400, 
                 detail="This PDF is password-protected. Please remove the password before uploading."
             )
-        page_count = len(doc)
-        if page_count > 55:
-            doc.close()
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Limit exceeded: Your document has {page_count} pages. To ensure fast processing, please upload PDFs under 55 pages or select a page range."
-            )
+        total_doc_pages = len(doc)
+        parsed_config = {}
+        try:
+            parsed_config = json.loads(config_options) if config_options else {}
+        except Exception:
+            pass
+
+        has_custom_range = parsed_config.get("page_range") == "custom" and parsed_config.get("page_to")
+        # 50-PAGE AUTO-DETECTION: Auto-slice documents exceeding 50 pages down to first 50 pages
+        if total_doc_pages > 50 and not has_custom_range:
+            logger.info(f"Auto-detect: Document has {total_doc_pages} pages. Auto-slicing to first 50 pages (1-50).")
+            doc.select(range(0, 50))
+            file_bytes = doc.tobytes(garbage=3, deflate=True)
+            page_count = 50
+        else:
+            page_count = len(doc)
+
         # --- SECURITY: DECOMPRESSION & PIXEL BOMB DEFENSE ---
         for p_idx in range(min(page_count, 10)):
             p = doc[p_idx]
@@ -470,7 +500,7 @@ async def process_pdf(
         Job.spam_words == spam_words,
         Job.ignore_images == ignore_images,
         Job.custom_prompt == custom_prompt
-    ).first()
+    ).order_by(Job.created_at.desc()).first()
     
     if existing_job:
         if existing_job.status == "COMPLETED":
@@ -481,15 +511,16 @@ async def process_pdf(
             else:
                 logger.warning(
                     f"Cached job {existing_job.id} marked COMPLETED in DB, but result file "
-                    f"'{cached_rel}' is missing from disk (ephemeral reboot). Recreating fresh job."
+                    f"'{cached_rel}' is missing from disk (ephemeral reboot). Marking EXPIRED and creating fresh job."
                 )
                 try:
-                    db.delete(existing_job)
+                    existing_job.status = "EXPIRED"
                     db.commit()
-                except Exception as del_err:
-                    logger.warning(f"Could not delete stale cached job {existing_job.id}: {del_err}")
+                except Exception as ex_err:
+                    logger.warning(f"Could not mark stale job {existing_job.id} EXPIRED: {ex_err}")
                     db.rollback()
-        else:
+                # DO NOT RETURN! Continue to insert fresh job
+        elif existing_job.status in ("PROCESSING", "QUEUED", "QUEUED_REPROCESS"):
             queue_pos = db.query(Job).filter(
                 Job.status.in_(["QUEUED", "QUEUED_REPROCESS"]),
                 Job.created_at <= existing_job.created_at
