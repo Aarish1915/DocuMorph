@@ -750,6 +750,19 @@ async def download_file(job_id: str, db: Session = Depends(get_db)):
                     recovered_content = "\n\n".join([p.raw_markdown or "" for p in pages if p.raw_markdown])
         
         if recovered_content:
+            ext = os.path.splitext(file_rel)[1].lower()
+            if ext == ".txt" or job.output_format == "txt":
+                recovered_content = re.sub(r'(?m)^#+\s*', '', recovered_content)
+                recovered_content = re.sub(r'[\*_]{1,3}(.*?)[\*_]{1,3}', r'\1', recovered_content)
+                recovered_content = re.sub(r'<!--.*?-->', '', recovered_content, flags=re.DOTALL)
+                recovered_content = re.sub(r'<[^>]+>', '', recovered_content)
+                recovered_content = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', recovered_content)
+                recovered_content = re.sub(r'(?m)^\|(?:\s*:?-+:?\s*\|)+$', '', recovered_content)
+                recovered_content = re.sub(r'(?m)^\|\s*', '', recovered_content)
+                recovered_content = re.sub(r'\s*\|\s*$', '', recovered_content)
+                recovered_content = re.sub(r'\s*\|\s*', '  |  ', recovered_content)
+                recovered_content = re.sub(r'\n{3,}', '\n\n', recovered_content).strip()
+
             os.makedirs(os.path.dirname(file_rel) or "data/results", exist_ok=True)
             with open(file_rel, "w", encoding="utf-8") as f:
                 f.write(recovered_content)

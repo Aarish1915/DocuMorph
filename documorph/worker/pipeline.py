@@ -522,8 +522,7 @@ class DocuMorphOrchestrator:
                                                 try:
                                                     glossary_map = {}
                                                     if desc and len(desc.strip()) > 2 and not desc.lower().startswith("diagram"):
-                                                        trans_desc = await self.vision_engine.translate_text_direct(desc, self.target_lang or "Hindi")
-                                                        glossary_map[desc] = trans_desc
+                                                        glossary_map[desc] = desc
                                                     glossary_html = self.diagram_extractor.generate_bilingual_glossary_html(glossary_map)
                                                 except Exception:
                                                     glossary_html = ""
