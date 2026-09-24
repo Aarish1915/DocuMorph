@@ -338,253 +338,253 @@ class DocuMorphOrchestrator:
                         logger.debug(f"GC pass after page {page_num + 1}")
 
                 # 3. NATIVE MULTI-PART BATCHING
-                    # Adaptive Micro-Batching: Balance token generation concurrency with API quota.
-                    # Partitioning into concurrent chunks of 2-3 pages allows parallel decoding across Semaphore(3),
-                    # slashing LLM generation latency from ~40s down to ~16s!
-                    total_crops = len(crops_to_batch)
-                    if total_crops <= 5:
-                        batch_size = 5
-                    elif total_crops <= 19:
-                        batch_size = 5
-                    else:
-                        # Hard 50-Page Scaling Rule: 50 pages / 10 = 5 API calls max ceiling
-                        batch_size = 10
-                    
-                    full_pages_count = sum(1 for c in crops_to_batch if c["type"] == "full_page")
-                    targeted_crops_count = sum(1 for c in crops_to_batch if c["type"] == "crop")
-                    logger.info(f"TELEMETRY_CROPS: total={len(crops_to_batch)}, full_page={full_pages_count}, targeted={targeted_crops_count}")
-                    
-                    async def process_all_chunks():
-                        if not crops_to_batch:
-                            logger.info("No scanned pages or crops detected: digital native fast-path complete.")
-                            return
-                        tasks = []
-                        chunk_indices = []
-                        for i in range(0, len(crops_to_batch), batch_size):
-                            chunk = crops_to_batch[i:i+batch_size]
-                            image_paths = [c["path"] for c in chunk]
-                            batch_index = (i // batch_size) + 1
-                            tasks.append(self.vision_engine.process_images_batch(image_paths, batch_index))
-                            chunk_indices.append(i)
-                            
-                        total_batches = len(tasks)
-                        self._report(f"AI Reading: Processing {total_batches} batches concurrently...", 40)
+                # Adaptive Micro-Batching: Balance token generation concurrency with API quota.
+                # Partitioning into concurrent chunks of 2-3 pages allows parallel decoding across Semaphore(3),
+                # slashing LLM generation latency from ~40s down to ~16s!
+                total_crops = len(crops_to_batch)
+                if total_crops <= 5:
+                    batch_size = 5
+                elif total_crops <= 19:
+                    batch_size = 5
+                else:
+                    # Hard 50-Page Scaling Rule: 50 pages / 10 = 5 API calls max ceiling
+                    batch_size = 10
+                
+                full_pages_count = sum(1 for c in crops_to_batch if c["type"] == "full_page")
+                targeted_crops_count = sum(1 for c in crops_to_batch if c["type"] == "crop")
+                logger.info(f"TELEMETRY_CROPS: total={len(crops_to_batch)}, full_page={full_pages_count}, targeted={targeted_crops_count}")
+                
+                async def process_all_chunks():
+                    if not crops_to_batch:
+                        logger.info("No scanned pages or crops detected: digital native fast-path complete.")
+                        return
+                    tasks = []
+                    chunk_indices = []
+                    for i in range(0, len(crops_to_batch), batch_size):
+                        chunk = crops_to_batch[i:i+batch_size]
+                        image_paths = [c["path"] for c in chunk]
+                        batch_index = (i // batch_size) + 1
+                        tasks.append(self.vision_engine.process_images_batch(image_paths, batch_index))
+                        chunk_indices.append(i)
                         
-                        completed_batches = 0
-                        # Use a restrained semaphore (3) to prevent Render 512MB RAM OOM crashes
-                        semaphore = asyncio.Semaphore(3) 
-                        async def sem_task(task):
-                            nonlocal completed_batches
-                            async with semaphore:
-                                res = await task
-                                completed_batches += 1
-                                pct = 40 + int((completed_batches / total_batches) * 25)
-                                self._report(f"AI Reading: Completed batch {completed_batches}/{total_batches}...", pct)
-                                return res
-                                
-                        sem_tasks = [sem_task(t) for t in tasks]
-                        results = await asyncio.gather(*sem_tasks, return_exceptions=True)
-                        
-                        # Re-inject results
-                        for batch_num, ai_results in enumerate(results):
-                            if isinstance(ai_results, Exception):
-                                logger.error(f"Batch {batch_num + 1} failed completely: {ai_results}")
-                                ai_results = {}
-                                
-                            start_idx = chunk_indices[batch_num]
-                            chunk = crops_to_batch[start_idx:start_idx+batch_size]
+                    total_batches = len(tasks)
+                    self._report(f"AI Reading: Processing {total_batches} batches concurrently...", 40)
+                    
+                    completed_batches = 0
+                    # Use a restrained semaphore (3) to prevent Render 512MB RAM OOM crashes
+                    semaphore = asyncio.Semaphore(3) 
+                    async def sem_task(task):
+                        nonlocal completed_batches
+                        async with semaphore:
+                            res = await task
+                            completed_batches += 1
+                            pct = 40 + int((completed_batches / total_batches) * 25)
+                            self._report(f"AI Reading: Completed batch {completed_batches}/{total_batches}...", pct)
+                            return res
                             
-                            for j, c in enumerate(chunk):
-                                extracted_text = ai_results.get(j, f"<!-- AI Extraction Failed for {c['path']} -->")
-                                pnum = c["page_num"]
+                    sem_tasks = [sem_task(t) for t in tasks]
+                    results = await asyncio.gather(*sem_tasks, return_exceptions=True)
+                    
+                    # Re-inject results
+                    for batch_num, ai_results in enumerate(results):
+                        if isinstance(ai_results, Exception):
+                            logger.error(f"Batch {batch_num + 1} failed completely: {ai_results}")
+                            ai_results = {}
+                            
+                        start_idx = chunk_indices[batch_num]
+                        chunk = crops_to_batch[start_idx:start_idx+batch_size]
+                        
+                        for j, c in enumerate(chunk):
+                            extracted_text = ai_results.get(j, f"<!-- AI Extraction Failed for {c['path']} -->")
+                            pnum = c["page_num"]
+                            
+                            if c["type"] == "full_page":
+                                extracted_text = ai_results.get(j, "")
+                                page_obj = doc[pnum]
+                                images_dir = Path("data/output/images")
+                                images_dir.mkdir(parents=True, exist_ok=True)
                                 
-                                if c["type"] == "full_page":
-                                    extracted_text = ai_results.get(j, "")
-                                    page_obj = doc[pnum]
-                                    images_dir = Path("data/output/images")
-                                    images_dir.mkdir(parents=True, exist_ok=True)
-                                    
-                                    # BULLETPROOF FALLBACK: If AI extraction returned empty or failed (network/quota/rate limit):
-                                    # Fall back to native selectable text so the output NEVER produces empty lined pages!
-                                    if not extracted_text or not extracted_text.strip() or extracted_text.strip().startswith("<!--"):
-                                        native_text = page_obj.get_text("text").strip()
-                                        if native_text:
-                                            logger.info(f"Page {pnum + 1}: AI extraction empty; falling back to native text ({len(native_text)} chars).")
-                                            if self.service_type == "translate":
-                                                try:
-                                                    extracted_text = await self.vision_engine.translate_text_direct(native_text, self.target_lang or "Hindi")
-                                                except Exception as trans_ex:
-                                                    logger.warning(f"Fallback translation error on page {pnum + 1}: {trans_ex}")
-                                                    extracted_text = native_text
-                                            else:
+                                # BULLETPROOF FALLBACK: If AI extraction returned empty or failed (network/quota/rate limit):
+                                # Fall back to native selectable text so the output NEVER produces empty lined pages!
+                                if not extracted_text or not extracted_text.strip() or extracted_text.strip().startswith("<!--"):
+                                    native_text = page_obj.get_text("text").strip()
+                                    if native_text:
+                                        logger.info(f"Page {pnum + 1}: AI extraction empty; falling back to native text ({len(native_text)} chars).")
+                                        if self.service_type == "translate":
+                                            try:
+                                                extracted_text = await self.vision_engine.translate_text_direct(native_text, self.target_lang or "Hindi")
+                                            except Exception as trans_ex:
+                                                logger.warning(f"Fallback translation error on page {pnum + 1}: {trans_ex}")
                                                 extracted_text = native_text
                                         else:
-                                            extracted_text = f"\n\n*Page {pnum + 1}: Visual diagram or handwritten content retained in document.*\n\n"
+                                            extracted_text = native_text
+                                    else:
+                                        extracted_text = f"\n\n*Page {pnum + 1}: Visual diagram or handwritten content retained in document.*\n\n"
+                                
+                                # 1. First, search for Vision-detected diagram bounding boxes:
+                                # [Figure: <desc> | bbox: [ymin, xmin, ymax, xmax]] or [चित्र: <desc> | bbox: [...]]
+                                bbox_pattern = r'\[(?:Figure|Diagram|चित्र|डायग्राम):\s*([^\|\]]+?)\s*\|\s*bbox:\s*\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]\s*\]'
+                                bbox_matches = list(re.finditer(bbox_pattern, extracted_text, re.IGNORECASE))
+                                
+                                # Process matches in reverse to preserve string indices during replacement
+                                for m_idx, m in enumerate(reversed(bbox_matches)):
+                                    desc = m.group(1).strip()
+                                    ymin, xmin, ymax, xmax = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))
                                     
-                                    # 1. First, search for Vision-detected diagram bounding boxes:
-                                    # [Figure: <desc> | bbox: [ymin, xmin, ymax, xmax]] or [चित्र: <desc> | bbox: [...]]
-                                    bbox_pattern = r'\[(?:Figure|Diagram|चित्र|डायग्राम):\s*([^\|\]]+?)\s*\|\s*bbox:\s*\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]\s*\]'
-                                    bbox_matches = list(re.finditer(bbox_pattern, extracted_text, re.IGNORECASE))
+                                    # Clamp to 0..1000
+                                    ymin = max(0, min(1000, ymin))
+                                    ymax = max(0, min(1000, ymax))
+                                    xmin = max(0, min(1000, xmin))
+                                    xmax = max(0, min(1000, xmax))
                                     
-                                    # Process matches in reverse to preserve string indices during replacement
-                                    for m_idx, m in enumerate(reversed(bbox_matches)):
-                                        desc = m.group(1).strip()
-                                        ymin, xmin, ymax, xmax = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))
-                                        
-                                        # Clamp to 0..1000
-                                        ymin = max(0, min(1000, ymin))
-                                        ymax = max(0, min(1000, ymax))
-                                        xmin = max(0, min(1000, xmin))
-                                        xmax = max(0, min(1000, xmax))
-                                        
-                                        box_w = xmax - xmin
-                                        box_h = ymax - ymin
-                                        
-                                        # Validate dimensions (ignore tiny noise or full-page captures)
-                                        if box_w >= 40 and box_h >= 40 and (box_w * box_h) < 850000:
-                                            pw, ph = page_obj.rect.width, page_obj.rect.height
-                                            raw_x0 = (xmin * pw / 1000.0)
-                                            raw_y0 = (ymin * ph / 1000.0)
-                                            raw_x1 = (xmax * pw / 1000.0)
-                                            raw_y1 = (ymax * ph / 1000.0)
+                                    box_w = xmax - xmin
+                                    box_h = ymax - ymin
+                                    
+                                    # Validate dimensions (ignore tiny noise or full-page captures)
+                                    if box_w >= 40 and box_h >= 40 and (box_w * box_h) < 850000:
+                                        pw, ph = page_obj.rect.width, page_obj.rect.height
+                                        raw_x0 = (xmin * pw / 1000.0)
+                                        raw_y0 = (ymin * ph / 1000.0)
+                                        raw_x1 = (xmax * pw / 1000.0)
+                                        raw_y1 = (ymax * ph / 1000.0)
 
-                                            # Safe adaptive padding: 4% width, 4% height
-                                            pad_x = max(14.0, 0.040 * pw)
-                                            pad_y = max(16.0, 0.040 * ph)
+                                        # Safe adaptive padding: 4% width, 4% height
+                                        pad_x = max(14.0, 0.040 * pw)
+                                        pad_y = max(16.0, 0.040 * ph)
 
-                                            rx0 = max(0.0, raw_x0 - pad_x)
-                                            ry0 = max(0.0, raw_y0 - pad_y)
-                                            rx1 = min(pw, raw_x1 + pad_x)
-                                            ry1 = min(ph, raw_y1 + pad_y)
+                                        rx0 = max(0.0, raw_x0 - pad_x)
+                                        ry0 = max(0.0, raw_y0 - pad_y)
+                                        rx1 = min(pw, raw_x1 + pad_x)
+                                        ry1 = min(ph, raw_y1 + pad_y)
 
-                                            # VECTOR DRAWING FUSION:
-                                            # Encompass any vector drawing paths (circuits, arrows, coordinate axes) that touch candidate rect
+                                        # VECTOR DRAWING FUSION:
+                                        # Encompass any vector drawing paths (circuits, arrows, coordinate axes) that touch candidate rect
+                                        try:
+                                            drawings = page_obj.get_drawings()
+                                            cand_rect = fitz.Rect(rx0, ry0, rx1, ry1)
+                                            for d in drawings:
+                                                dr = fitz.Rect(d["rect"])
+                                                if dr.intersects(cand_rect) and dr.width < 0.90 * pw and dr.height < 0.80 * ph:
+                                                    rx0 = min(rx0, dr.x0 - 4.0)
+                                                    ry0 = min(ry0, dr.y0 - 4.0)
+                                                    rx1 = max(rx1, dr.x1 + 4.0)
+                                                    ry1 = max(ry1, dr.y1 + 4.0)
+                                        except Exception as dr_ex:
+                                            logger.debug(f"Vector drawing inspection skipped: {dr_ex}")
+
+                                        # SUB-PIXEL TEXT COLLISION BARRIER:
+                                        try:
+                                            blocks = page_obj.get_text("blocks")
+                                            for b in blocks:
+                                                if b[6] == 0:  # text block
+                                                    bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
+                                                    if max(rx0, bx0) < min(rx1, bx1):
+                                                        if by1 <= raw_y0 + 2.0 and by1 > ry0:
+                                                            ry0 = min(raw_y0, by1 + 2.0)
+                                                        if by0 >= raw_y1 - 2.0 and by0 < ry1:
+                                                            ry1 = max(raw_y1, by0 - 2.0)
+                                        except Exception as coll_err:
+                                            logger.debug(f"Text boundary collision check skipped: {coll_err}")
+
+                                        crop_rect = fitz.Rect(max(0.0, rx0), max(0.0, ry0), min(pw, rx1), min(ph, ry1))
+
+                                        # SPAM DIAGRAM & WATERMARK FILTER:
+                                        crop_text = page_obj.get_text("text", clip=crop_rect).lower()
+                                        custom_spam = [w.strip().lower() for w in str(self.config_options.get("spam_words", "")).split(",") if w.strip()]
+                                        spam_keywords = ["telegram", "whatsapp", "@", "call", "academy", "classes", "institute", "pre :", "mains :", "foundation batch", "fee:"] + custom_spam
+                                        is_spam_diag = (
+                                            any(k in crop_text for k in spam_keywords)
+                                            or bool(re.search(r'\b[6-9]\d{9}\b', crop_text))
+                                        )
+                                        if is_spam_diag:
+                                            logger.info(f"Rejected spam diagram on page {pnum}: '{desc}' containing promotional text.")
+                                            extracted_text = extracted_text[:m.start()] + "" + extracted_text[m.end():]
+                                            continue
+
+                                        # Determine quality DPI scaling: 300 DPI (2.5), 200 DPI (1.8), 150 DPI (1.2)
+                                        pic_q = str(self.config_options.get("picture_quality", "high")).lower()
+                                        scale_factor = 1.2 if "fast" in pic_q or "150" in pic_q else (1.8 if "balanced" in pic_q or "200" in pic_q else 2.5)
+                                        diag_pix = page_obj.get_pixmap(matrix=fitz.Matrix(scale_factor, scale_factor), clip=crop_rect)
+                                        diag_fname = f"{self.job_id or timestamp}_vdiag_{pnum}_{m_idx}.png"
+                                        diag_path = images_dir / diag_fname
+                                        
+                                        whitening_level = str(self.config_options.get("whitening_level", "high")).lower()
+                                        self.diagram_extractor.save_whitened_image(diag_pix, diag_path, whitening_level)
+                                        diag_pix = None  # Phase C: release pixmap immediately
+                                        
+                                        rel_path = f"images/{diag_fname}"
+                                        
+                                        # Inside-Diagram Bilingual Companion Glossary support
+                                        glossary_html = ""
+                                        if self.service_type == "translate":
                                             try:
-                                                drawings = page_obj.get_drawings()
-                                                cand_rect = fitz.Rect(rx0, ry0, rx1, ry1)
-                                                for d in drawings:
-                                                    dr = fitz.Rect(d["rect"])
-                                                    if dr.intersects(cand_rect) and dr.width < 0.90 * pw and dr.height < 0.80 * ph:
-                                                        rx0 = min(rx0, dr.x0 - 4.0)
-                                                        ry0 = min(ry0, dr.y0 - 4.0)
-                                                        rx1 = max(rx1, dr.x1 + 4.0)
-                                                        ry1 = max(ry1, dr.y1 + 4.0)
-                                            except Exception as dr_ex:
-                                                logger.debug(f"Vector drawing inspection skipped: {dr_ex}")
+                                                glossary_map = {}
+                                                if desc and len(desc.strip()) > 2 and not desc.lower().startswith("diagram"):
+                                                    glossary_map[desc] = desc
+                                                glossary_html = self.diagram_extractor.generate_bilingual_glossary_html(glossary_map)
+                                            except Exception:
+                                                glossary_html = ""
 
-                                            # SUB-PIXEL TEXT COLLISION BARRIER:
-                                            try:
-                                                blocks = page_obj.get_text("blocks")
-                                                for b in blocks:
-                                                    if b[6] == 0:  # text block
-                                                        bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
-                                                        if max(rx0, bx0) < min(rx1, bx1):
-                                                            if by1 <= raw_y0 + 2.0 and by1 > ry0:
-                                                                ry0 = min(raw_y0, by1 + 2.0)
-                                                            if by0 >= raw_y1 - 2.0 and by0 < ry1:
-                                                                ry1 = max(raw_y1, by0 - 2.0)
-                                            except Exception as coll_err:
-                                                logger.debug(f"Text boundary collision check skipped: {coll_err}")
-
-                                            crop_rect = fitz.Rect(max(0.0, rx0), max(0.0, ry0), min(pw, rx1), min(ph, ry1))
-
-                                            # SPAM DIAGRAM & WATERMARK FILTER:
-                                            crop_text = page_obj.get_text("text", clip=crop_rect).lower()
-                                            custom_spam = [w.strip().lower() for w in str(self.config_options.get("spam_words", "")).split(",") if w.strip()]
-                                            spam_keywords = ["telegram", "whatsapp", "@", "call", "academy", "classes", "institute", "pre :", "mains :", "foundation batch", "fee:"] + custom_spam
-                                            is_spam_diag = (
-                                                any(k in crop_text for k in spam_keywords)
-                                                or bool(re.search(r'\b[6-9]\d{9}\b', crop_text))
-                                            )
-                                            if is_spam_diag:
-                                                logger.info(f"Rejected spam diagram on page {pnum}: '{desc}' containing promotional text.")
-                                                extracted_text = extracted_text[:m.start()] + "" + extracted_text[m.end():]
-                                                continue
-
-                                            # Determine quality DPI scaling: 300 DPI (2.5), 200 DPI (1.8), 150 DPI (1.2)
-                                            pic_q = str(self.config_options.get("picture_quality", "high")).lower()
-                                            scale_factor = 1.2 if "fast" in pic_q or "150" in pic_q else (1.8 if "balanced" in pic_q or "200" in pic_q else 2.5)
-                                            diag_pix = page_obj.get_pixmap(matrix=fitz.Matrix(scale_factor, scale_factor), clip=crop_rect)
-                                            diag_fname = f"{self.job_id or timestamp}_vdiag_{pnum}_{m_idx}.png"
-                                            diag_path = images_dir / diag_fname
-                                            
-                                            whitening_level = str(self.config_options.get("whitening_level", "high")).lower()
-                                            self.diagram_extractor.save_whitened_image(diag_pix, diag_path, whitening_level)
-                                            diag_pix = None  # Phase C: release pixmap immediately
-                                            
-                                            rel_path = f"images/{diag_fname}"
-                                            
-                                            # Inside-Diagram Bilingual Companion Glossary support
-                                            glossary_html = ""
-                                            if self.service_type == "translate":
-                                                try:
-                                                    glossary_map = {}
-                                                    if desc and len(desc.strip()) > 2 and not desc.lower().startswith("diagram"):
-                                                        glossary_map[desc] = desc
-                                                    glossary_html = self.diagram_extractor.generate_bilingual_glossary_html(glossary_map)
-                                                except Exception:
-                                                    glossary_html = ""
-
-                                            diag_html = (
-                                                f'\n\n<div class="diagram-container" align="center" style="margin: 16px 0; break-inside: avoid; page-break-inside: avoid;">\n'
-                                                f'  <img src="{rel_path}" alt="{desc}" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
-                                                f'  <div class="figure-caption" style="font-size: 10.5pt; color: #475569; font-weight: 600; margin-top: 6px;">Figure: {desc}</div>\n'
-                                                f'</div>\n{glossary_html}\n'
-                                            )
-                                            extracted_text = extracted_text[:m.start()] + diag_html + extracted_text[m.end():]
-                                    
-                                    # 2. Next, inject any PDF XObject diagrams if available
-                                    diags = c.get("scanned_diagrams", [])
-                                    if diags:
-                                        diags.sort(key=lambda d: d.get("y_rel", 0.5))
-                                        for diag_item in diags:
-                                            diag_html = (
-                                                f'\n\n<div class="diagram-container" align="center" style="margin: 14px 0; break-inside: avoid; page-break-inside: avoid;">\n'
-                                                f'  <img src="{diag_item["rel_path"]}" alt="Figure Diagram" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
-                                                f'</div>\n\n'
-                                            )
-                                            placeholder_match = re.search(r'(\[(?:Diagram|Figure|Image|चित्र|डायग्राम)[^\]]*\]|\((?:Figure|Fig\.|चित्र)[^\)]*\))', extracted_text, re.IGNORECASE)
-                                            if placeholder_match:
-                                                extracted_text = extracted_text[:placeholder_match.start()] + diag_html + extracted_text[placeholder_match.end():]
+                                        diag_html = (
+                                            f'\n\n<div class="diagram-container" align="center" style="margin: 16px 0; break-inside: avoid; page-break-inside: avoid;">\n'
+                                            f'  <img src="{rel_path}" alt="{desc}" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
+                                            f'  <div class="figure-caption" style="font-size: 10.5pt; color: #475569; font-weight: 600; margin-top: 6px;">Figure: {desc}</div>\n'
+                                            f'</div>\n{glossary_html}\n'
+                                        )
+                                        extracted_text = extracted_text[:m.start()] + diag_html + extracted_text[m.end():]
+                                
+                                # 2. Next, inject any PDF XObject diagrams if available
+                                diags = c.get("scanned_diagrams", [])
+                                if diags:
+                                    diags.sort(key=lambda d: d.get("y_rel", 0.5))
+                                    for diag_item in diags:
+                                        diag_html = (
+                                            f'\n\n<div class="diagram-container" align="center" style="margin: 14px 0; break-inside: avoid; page-break-inside: avoid;">\n'
+                                            f'  <img src="{diag_item["rel_path"]}" alt="Figure Diagram" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
+                                            f'</div>\n\n'
+                                        )
+                                        placeholder_match = re.search(r'(\[(?:Diagram|Figure|Image|चित्र|डायग्राम)[^\]]*\]|\((?:Figure|Fig\.|चित्र)[^\)]*\))', extracted_text, re.IGNORECASE)
+                                        if placeholder_match:
+                                            extracted_text = extracted_text[:placeholder_match.start()] + diag_html + extracted_text[placeholder_match.end():]
+                                        else:
+                                            y_rel = diag_item.get("y_rel", 0.5)
+                                            target_char_idx = int(y_rel * len(extracted_text))
+                                            split_pos = extracted_text.find('\n\n', target_char_idx)
+                                            if split_pos == -1:
+                                                split_pos = extracted_text.rfind('\n\n', 0, target_char_idx)
+                                            if split_pos != -1:
+                                                extracted_text = extracted_text[:split_pos] + diag_html + extracted_text[split_pos:]
                                             else:
-                                                y_rel = diag_item.get("y_rel", 0.5)
-                                                target_char_idx = int(y_rel * len(extracted_text))
-                                                split_pos = extracted_text.find('\n\n', target_char_idx)
-                                                if split_pos == -1:
-                                                    split_pos = extracted_text.rfind('\n\n', 0, target_char_idx)
-                                                if split_pos != -1:
-                                                    extracted_text = extracted_text[:split_pos] + diag_html + extracted_text[split_pos:]
-                                                else:
-                                                    extracted_text = extracted_text + diag_html
-                                    
-                                    # 3. Clean up or style any residual unreplaced [Figure: <desc>] tags
-                                    # Never leak raw bracket tags into text or slice words
-                                    def _replace_residual_tag(match):
-                                        tag_text = match.group(0)
-                                        # Extract the description inside the brackets
-                                        inner = re.sub(r'^\[(?:Figure|Diagram|Image|चित्र|डायग्राम):\s*|\s*\]$', '', tag_text, flags=re.IGNORECASE).strip()
-                                        if len(inner) > 3 and not inner.lower().startswith("bbox"):
-                                            return f'\n\n<div class="diagram-callout" style="margin: 12px 0; padding: 10px 14px; background: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 6px; font-size: 11pt; color: #1e3a8a;">📌 <strong>Illustration:</strong> {inner}</div>\n\n'
-                                        return ''
-                                    
-                                    extracted_text = re.sub(r'\[(?:Figure|Diagram|Image|चित्र|डायग्राम)[^\]]*\]', _replace_residual_tag, extracted_text, flags=re.IGNORECASE)
-                                    extracted_text = re.sub(r'\((?:Figure|Fig\.|\u091a\u093f\u0924\u094d\u0930)[^\)]*\)', '', extracted_text)
-                                    final_markdown_pages[pnum] = [extracted_text]
-                                else:
-                                    b_idx = c["block_idx"]
-                                    final_markdown_pages[pnum][b_idx] = f"\n\n{extracted_text}\n\n"
-                                    
-                    try:
-                        loop = asyncio.get_running_loop()
-                    except RuntimeError:
-                        loop = None
-                        
-                    if loop and loop.is_running():
-                        with concurrent.futures.ThreadPoolExecutor() as pool:
-                            pool.submit(asyncio.run, process_all_chunks()).result()
-                    else:
-                        asyncio.run(process_all_chunks())
-                    self._report(f"AI Reading: Completed.", 65)
+                                                extracted_text = extracted_text + diag_html
+                                
+                                # 3. Clean up or style any residual unreplaced [Figure: <desc>] tags
+                                # Never leak raw bracket tags into text or slice words
+                                def _replace_residual_tag(match):
+                                    tag_text = match.group(0)
+                                    # Extract the description inside the brackets
+                                    inner = re.sub(r'^\[(?:Figure|Diagram|Image|चित्र|डायग्राम):\s*|\s*\]$', '', tag_text, flags=re.IGNORECASE).strip()
+                                    if len(inner) > 3 and not inner.lower().startswith("bbox"):
+                                        return f'\n\n<div class="diagram-callout" style="margin: 12px 0; padding: 10px 14px; background: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 6px; font-size: 11pt; color: #1e3a8a;">📌 <strong>Illustration:</strong> {inner}</div>\n\n'
+                                    return ''
+                                
+                                extracted_text = re.sub(r'\[(?:Figure|Diagram|Image|चित्र|डायग्राम)[^\]]*\]', _replace_residual_tag, extracted_text, flags=re.IGNORECASE)
+                                extracted_text = re.sub(r'\((?:Figure|Fig\.|\u091a\u093f\u0924\u094d\u0930)[^\)]*\)', '', extracted_text)
+                                final_markdown_pages[pnum] = [extracted_text]
+                            else:
+                                b_idx = c["block_idx"]
+                                final_markdown_pages[pnum][b_idx] = f"\n\n{extracted_text}\n\n"
+                                
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+                    
+                if loop and loop.is_running():
+                    with concurrent.futures.ThreadPoolExecutor() as pool:
+                        pool.submit(asyncio.run, process_all_chunks()).result()
+                else:
+                    asyncio.run(process_all_chunks())
+                self._report(f"AI Reading: Completed.", 65)
                 # Combine pages
                 for p in range(len(doc)):
                     if p not in final_markdown_pages:
