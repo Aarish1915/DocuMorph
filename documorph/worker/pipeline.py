@@ -342,10 +342,8 @@ class DocuMorphOrchestrator:
                     # Partitioning into concurrent chunks of 2-3 pages allows parallel decoding across Semaphore(3),
                     # slashing LLM generation latency from ~40s down to ~16s!
                     total_crops = len(crops_to_batch)
-                    if total_crops <= 4:
-                        batch_size = 2
-                    elif total_crops <= 9:
-                        batch_size = 3
+                    if total_crops <= 5:
+                        batch_size = 5
                     elif total_crops <= 19:
                         batch_size = 5
                     else:

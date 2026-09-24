@@ -77,7 +77,7 @@ export default function ProgressCard({
     return () => clearInterval(tipInterval);
   }, [jobStatus, isComplete, isError]);
 
-  // Smooth micro-stepping / synthetic lerp state: strictly cap at 92% until complete
+  // Smooth micro-stepping / synthetic lerp state: strictly follows authentic backend progress
   const targetProgress = Math.max(0, Math.min(100, Number(jobStatus?.progress) || 0));
   const [displayProgress, setDisplayProgress] = useState(targetProgress);
 
@@ -85,15 +85,12 @@ export default function ProgressCard({
     const interval = setInterval(() => {
       setDisplayProgress((prev) => {
         if (isComplete) return 100;
-        // Freeze guard: never exceed 92% until status === 'COMPLETED'
-        const cappedTarget = Math.min(92, targetProgress);
-        if (prev < cappedTarget) {
-          const step = Math.max(0.3, (cappedTarget - prev) * 0.15);
-          return Math.min(cappedTarget, prev + step);
-        }
-        // Micro-creep while backend typesets
-        if (!isComplete && !isError && prev < 92) {
-          return Math.min(92, prev + 0.1);
+        // Strictly converge to backend reported progress
+        if (prev < targetProgress) {
+          const step = Math.max(0.5, (targetProgress - prev) * 0.25);
+          return Math.min(targetProgress, prev + step);
+        } else if (prev > targetProgress) {
+          return targetProgress;
         }
         return prev;
       });
@@ -129,7 +126,8 @@ export default function ProgressCard({
   };
 
   const currentDisplayPct = Math.round(displayProgress);
-  const stageProgress = displayProgress > 0 ? getStagePercentage(displayProgress) : 0;
+  const isActivelyProcessing = jobStatus?.status === 'PROCESSING' || jobStatus?.status === 'QUEUED_REPROCESS';
+  const stageProgress = (isActivelyProcessing && displayProgress > 0) ? getStagePercentage(displayProgress) : 0;
 
   // Calculate compression statistics
   const origSize = jobStatus.original_file_size || 0;

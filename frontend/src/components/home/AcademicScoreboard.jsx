@@ -40,7 +40,7 @@ const BENCHMARKS = [
 
 export default function AcademicScoreboard() {
   return (
-    <section className="academic-scoreboard-section" aria-label="Academic Proof Scoreboard">
+    <section className="academic-scoreboard-section" id="scoreboard" aria-label="Academic Proof Scoreboard">
       <div className="scoreboard-container">
         <div className="scoreboard-header">
           <div className="scoreboard-pill">

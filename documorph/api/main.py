@@ -812,14 +812,23 @@ async def download_file(job_id: str, db: Session = Depends(get_db)):
         ".json": "application/json; charset=utf-8",
     }
     media_type = media_types.get(ext, "application/octet-stream")
-    filename = os.path.basename(file_rel)
+    raw_filename = os.path.basename(file_rel)
+    # Clean up filename for user downloads: e.g. FINAL_1790098911_job_xxx_notes.pdf -> CleanNotes_notes.pdf
+    clean_filename = re.sub(r'^(?:FINAL|TRANSLATED|COMPRESSED|EXTRACTED)_[0-9]+_(?:job_[a-f0-9]+_)?', 'CleanNotes_', raw_filename)
+    if not clean_filename or clean_filename == "CleanNotes_":
+        clean_filename = f"CleanNotes_Output{ext}"
+
+    file_size = os.path.getsize(file_rel) if os.path.exists(file_rel) else 0
     return FileResponse(
         file_rel, 
         media_type=media_type, 
-        filename=filename,
+        filename=clean_filename,
         content_disposition_type="attachment",
         headers={
-            "Access-Control-Expose-Headers": "Content-Disposition"
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Length",
+            "Content-Length": str(file_size),
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-transform, max-age=3600"
         }
     )
 

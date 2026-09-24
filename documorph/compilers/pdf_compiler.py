@@ -118,8 +118,6 @@ class PDFCompiler:
 
         return f"""
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap');
-            
             :root {{
                 --primary: #1e40af;
                 --primary-light: #eff6ff;
@@ -221,13 +219,17 @@ class PDFCompiler:
             
             table {{
                 width: 100%;
+                max-width: 100%;
                 border-collapse: collapse;
                 margin: {table_margin};
                 border: 1px solid #cbd5e1;
                 table-layout: auto;
                 word-wrap: break-word;
+                word-break: break-word;
+                overflow-wrap: break-word;
                 font-size: {table_font_size};
                 break-inside: avoid;
+                page-break-inside: avoid;
             }}
             
             th, td {{
@@ -236,6 +238,14 @@ class PDFCompiler:
                 text-align-last: left;
                 border: 1px solid #cbd5e1;
                 vertical-align: top;
+                word-break: break-word;
+                overflow-wrap: break-word;
+            }}
+
+            td p, th p {{
+                margin: 0 !important;
+                padding: 0 !important;
+                line-height: inherit !important;
             }}
             
             .math-raw-fallback {{
@@ -433,7 +443,7 @@ class PDFCompiler:
 
         # 6. Ensure blank lines before and after tables without breaking row continuity
         markdown_text = re.sub(r'([^\n|])\n(\|)', r'\1\n\n\2', markdown_text)
-        markdown_text = re.sub(r'(\|\n)([^|\n])', r'\1\n\2', markdown_text)
+        markdown_text = re.sub(r'(\|\n)([^|\n])', r'\1\n\n\2', markdown_text)
 
         # 4. Shield all math blocks into safe token placeholders before Markdown parsing
         math_store = {}
@@ -542,7 +552,7 @@ class PDFCompiler:
                 }
               };
             </script>
-            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
             """
         else:
             mathjax_block = """
