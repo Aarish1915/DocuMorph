@@ -29,7 +29,7 @@ export function getStoredConfig() {
   return {
     laptopUrl: localStorage.getItem('documorph_tunnel_url') || import.meta.env.VITE_TUNNEL_URL || '',
     renderUrl: finalRenderUrl,
-    preferred: localStorage.getItem('documorph_backend_pref') || 'auto', // 'auto' | 'laptop' | 'render'
+    preferred: localStorage.getItem('documorph_backend_pref') || 'render', // Default to render for 24/7 cloud performance
   };
 }
 
@@ -142,7 +142,7 @@ export function getApiBaseSync() {
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:8000';
   }
-  return config.laptopUrl || config.renderUrl || DEFAULT_RENDER_CLOUD;
+  return config.renderUrl || DEFAULT_RENDER_CLOUD;
 }
 
 // Backward-compatible export

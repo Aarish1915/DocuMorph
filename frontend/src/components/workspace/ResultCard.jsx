@@ -12,6 +12,13 @@ export default function ResultCard({
   const [isCopied, setIsCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const activeBase = API_BASE || 'https://documorph-v1.onrender.com';
+  const downloadUrl = jobStatus?.download_url
+    ? (jobStatus.download_url.startsWith('http') ? jobStatus.download_url : `${activeBase}${jobStatus.download_url}`)
+    : jobStatus?.result_url
+    ? `${activeBase}/api/download/${jobStatus.id}`
+    : `${activeBase}/api/download/${jobStatus?.id || 'latest'}`;
+
   // Compute clean user-facing download filename
   const baseName = (fileName || 'Document').replace(/\.[^/.]+$/, '');
   let defaultExt = '.pdf';
@@ -71,12 +78,6 @@ export default function ResultCard({
   const origMB = (origBytes / (1024 * 1024)).toFixed(1);
   const compMB = (compBytes / (1024 * 1024)).toFixed(1);
   const sizeSavedPct = Math.max(10, Math.round(((origBytes - compBytes) / origBytes) * 100));
-
-  const downloadUrl = jobStatus?.download_url
-    ? `${API_BASE}${jobStatus.download_url}`
-    : jobStatus?.result_url
-    ? `${API_BASE}/api/download/${jobStatus.id}`
-    : `${API_BASE}/api/download/${jobStatus?.id || 'latest'}`;
 
   const handleCopy = async () => {
     try {

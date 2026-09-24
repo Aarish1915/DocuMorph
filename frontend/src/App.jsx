@@ -302,7 +302,7 @@ export default function App() {
       };
 
       pollOnce();
-      activeStreamRef.current.pollTimer = setInterval(pollOnce, 2000);
+      activeStreamRef.current.pollTimer = setInterval(pollOnce, 750);
     };
 
     try {
