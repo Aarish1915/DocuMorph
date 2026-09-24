@@ -1,187 +1,209 @@
 /* =====================================================
    DocuMorph Ultra-Modern Design System Tokens
-   Aesthetic: Silicon Valley Midnight Sapphire (Dark) & Editorial Slate (Light)
-   Typography: Plus Jakarta Sans / Inter + JetBrains Mono (Code/Numbers)
-   Accents: Electric Indigo (#6366F1 / #4F46E5) + Thematic Tool Colors
+   Typography: Outfit (Display) + Plus Jakarta Sans (Body) + JetBrains Mono (Code)
+   Themes: Obsidian Dark (Zinc-950) & Editorial Snow Light
    ===================================================== */
 
 :root {
   /* Typography Engine */
-  --font-display: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-body: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --font-family: var(--font-body);
 
-  /* Precise Type Scale (WCAG Compliant, Min 12px) */
+  /* Precise Type Scale */
+  /* Precise Type Scale (Min 12px WCAG compliant) */
   --font-2xs: 12px;
-  --font-xs: 13px;
-  --font-sm: 14px;
+  --font-xs: 12.5px;
+  --font-sm: 13.5px;
   --font-base: 15px;
   --font-md: 17px;
   --font-lg: 20px;
   --font-xl: 24px;
-  --font-2xl: 30px;
-  --font-3xl: 38px;
+  --font-2xl: 32px;
+  --font-3xl: 44px;
 
   /* Line Heights */
-  --lh-tight: 1.25;
-  --lh-snug: 1.375;
+  --lh-tight: 1.2;
+  --lh-snug: 1.35;
   --lh-normal: 1.5;
   --lh-relaxed: 1.65;
 
   /* Corner Radii (Usability Heuristics standard: max 4 scales + full) */
   --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-full: 9999px;
 
-  /* Color System — Light Theme (Editorial Slate / Clean Snow) */
-  --bg-app: #F8FAFC;              /* Slate-50 Crisp Canvas */
-  --bg-surface: #FFFFFF;          /* Pure White Card */
-  --bg-surface-2: #F1F5F9;        /* Slate-100 for nested panels & subtle bars */
-  --bg-hover: #E2E8F0;            /* Slate-200 for hover */
-  --bg-active: #CBD5E1;           /* Slate-300 */
+  /* Color Tokens - Editorial Snow Light Theme */
+  --bg-page: #fafafa;
+  --bg-secondary: #f4f4f6;
+  --surface-white: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-card: #ffffff;
+  --surface-card-hover: #fcfcfd;
+  --surface-selected: #f0f4ff;
   
-  --border: #E2E8F0;              /* Slate-200 crisp 1px border */
-  --border-subtle: #F1F5F9;       /* Slate-100 faint dividers */
-  --border-hover: #CBD5E1;        /* Slate-300 */
+  --border-default: #e4e4e7;
+  --border-subtle: #f1f1f4;
+  --border-active: #4f46e5;
+  --border-hover: #d4d4d8;
+
+  --color-primary: #4f46e5;
+  --color-primary-hover: #4338ca;
+  --color-primary-light: #eef2ff;
+  --color-primary-glow: rgba(79, 70, 229, 0.2);
   
-  --text-1: #0F172A;              /* Slate-900 high contrast ink */
-  --text-2: #475569;              /* Slate-600 readable secondary */
-  --text-3: #64748B;              /* Slate-500 muted hints / timestamps */
-  --text-inverse: #FFFFFF;        /* Inverted text */
+  --text-main: #09090b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --text-subtle: #a1a1aa;
+  --text-light: #d4d4d8;
+  --text-code: #18181b;
 
-  /* Primary Accent: Electric Indigo / Sapphire */
-  --accent: #4F46E5;              /* Indigo-600 */
-  --accent-hover: #4338CA;        /* Indigo-700 */
-  --accent-soft: #EEF2FF;         /* Indigo-50 */
-  --accent-border: #C7D2FE;       /* Indigo-200 */
-  --accent-glow: rgba(79, 70, 229, 0.2);
+  --color-success: #10b981;
+  --color-success-bg: #ecfdf5;
+  --color-success-border: #a7f3d0;
 
-  /* Functional Status Colors */
-  --success: #10B981;             /* Emerald-500 */
-  --success-soft: #ECFDF5;        /* Emerald-50 */
-  --success-border: #A7F3D0;      /* Emerald-200 */
+  --color-danger: #ef4444;
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #fecaca;
 
-  --warning: #F59E0B;             /* Amber-500 */
-  --warning-soft: #FFFBEB;        /* Amber-50 */
-  --warning-border: #FDE68A;      /* Amber-200 */
-
-  --danger: #EF4444;              /* Red-500 */
-  --danger-soft: #FEF2F2;         /* Red-50 */
-  --danger-border: #FECACA;       /* Red-200 */
-
-  /* Tool-Specific Thematic Palettes (Light Mode) */
-  --tool-clean-primary: #4F46E5;
-  --tool-clean-light: #EEF2FF;
-  --tool-clean-border: #C7D2FE;
-  --tool-clean-glow: rgba(79, 70, 229, 0.2);
-
-  --tool-compress-primary: #059669;
-  --tool-compress-light: #ECFDF5;
-  --tool-compress-border: #A7F3D0;
-  --tool-compress-glow: rgba(16, 185, 129, 0.2);
-
-  --tool-extract-primary: #D97706;
-  --tool-extract-light: #FFFBEB;
-  --tool-extract-border: #FDE68A;
-  --tool-extract-glow: rgba(245, 158, 11, 0.2);
-
-  --tool-translate-primary: #0284C7;
-  --tool-translate-light: #F0F9FF;
-  --tool-translate-border: #BAE6FD;
-  --tool-translate-glow: rgba(6, 182, 212, 0.2);
-
-  /* Backward-compatible token aliases */
-  --bg-page: var(--bg-app);
-  --bg-main: var(--bg-app);
-  --bg-secondary: var(--bg-surface-2);
-  --surface-card: var(--bg-surface);
-  --surface-white: var(--bg-surface);
-  --border-default: var(--border);
-  --border-color: var(--border);
-  --color-primary: var(--accent);
-  --color-primary-hover: var(--accent-hover);
-  --color-primary-light: var(--accent-soft);
-  --text-primary: var(--text-1);
-  --text-main: var(--text-1);
-  --text-secondary: var(--text-2);
-  --text-muted: var(--text-3);
-  --color-success: var(--success);
-  --color-danger: var(--danger);
-  --color-amber: var(--warning);
-
-  /* Shadows (Minimal, 1px-first philosophy) */
+  /* Modern Layered Shadows */
   --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
-  --shadow-card: 0 4px 12px -2px rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
-  --shadow-modal: 0 16px 36px -10px rgba(0, 0, 0, 0.18), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 14px 28px -6px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 22px 38px -10px rgba(0, 0, 0, 0.12);
 
-  /* Transition speeds */
-  --transition-fast: 120ms ease;
-  --transition-normal: 200ms ease;
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(228, 228, 231, 0.8);
+  --glass-blur: blur(14px);
+
+  /* Tool Specific Accent Palettes */
+  --tool-clean-primary: #6366f1;
+  --tool-clean-light: rgba(99, 102, 241, 0.08);
+  --tool-clean-glow: rgba(99, 102, 241, 0.25);
+  --tool-clean-border: rgba(99, 102, 241, 0.2);
+
+  --tool-compress-primary: #10b981;
+  --tool-compress-light: rgba(16, 185, 129, 0.08);
+  --tool-compress-glow: rgba(16, 185, 129, 0.25);
+  --tool-compress-border: rgba(16, 185, 129, 0.2);
+
+  --tool-extract-primary: #f59e0b;
+  --tool-extract-light: rgba(245, 158, 11, 0.08);
+  --tool-extract-glow: rgba(245, 158, 11, 0.25);
+  --tool-extract-border: rgba(245, 158, 11, 0.2);
+
+  --tool-translate-primary: #06b6d4;
+  --tool-translate-light: rgba(6, 182, 212, 0.08);
+  --tool-translate-glow: rgba(6, 182, 212, 0.25);
+  --tool-translate-border: rgba(6, 182, 212, 0.2);
+
+  /* Active tool defaults */
+  --tool-primary: var(--color-primary);
+  --tool-light: var(--color-primary-light);
+  --tool-glow: var(--color-primary-glow);
+  --tool-border: var(--border-default);
 }
 
 /* =====================================================
-   Dark Theme (Silicon Valley Midnight Sapphire / Carbon Slate)
+   Silicon Valley Midnight Sapphire Theme (Linear / Vercel Pro)
    ===================================================== */
 [data-theme="dark"] {
-  --bg-app: #0B0F19;              /* Midnight Sapphire Background */
-  --bg-surface: #111827;          /* Carbon Slate-900 Card */
-  --bg-surface-2: #1E293B;        /* Slate-800 Nested Toolbars */
-  --bg-hover: #1F2937;            /* Slate-750 Hover */
-  --bg-active: #374151;           /* Slate-700 Active */
-  
-  --border: rgba(255, 255, 255, 0.09);       /* Clean Crisp Translucent Border */
-  --border-subtle: rgba(255, 255, 255, 0.04);/* Muted Divider */
-  --border-hover: rgba(99, 102, 241, 0.4);   /* Sapphire Highlight */
-  
-  --text-1: #F8FAFC;              /* Slate-50 Crisp White */
-  --text-2: #CBD5E1;              /* Slate-300 Readable Secondary */
-  --text-3: #94A3B8;              /* Slate-400 Muted Hints */
-  --text-inverse: #0B0F19;
+  --bg-page: #0b0f19;
+  --bg-secondary: #0f172a;
+  --surface-white: #111827;
+  --surface-subtle: #131b2e;
+  --surface-card: rgba(17, 24, 39, 0.78);
+  --surface-card-hover: rgba(26, 36, 56, 0.88);
+  --surface-selected: rgba(99, 102, 241, 0.16);
 
-  /* Accent: Vivid Electric Sapphire / Indigo */
-  --accent: #6366F1;              /* Indigo-500 */
-  --accent-hover: #818CF8;        /* Indigo-400 */
-  --accent-soft: rgba(99, 102, 241, 0.14);
-  --accent-border: rgba(99, 102, 241, 0.35);
-  --accent-glow: rgba(99, 102, 241, 0.3);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-active: #6366f1;
+  --border-hover: rgba(99, 102, 241, 0.35);
 
-  --success: #10B981;             /* Emerald-500 */
-  --success-soft: rgba(16, 185, 129, 0.14);
-  --success-border: rgba(16, 185, 129, 0.35);
+  --color-primary: #6366f1;
+  --color-primary-hover: #818cf8;
+  --color-primary-light: rgba(99, 102, 241, 0.15);
+  --color-primary-glow: rgba(99, 102, 241, 0.35);
 
-  --warning: #F59E0B;             /* Amber-500 */
-  --warning-soft: rgba(245, 158, 11, 0.14);
-  --warning-border: rgba(245, 158, 11, 0.35);
+  --text-main: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --text-light: #475569;
+  --text-code: #f1f5f9;
 
-  --danger: #F43F5E;              /* Rose-500 */
-  --danger-soft: rgba(244, 63, 94, 0.14);
-  --danger-border: rgba(244, 63, 94, 0.35);
+  --color-success: #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.12);
+  --color-success-border: rgba(16, 185, 129, 0.3);
 
-  /* Tool-Specific Thematic Palettes (Dark Mode) */
-  --tool-clean-primary: #818CF8;
-  --tool-clean-light: rgba(129, 140, 248, 0.14);
-  --tool-clean-border: rgba(129, 140, 248, 0.35);
-  --tool-clean-glow: rgba(129, 140, 248, 0.3);
+  --color-danger: #f43f5e;
+  --color-danger-bg: rgba(244, 63, 94, 0.12);
+  --color-danger-border: rgba(244, 63, 94, 0.3);
 
-  --tool-compress-primary: #34D399;
-  --tool-compress-light: rgba(52, 211, 153, 0.14);
-  --tool-compress-border: rgba(52, 211, 153, 0.35);
-  --tool-compress-glow: rgba(52, 211, 153, 0.3);
-
-  --tool-extract-primary: #FBBF24;
-  --tool-extract-light: rgba(251, 191, 36, 0.14);
-  --tool-extract-border: rgba(251, 191, 36, 0.35);
-  --tool-extract-glow: rgba(251, 191, 36, 0.3);
-
-  --tool-translate-primary: #38BDF8;
-  --tool-translate-light: rgba(56, 189, 248, 0.14);
-  --tool-translate-border: rgba(56, 189, 248, 0.35);
-  --tool-translate-glow: rgba(56, 189, 248, 0.3);
-
-  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  /* Modern Ambient Shadows & Luminous Borders */
+  --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
   --shadow-card: 0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
-  --shadow-modal: 0 20px 48px -8px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-hover: 0 16px 36px -6px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(99, 102, 241, 0.45);
+  --shadow-lg: 0 28px 56px -12px rgba(0, 0, 0, 0.8);
+
+  /* Atmospheric Glassmorphism */
+  --glass-bg: rgba(15, 23, 42, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-blur: blur(16px);
+
+  /* Tool Accents for Midnight Mode */
+  --tool-clean-primary: #818cf8;
+  --tool-clean-light: rgba(129, 140, 248, 0.12);
+  --tool-clean-glow: rgba(129, 140, 248, 0.35);
+  --tool-clean-border: rgba(129, 140, 248, 0.25);
+
+  --tool-compress-primary: #34d399;
+  --tool-compress-light: rgba(52, 211, 153, 0.12);
+  --tool-compress-glow: rgba(52, 211, 153, 0.35);
+  --tool-compress-border: rgba(52, 211, 153, 0.25);
+
+  --tool-extract-primary: #fbbf24;
+  --tool-extract-light: rgba(251, 191, 36, 0.12);
+  --tool-extract-glow: rgba(251, 191, 36, 0.35);
+  --tool-extract-border: rgba(251, 191, 36, 0.25);
+
+  --tool-translate-primary: #38bdf8;
+  --tool-translate-light: rgba(56, 189, 248, 0.12);
+  --tool-translate-glow: rgba(56, 189, 248, 0.35);
+  --tool-translate-border: rgba(56, 189, 248, 0.25);
+}
+
+/* Tool Theme Scoping */
+.tool-theme-clean {
+  --tool-primary: var(--tool-clean-primary);
+  --tool-light: var(--tool-clean-light);
+  --tool-glow: var(--tool-clean-glow);
+  --tool-border: var(--tool-clean-border);
+}
+
+.tool-theme-compress {
+  --tool-primary: var(--tool-compress-primary);
+  --tool-light: var(--tool-compress-light);
+  --tool-glow: var(--tool-compress-glow);
+  --tool-border: var(--tool-compress-border);
+}
+
+.tool-theme-extract {
+  --tool-primary: var(--tool-extract-primary);
+  --tool-light: var(--tool-extract-light);
+  --tool-glow: var(--tool-extract-glow);
+  --tool-border: var(--tool-extract-border);
+}
+
+.tool-theme-translate {
+  --tool-primary: var(--tool-translate-primary);
+  --tool-light: var(--tool-translate-light);
+  --tool-glow: var(--tool-translate-glow);
+  --tool-border: var(--tool-translate-border);
 }

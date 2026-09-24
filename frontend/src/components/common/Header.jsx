@@ -1,136 +1,162 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 export default function Header({
+  step = 1,
+  serviceTitle = 'Clean & Format',
   activeView = 'home',
   onNavigateView,
+  onBack,
+  onNewJob,
+  onToggleHistory,
+  historyCount = 0,
   appliedTheme = 'light',
   onToggleTheme,
   onOpenDonation,
 }) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isHome = activeView === 'home';
-
-  const handleNav = (view) => {
-    setMobileMenuOpen(false);
-    onNavigateView(view);
-  };
-
-  const scrollToSection = (sectionId) => {
-    setMobileMenuOpen(false);
-    const el = document.getElementById(sectionId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      onNavigateView('home');
-      setTimeout(() => {
-        const target = document.getElementById(sectionId);
-        if (target) target.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    }
-  };
-
   return (
-    <header className="app-header">
+    <header className="site-header">
       <div className="header-inner">
-        {/* Left: Brand Logo & Title */}
-        <div className="header-brand-wrap">
-          {!isHome && (
+        {step === 1 ? (
+          /* Step 1: Minimal Header */
+          <div className="header-left">
+            {activeView !== 'home' && (
+              <button 
+                type="button"
+                className="back-button" 
+                onClick={() => onNavigateView ? onNavigateView('home') : onNewJob()} 
+                aria-label="Back to all tools"
+                title="Back to All Tools"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+              </button>
+            )}
+            <div 
+              className="brand-logo" 
+              onClick={() => onNavigateView ? onNavigateView('home') : onNewJob()} 
+              role="button" 
+              tabIndex={0}
+              title="DocuMorph Home"
+            >
+              <div className="brand-icon-modern">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <defs>
+                    <linearGradient id="dm-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#6366f1" />
+                      <stop offset="50%" stopColor="#4f46e5" />
+                      <stop offset="100%" stopColor="#06b6d4" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="2" y="2" width="20" height="20" rx="6" fill="url(#dm-grad)" />
+                  <path d="M7 7H12.5C14.9853 7 17 9.01472 17 11.5C17 13.9853 14.9853 16 12.5 16H7V7Z" stroke="#ffffff" strokeWidth="2.2" strokeLinejoin="round" />
+                  <circle cx="15.5" cy="8.5" r="1.5" fill="#34d399" />
+                </svg>
+              </div>
+              <span className="brand-name">DocuMorph <span className="brand-badge-ai">AI</span></span>
+            </div>
+          </div>
+        ) : (
+          /* Step 2-4: Cockpit & Back Header */
+          <div className="header-left">
+            <button 
+              type="button"
+              className="back-button" 
+              onClick={onBack} 
+              aria-label={step === 4 ? "Back to all tools" : "Go back to previous step"}
+              title={step === 4 ? "Back to Tools" : "Back"}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </button>
+            <div className="step-title-group">
+              <span className="service-heading">{serviceTitle}</span>
+              {step === 4 ? (
+                <span className="cockpit-status-badge">
+                  <span className="cockpit-status-dot"></span>
+                  <span>AI Transformation Cockpit</span>
+                </span>
+              ) : (
+                <span className="step-indicator-text">Step {step} of 4</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Desktop Tool Navigation */}
+        {step === 1 && onNavigateView && (
+          <nav className="header-nav-tools" aria-label="Tool Navigation">
             <button
               type="button"
-              className="btn-header-back"
-              onClick={() => handleNav('home')}
-              aria-label="Back to document tools"
-              title="Back to Document Tools"
+              className={`nav-tool-link ${activeView === 'home' ? 'active' : ''}`}
+              onClick={() => onNavigateView('home')}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12" />
-                <polyline points="12 19 5 12 12 5" />
-              </svg>
-              <span className="btn-back-label">Workspace</span>
+              All Tools
             </button>
+            <button
+              type="button"
+              className={`nav-tool-link ${activeView === 'clean' ? 'active' : ''}`}
+              onClick={() => onNavigateView('clean')}
+            >
+              <span>✨</span> Clean &amp; Format
+            </button>
+            <button
+              type="button"
+              className={`nav-tool-link ${activeView === 'compress' ? 'active' : ''}`}
+              onClick={() => onNavigateView('compress')}
+            >
+              <span>📉</span> Compress
+            </button>
+            <button
+              type="button"
+              className={`nav-tool-link ${activeView === 'extract' ? 'active' : ''}`}
+              onClick={() => onNavigateView('extract')}
+            >
+              <span>📋</span> Extract
+            </button>
+            <button
+              type="button"
+              className={`nav-tool-link ${activeView === 'translate' ? 'active' : ''}`}
+              onClick={() => onNavigateView('translate')}
+            >
+              <span>🌐</span> Translate
+            </button>
+            <button
+              type="button"
+              className={`nav-tool-link ${activeView === 'backers' ? 'active' : ''}`}
+              onClick={() => onNavigateView('backers')}
+            >
+              <span>🏆</span> Backers
+            </button>
+          </nav>
+        )}
+
+        <div className="header-right">
+          {step > 1 && step < 4 && (
+            /* 4-dash Progress Bar only on intermediate wizard steps */
+            <div className="step-dash-bar" aria-label={`Step ${step} of 4`}>
+              {[1, 2, 3, 4].map((dashStep) => (
+                <div
+                  key={dashStep}
+                  className={`dash-segment ${dashStep <= step ? 'filled' : 'empty'}`}
+                />
+              ))}
+            </div>
           )}
 
-          <div
-            className="header-brand"
-            onClick={() => handleNav('home')}
-            role="button"
-            tabIndex={0}
-            title="DocuMorph AI Studio"
-          >
-            <div className="brand-icon-box">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-                <path d="m10 13-2 2 2 2" />
-                <path d="m14 17 2-2-2-2" />
-              </svg>
-            </div>
-            <span className="brand-title">DocuMorph</span>
-            <span className="brand-badge">ACADEMIC</span>
-          </div>
-        </div>
-
-        {/* Center: Desktop Navigation Bar */}
-        <nav className="header-desktop-nav" aria-label="Main Navigation">
-          <button
+          {/* Theme Toggle (Sun / Moon) */}
+          <button 
             type="button"
-            className={`nav-link-btn ${isHome ? 'active' : ''}`}
-            onClick={() => handleNav('home')}
-          >
-            Tools
-          </button>
-          <button
-            type="button"
-            className="nav-link-btn"
-            onClick={() => scrollToSection('scoreboard')}
-          >
-            Proof Scoreboard
-          </button>
-          <button
-            type="button"
-            className="nav-link-btn"
-            onClick={() => scrollToSection('how-it-works')}
-          >
-            3-Pass Engine
-          </button>
-          <button
-            type="button"
-            className={`nav-link-btn ${activeView === 'community' ? 'active' : ''}`}
-            onClick={() => handleNav('community')}
-          >
-            Wall of Fame
-          </button>
-          <button
-            type="button"
-            className={`nav-link-btn ${activeView === 'faq' ? 'active' : ''}`}
-            onClick={() => handleNav('faq')}
-          >
-            FAQ
-          </button>
-        </nav>
-
-        {/* Right: Header Action Buttons */}
-        <div className="header-actions">
-          <button
-            type="button"
-            className="btn-header-fuel"
-            onClick={onOpenDonation}
-            title="Fuel Server Costs — 100% Student Free"
-          >
-            <span className="fuel-icon">☕</span>
-            <span className="fuel-label">Fuel Server</span>
-            <span className="fuel-amount-badge">₹20</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn-header-theme"
+            className="header-icon-btn theme-toggle-btn" 
             onClick={onToggleTheme}
-            aria-label={`Switch to ${appliedTheme === 'dark' ? 'light' : 'dark'} mode`}
-            title={`Switch to ${appliedTheme === 'dark' ? 'light' : 'dark'} mode`}
+            title={appliedTheme === 'dark' ? 'Switch to Light theme' : 'Switch to Dark theme'}
+            aria-label="Toggle light/dark theme"
           >
             {appliedTheme === 'dark' ? (
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="5" />
                 <line x1="12" y1="1" x2="12" y2="3" />
                 <line x1="12" y1="21" x2="12" y2="23" />
@@ -142,96 +168,61 @@ export default function Header({
                 <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
               </svg>
             ) : (
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             )}
           </button>
 
-          {/* Mobile Menu Button */}
-          <button
+          <button 
             type="button"
-            className="btn-header-mobile-toggle"
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
-            aria-label="Toggle Navigation Menu"
-            aria-expanded={mobileMenuOpen}
+            className="header-action-btn history-header-btn" 
+            onClick={onToggleHistory}
+            title="Recent Document Transformations"
+            aria-label={`Recent Jobs history (${historyCount})`}
           >
-            {mobileMenuOpen ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            )}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span className="btn-label">History</span>
+            {historyCount > 0 && <span className="history-pill">{historyCount}</span>}
           </button>
         </div>
       </div>
 
-      {/* Mobile Drawer Dropdown */}
-      {mobileMenuOpen && (
-        <div className="header-mobile-drawer">
-          <nav className="mobile-drawer-nav">
-            <button
-              type="button"
-              className={`mobile-nav-item ${isHome ? 'active' : ''}`}
-              onClick={() => handleNav('home')}
-            >
-              <span>📄 Document Workspace</span>
-            </button>
-            <button
-              type="button"
-              className="mobile-nav-item"
-              onClick={() => scrollToSection('scoreboard')}
-            >
-              <span>🏆 Empirical Scoreboard</span>
-            </button>
-            <button
-              type="button"
-              className="mobile-nav-item"
-              onClick={() => scrollToSection('how-it-works')}
-            >
-              <span>🧠 The 3-Pass Engine</span>
-            </button>
-            <button
-              type="button"
-              className={`mobile-nav-item ${activeView === 'community' ? 'active' : ''}`}
-              onClick={() => handleNav('community')}
-            >
-              <span>⭐ Wall of Fame</span>
-            </button>
-            <button
-              type="button"
-              className={`mobile-nav-item ${activeView === 'faq' ? 'active' : ''}`}
-              onClick={() => handleNav('faq')}
-            >
-              <span>💡 Frequently Asked Questions</span>
-            </button>
-            <button
-              type="button"
-              className={`mobile-nav-item ${activeView === 'privacy' ? 'active' : ''}`}
-              onClick={() => handleNav('privacy')}
-            >
-              <span>🔒 Zero-Retention Privacy</span>
-            </button>
-            <div className="mobile-drawer-footer">
-              <button
-                type="button"
-                className="btn-mobile-fuel"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenDonation();
-                }}
-              >
-                <span>☕ Fuel Server (₹20 Chai)</span>
-              </button>
-            </div>
-          </nav>
-        </div>
+      {/* Mobile Tool Navigation: All 4 tools fitted evenly across screen */}
+      {step === 1 && onNavigateView && (
+        <nav className="mobile-tool-scroller" aria-label="Mobile Tool Navigation">
+          <button
+            type="button"
+            className={`mobile-nav-chip ${activeView === 'clean' ? 'active' : ''}`}
+            onClick={() => onNavigateView('clean')}
+          >
+            <span>✨</span> Clean
+          </button>
+          <button
+            type="button"
+            className={`mobile-nav-chip ${activeView === 'compress' ? 'active' : ''}`}
+            onClick={() => onNavigateView('compress')}
+          >
+            <span>📉</span> Compress
+          </button>
+          <button
+            type="button"
+            className={`mobile-nav-chip ${activeView === 'extract' ? 'active' : ''}`}
+            onClick={() => onNavigateView('extract')}
+          >
+            <span>📋</span> Extract
+          </button>
+          <button
+            type="button"
+            className={`mobile-nav-chip ${activeView === 'translate' ? 'active' : ''}`}
+            onClick={() => onNavigateView('translate')}
+          >
+            <span>🌐</span> Translate
+          </button>
+        </nav>
       )}
     </header>
   );

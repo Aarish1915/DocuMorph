@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { API_BASE, probeBackend } from '../../config';
+import { API_BASE_URL } from '../../config';
 
 const AMOUNT_PRESETS = [20, 50, 100, 200, 500];
 
@@ -14,7 +14,6 @@ export default function SubmitUtrModal({ isOpen, onClose, onDonationRecorded }) 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [geoDetecting, setGeoDetecting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -33,50 +32,6 @@ export default function SubmitUtrModal({ isOpen, onClose, onDonationRecorded }) 
     }
   };
 
-  // 1-Click Gen-Z Geo Flex auto-detector
-  const handleDetectLocation = async () => {
-    setGeoDetecting(true);
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const { latitude, longitude } = position.coords;
-            // Quick reverse geocode via free public API with 3s timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000);
-            const res = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
-              { signal: controller.signal }
-            );
-            clearTimeout(timeoutId);
-            if (res.ok) {
-              const data = await res.json();
-              const city = data.address?.city || data.address?.state_district || data.address?.state || 'India';
-              const state = data.address?.state;
-              const locationStr = state && state !== city ? `${city}, ${state}` : city;
-              setCollege(locationStr);
-            } else {
-              setCollege('Delhi, IN');
-            }
-          } catch {
-            setCollege('Kota, Rajasthan');
-          } finally {
-            setGeoDetecting(false);
-          }
-        },
-        () => {
-          // Denied or timeout: set smart fallback
-          setCollege('Kota, Rajasthan');
-          setGeoDetecting(false);
-        },
-        { timeout: 4000 }
-      );
-    } else {
-      setCollege('Delhi, IN');
-      setGeoDetecting(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -89,39 +44,36 @@ export default function SubmitUtrModal({ isOpen, onClose, onDonationRecorded }) 
     }
 
     const cleanUtr = utrReference.trim().replace(/\s+/g, '');
-    if (cleanUtr.length !== 12 || !/^\d{12}$/.test(cleanUtr)) {
-      setErrorMsg('Please enter an exact 12-digit UPI UTR / Transaction Reference Number.');
+    if (cleanUtr.length < 8 || cleanUtr.length > 30) {
+      setErrorMsg('Please enter a valid 12-digit UPI UTR / Transaction Reference Number.');
       return;
     }
 
     if (donorName.trim().length < 2) {
-      setErrorMsg('Please enter your name or batch/hostel name.');
+      setErrorMsg('Please enter your name or hostel / batch name.');
       return;
     }
 
     setSubmitting(true);
     try {
-      const node = await probeBackend();
-      const targetUrl = node.url || API_BASE;
-
-      const res = await fetch(`${targetUrl}/api/donations/submit-utr`, {
+      const res = await fetch(`${API_BASE_URL}/api/donations/submit-utr`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           donor_name: donorName.trim(),
           college: college.trim() || null,
-          amount: `₹${finalAmount}`,
+          amount: finalAmount,
           utr_reference: cleanUtr,
-          message: message.trim() || null,
-        }),
+          message: message.trim() || null
+        })
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || 'Failed to verify transaction. Please check UTR.');
+        throw new Error(data.detail || 'Failed to verify transaction. Please check the UTR number.');
       }
 
-      setSuccessMsg('🎉 Verified! Your name & tagline are now live on the Wall of Fame.');
+      setSuccessMsg('🎉 Verified! Your contribution is now shining on the Wall of Fame.');
       if (onDonationRecorded) {
         onDonationRecorded(data.donor);
       }
@@ -134,168 +86,140 @@ export default function SubmitUtrModal({ isOpen, onClose, onDonationRecorded }) 
         setMessage('');
       }, 2000);
     } catch (err) {
-      setErrorMsg(err.message || 'An error occurred during verification.');
+      setErrorMsg(err.message || 'An unexpected error occurred during verification.');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header-row">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '20px' }}>🏆</span>
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="submit-utr-title">
+      <div className="modal-dialog-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title-group">
+            <span className="modal-title-icon">🏆</span>
             <div>
-              <h2 className="modal-title">Record UPI Server Fuel</h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-3)' }}>
-                Flex your contribution &amp; tagline on the permanent Wall of Fame.
-              </p>
+              <h2 id="submit-utr-title" className="modal-title">Record UPI Server Fuel</h2>
+              <p className="modal-subtitle">Add your name, college, and message to the permanent Wall of Fame.</p>
             </div>
           </div>
-          <button type="button" className="btn-modal-close" onClick={onClose} aria-label="Close modal">
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close modal">
             &times;
           </button>
         </div>
 
         {errorMsg && (
-          <div style={{ padding: '10px 12px', borderRadius: '4px', background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', color: 'var(--danger)', fontSize: '13px' }}>
-            ⚠️ {errorMsg}
+          <div className="modal-alert modal-alert-error" role="alert">
+            <span>⚠️</span>
+            <span>{errorMsg}</span>
           </div>
         )}
 
         {successMsg && (
-          <div style={{ padding: '10px 12px', borderRadius: '4px', background: 'var(--success-soft)', border: '1px solid var(--success-border)', color: 'var(--success)', fontSize: '13px' }}>
-            {successMsg}
+          <div className="modal-alert modal-alert-success" role="alert">
+            <span>✅</span>
+            <span>{successMsg}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Amount Presets */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label className="setting-label">Fuel Contribution</label>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <form onSubmit={handleSubmit} className="modal-form">
+          {/* Amount presets */}
+          <div className="form-group">
+            <label className="form-label">Fuel Contribution Amount</label>
+            <div className="fuel-preset-chips">
               {AMOUNT_PRESETS.map((val) => (
                 <button
                   type="button"
                   key={val}
-                  className="sample-chip"
-                  style={{
-                    background: !isCustom && amount === val ? 'var(--accent)' : 'var(--bg-surface-2)',
-                    color: !isCustom && amount === val ? '#ffffff' : 'var(--text-1)',
-                    borderColor: !isCustom && amount === val ? 'var(--accent)' : 'var(--border)'
-                  }}
+                  className={`fuel-chip ${!isCustom && amount === val ? 'active' : ''}`}
                   onClick={() => handleSelectPreset(val)}
                 >
                   ₹{val}
                 </button>
               ))}
+              <div className="fuel-custom-chip-wrap">
+                <span className="rupee-prefix">₹</span>
+                <input
+                  type="text"
+                  placeholder="Custom"
+                  value={customAmount}
+                  onChange={handleCustomChange}
+                  className={`fuel-custom-input ${isCustom ? 'active' : ''}`}
+                  maxLength={5}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 12-Digit UPI UTR Reference */}
+          <div className="form-group">
+            <label htmlFor="utr-number" className="form-label">
+              12-Digit UPI UTR / Transaction ID *
+            </label>
+            <input
+              id="utr-number"
+              type="text"
+              className="form-input font-mono"
+              placeholder="e.g. 628491028471"
+              value={utrReference}
+              onChange={(e) => setUtrReference(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
+              maxLength={22}
+              required
+            />
+            <span className="input-hint">Found in Google Pay, PhonePe, or Paytm payment receipt details.</span>
+          </div>
+
+          {/* Name & College 2-Col */}
+          <div className="form-row-2col">
+            <div className="form-group">
+              <label htmlFor="donor-name-input" className="form-label">Your Name / Batch *</label>
               <input
+                id="donor-name-input"
                 type="text"
-                placeholder="Custom ₹"
-                value={customAmount}
-                onChange={handleCustomChange}
-                className="setting-input"
-                style={{ width: '80px', padding: '4px 8px', fontSize: '12px' }}
-                maxLength={5}
+                className="form-input"
+                placeholder="e.g. Aryan Sharma or Mech Batch 26"
+                value={donorName}
+                onChange={(e) => setDonorName(e.target.value)}
+                maxLength={60}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="donor-college-input" className="form-label">College / Institute</label>
+              <input
+                id="donor-college-input"
+                type="text"
+                className="form-input"
+                placeholder="e.g. IIT Delhi or Allen Kota"
+                value={college}
+                onChange={(e) => setCollege(e.target.value)}
+                maxLength={80}
               />
             </div>
           </div>
 
-          {/* 12-Digit UTR */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label className="setting-label" htmlFor="utr-ref">
-              12-Digit UPI UTR / Transaction ID *
+          {/* Message / Note */}
+          <div className="form-group">
+            <label htmlFor="donor-message-input" className="form-label">
+              Message on the Wall of Fame (Optional)
             </label>
             <input
-              id="utr-ref"
+              id="donor-message-input"
               type="text"
-              className="setting-input"
-              style={{ fontFamily: 'var(--font-mono)' }}
-              placeholder="e.g. 628491028471"
-              value={utrReference}
-              onChange={(e) => setUtrReference(e.target.value.replace(/\D/g, '').slice(0, 12))}
-              maxLength={12}
-              required
-            />
-            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
-              From Google Pay, PhonePe, Paytm, or CRED receipt details.
-            </span>
-          </div>
-
-          {/* Donor Name */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label className="setting-label" htmlFor="donor-name">Your Name / Nickname *</label>
-            <input
-              id="donor-name"
-              type="text"
-              className="setting-input"
-              placeholder="e.g. Aryan S. or IITD Mech Hostel"
-              value={donorName}
-              onChange={(e) => setDonorName(e.target.value)}
-              maxLength={60}
-              required
-            />
-          </div>
-
-          {/* Geo Flex Location with 1-Click Auto-Detect */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label className="setting-label" htmlFor="donor-loc">City / College Flex</label>
-              <button
-                type="button"
-                className="btn-geo-detect"
-                onClick={handleDetectLocation}
-                disabled={geoDetecting}
-                title="Auto-detect city without asking for personal address"
-              >
-                <span>📍</span>
-                <span>{geoDetecting ? 'Detecting...' : 'Auto-detect My City'}</span>
-              </button>
-            </div>
-            <input
-              id="donor-loc"
-              type="text"
-              className="setting-input"
-              placeholder="e.g. Kota, Rajasthan or Mukherjee Nagar"
-              value={college}
-              onChange={(e) => setCollege(e.target.value)}
-              maxLength={80}
-            />
-          </div>
-
-          {/* Custom Tagline / Shoutout */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label className="setting-label" htmlFor="donor-msg">
-              Tagline / Flex Quote on Wall
-            </label>
-            <input
-              id="donor-msg"
-              type="text"
-              className="setting-input"
-              placeholder="e.g. 'Saved ₹1,200 on printing!' or 'AIR 1 Loading 🚀'"
+              className="form-input"
+              placeholder="e.g. 'Saved 200 sheets on thermodynamics notes!' or 'Keep this free!'"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               maxLength={180}
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-            <button
-              type="button"
-              className="btn-result-secondary"
-              style={{ flex: 1 }}
-              onClick={onClose}
-              disabled={submitting}
-            >
+          <div className="modal-actions">
+            <button type="button" className="btn-cancel" onClick={onClose} disabled={submitting}>
               Cancel
             </button>
-            <button
-              type="submit"
-              className="btn-download-primary"
-              style={{ flex: 2 }}
-              disabled={submitting}
-            >
+            <button type="submit" className="btn-submit-primary" disabled={submitting}>
               {submitting ? 'Verifying...' : 'Verify & Add to Wall 🏆'}
             </button>
           </div>

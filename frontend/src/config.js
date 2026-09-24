@@ -29,7 +29,7 @@ export function getStoredConfig() {
   return {
     laptopUrl: localStorage.getItem('documorph_tunnel_url') || import.meta.env.VITE_TUNNEL_URL || '',
     renderUrl: finalRenderUrl,
-    preferred: localStorage.getItem('documorph_backend_pref') || 'render', // Default to render for 24/7 cloud performance
+    preferred: localStorage.getItem('documorph_backend_pref') || 'auto', // 'auto' | 'laptop' | 'render'
   };
 }
 

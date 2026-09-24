@@ -7,7 +7,7 @@ export default function HeroSection({ onSelectTool }) {
       <div className="hero-headline-group">
         <div className="hero-pill-badge" role="status">
           <span className="hero-live-dot" />
-          <span className="hero-badge-text">✨ CleanNotes AI • 100% Math &amp; Diagram Safe</span>
+          <span className="hero-badge-text">AI Academic Studio • 100% Math &amp; Diagram Safe</span>
         </div>
         
         <h1 className="hero-title">

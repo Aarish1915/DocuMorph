@@ -1,14 +1,15 @@
 /* =====================================================
-   CleanNotes Modular Stylesheet Architecture
-   Strictly Component-Scoped Styles • High Maintainability
+   DocuMorph Minimalist SaaS Design System & Styles
+   Modular Architecture (ITCSS / SMACSS Pattern)
    ===================================================== */
 
 @import './DesignTokens.css';
 @import './styles/base.css';
-@import './styles/header.css';
+@import './styles/common.css';
+@import './styles/hero.css';
 @import './styles/workspace.css';
-@import './styles/homeComponents.css';
-@import './styles/community.css';
+@import './styles/config.css';
+@import './styles/toolPages.css';
+@import './styles/progress.css';
 @import './styles/admin.css';
-@import './styles/footer.css';
 @import './styles/responsive.css';

@@ -77,7 +77,7 @@ export default function ProgressCard({
     return () => clearInterval(tipInterval);
   }, [jobStatus, isComplete, isError]);
 
-  // Smooth micro-stepping / synthetic lerp state: strictly follows authentic backend progress
+  // Smooth micro-stepping / synthetic lerp state: strictly cap at 92% until complete
   const targetProgress = Math.max(0, Math.min(100, Number(jobStatus?.progress) || 0));
   const [displayProgress, setDisplayProgress] = useState(targetProgress);
 
@@ -85,12 +85,15 @@ export default function ProgressCard({
     const interval = setInterval(() => {
       setDisplayProgress((prev) => {
         if (isComplete) return 100;
-        // Strictly converge to backend reported progress
-        if (prev < targetProgress) {
-          const step = Math.max(0.5, (targetProgress - prev) * 0.25);
-          return Math.min(targetProgress, prev + step);
-        } else if (prev > targetProgress) {
-          return targetProgress;
+        // Freeze guard: never exceed 92% until status === 'COMPLETED'
+        const cappedTarget = Math.min(92, targetProgress);
+        if (prev < cappedTarget) {
+          const step = Math.max(0.3, (cappedTarget - prev) * 0.15);
+          return Math.min(cappedTarget, prev + step);
+        }
+        // Micro-creep while backend typesets
+        if (!isComplete && !isError && prev < 92) {
+          return Math.min(92, prev + 0.1);
         }
         return prev;
       });
@@ -126,8 +129,9 @@ export default function ProgressCard({
   };
 
   const currentDisplayPct = Math.round(displayProgress);
-  const isActivelyProcessing = jobStatus?.status === 'PROCESSING' || jobStatus?.status === 'QUEUED_REPROCESS';
-  const stageProgress = (isActivelyProcessing && displayProgress > 0) ? getStagePercentage(displayProgress) : 0;
+  const stageProgress = (jobStatus.status === 'UPLOADING' || jobStatus.status === 'QUEUED')
+    ? 0
+    : (displayProgress > 0 ? getStagePercentage(displayProgress) : 0);
 
   // Calculate compression statistics
   const origSize = jobStatus.original_file_size || 0;
@@ -136,9 +140,11 @@ export default function ProgressCard({
     ? Math.max(0, Math.round(((origSize - compSize) / origSize) * 100)) 
     : 0;
 
-  const downloadUrl = jobStatus.download_url 
-    ? `${API_BASE}${jobStatus.download_url}`
-    : `${API_BASE}${jobStatus.result_url}`;
+  const activeBase = (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')
+    ? 'https://documorph-v1.onrender.com'
+    : API_BASE;
+  const rawDownloadUrl = jobStatus.download_url || jobStatus.result_url;
+  const downloadUrl = rawDownloadUrl ? `${activeBase}${rawDownloadUrl}` : '#';
 
   const getTargetFilename = () => {
     if (serviceType === 'compress') return 'compressed_document.pdf';

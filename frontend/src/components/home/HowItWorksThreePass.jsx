@@ -29,7 +29,7 @@ const STEPS = [
 
 export default function HowItWorksThreePass() {
   return (
-    <section className="how-it-works-section" id="how-it-works" aria-label="3-Pass Engine Workflow">
+    <section className="how-it-works-section" aria-label="3-Pass Engine Workflow">
       <div className="how-container">
         <div className="how-header">
           <div className="how-pill">
