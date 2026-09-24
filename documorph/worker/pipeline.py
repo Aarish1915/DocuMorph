@@ -305,8 +305,8 @@ class DocuMorphOrchestrator:
 
                                     rel_img_path = f"images/{diagram_filename}"
                                     page_md_blocks.append(
-                                        f'\n\n<div class="diagram-container" align="center" style="margin: 14px 0; break-inside: avoid; page-break-inside: avoid;">\n'
-                                        f'  <img src="{rel_img_path}" alt="Document Diagram" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
+                                        f'\n\n<div class="diagram-container" align="center" style="margin: 8px 0; break-inside: avoid; page-break-inside: avoid;">\n'
+                                        f'  <img src="{rel_img_path}" alt="Document Diagram" style="max-width: 90%; max-height: 230px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
                                         f'</div>\n\n'
                                     )
                                 except Exception as d_ex:
@@ -526,9 +526,9 @@ class DocuMorphOrchestrator:
                                                 glossary_html = ""
 
                                         diag_html = (
-                                            f'\n\n<div class="diagram-container" align="center" style="margin: 16px 0; break-inside: avoid; page-break-inside: avoid;">\n'
-                                            f'  <img src="{rel_path}" alt="{desc}" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
-                                            f'  <div class="figure-caption" style="font-size: 10.5pt; color: #475569; font-weight: 600; margin-top: 6px;">Figure: {desc}</div>\n'
+                                            f'\n\n<div class="diagram-container" align="center" style="margin: 8px 0; break-inside: avoid; page-break-inside: avoid;">\n'
+                                            f'  <img src="{rel_path}" alt="{desc}" style="max-width: 90%; max-height: 230px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
+                                            f'  <div class="figure-caption" style="font-size: 9.5pt; color: #475569; font-weight: 600; margin-top: 4px;">Figure: {desc}</div>\n'
                                             f'</div>\n{glossary_html}\n'
                                         )
                                         extracted_text = extracted_text[:m.start()] + diag_html + extracted_text[m.end():]
@@ -539,8 +539,8 @@ class DocuMorphOrchestrator:
                                     diags.sort(key=lambda d: d.get("y_rel", 0.5))
                                     for diag_item in diags:
                                         diag_html = (
-                                            f'\n\n<div class="diagram-container" align="center" style="margin: 14px 0; break-inside: avoid; page-break-inside: avoid;">\n'
-                                            f'  <img src="{diag_item["rel_path"]}" alt="Figure Diagram" style="max-width: 90%; max-height: 440px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
+                                            f'\n\n<div class="diagram-container" align="center" style="margin: 8px 0; break-inside: avoid; page-break-inside: avoid;">\n'
+                                            f'  <img src="{diag_item["rel_path"]}" alt="Figure Diagram" style="max-width: 90%; max-height: 230px; object-fit: contain; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); break-inside: avoid; page-break-inside: avoid;" />\n'
                                             f'</div>\n\n'
                                         )
                                         placeholder_match = re.search(r'(\[(?:Diagram|Figure|Image|चित्र|डायग्राम)[^\]]*\]|\((?:Figure|Fig\.|चित्र)[^\)]*\))', extracted_text, re.IGNORECASE)
@@ -598,6 +598,8 @@ class DocuMorphOrchestrator:
             def polish_page_worker(p_idx, text):
                 # Sanitize promotional spam BEFORE polishing so fee banners do not become H1 titles!
                 sanitized_text = self.spam_filter.clean_text(text)
+                # Strip redundant diagram label tables that bloat document page counts
+                sanitized_text = re.sub(r'\|?\s*Diagram Label \(Original\)\s*\|?\s*Translation \([^\)]+\)\s*\|?[\s\S]*?(?=\n\n|\Z)', '', sanitized_text)
                 
                 # If translation service and local page, translate directly using fast text model
                 if self.service_type == "translate" and p_idx in local_pages and len(sanitized_text.strip()) > 10:

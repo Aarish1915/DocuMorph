@@ -18,75 +18,100 @@ class PDFCompiler:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def _generate_css(self, compact_mode: str = "standard", is_landscape: bool = False, print_margins: bool = False) -> str:
+        mode_clean = str(compact_mode).lower().strip()
+
         if is_landscape:
             page_margin = "14mm 20mm 14mm 20mm"
-            body_font_size = "15.5pt"
-            body_line_height = "1.65"
-            p_margin_bottom = "0.75em"
-            h1_font_size = "26pt"
-            h1_margin = "0 0 0.5em 0"
-            h2_font_size = "20pt"
-            h2_margin = "0.6em 0 0.35em 0"
-            h3_font_size = "16pt"
-            h3_margin = "0.5em 0 0.3em 0"
-            table_font_size = "13pt"
-            table_padding = "8px 12px"
-            table_margin = "1em 0"
-            list_margin = "0.4em 0 0.8em 0"
-            li_margin = "0.45em"
-            hr_margin = "1.2em 0"
-            blockquote_margin = "1em 0"
-            blockquote_padding = "0.8em 1.2em"
-        elif print_margins:
-            page_margin = "20mm 20mm 20mm 20mm"
-            body_font_size = "11.5pt"
-            body_line_height = "1.58"
-            p_margin_bottom = "0.55em"
-            h1_font_size = "18pt"
-            h1_margin = "0.8em 0 0.35em 0"
-            h2_font_size = "14.5pt"
-            h2_margin = "0.7em 0 0.25em 0"
-            h3_font_size = "12pt"
-            h3_margin = "0.5em 0 0.2em 0"
-            table_font_size = "9.5pt"
-            table_padding = "5px 8px"
-            table_margin = "0.7em 0"
-            list_margin = "0.2em 0 0.5em 0"
-            li_margin = "0.25em"
-            hr_margin = "0.8em 0"
-            blockquote_margin = "0.7em 0"
-            blockquote_padding = "0.5em 0.9em"
-        elif compact_mode == "ultra_dense":
-            page_margin = "8mm 10mm 10mm 10mm"
+            body_font_size = "14pt"
+            body_line_height = "1.55"
+            p_margin_bottom = "0.65em"
+            h1_font_size = "22pt"
+            h1_margin = "0 0 0.4em 0"
+            h2_font_size = "17pt"
+            h2_margin = "0.5em 0 0.25em 0"
+            h3_font_size = "14pt"
+            h3_margin = "0.4em 0 0.2em 0"
+            table_font_size = "11pt"
+            table_padding = "6px 10px"
+            table_margin = "0.8em 0"
+            list_margin = "0.3em 0 0.6em 0"
+            li_margin = "0.35em"
+            hr_margin = "1em 0"
+            blockquote_margin = "0.8em 0"
+            blockquote_padding = "0.6em 1em"
+            img_max_height = "260px"
+        elif mode_clean in ("ultra_dense", "ultra", "print_saver", "max_compression"):
+            page_margin = "6mm 8mm 8mm 8mm"
             body_font_size = "9pt"
-            body_line_height = "1.35"
-            p_margin_bottom = "0.25em"
+            body_line_height = "1.28"
+            p_margin_bottom = "0.22em"
             h1_font_size = "13pt"
-            h1_margin = "0.45em 0 0.18em 0"
+            h1_margin = "0.35em 0 0.15em 0"
             h2_font_size = "11pt"
-            h2_margin = "0.35em 0 0.15em 0"
-            h3_font_size = "10pt"
-            h3_margin = "0.3em 0 0.12em 0"
+            h2_margin = "0.28em 0 0.12em 0"
+            h3_font_size = "9.5pt"
+            h3_margin = "0.22em 0 0.1em 0"
             table_font_size = "8pt"
-            table_padding = "3px 5px"
-            table_margin = "0.4em 0"
+            table_padding = "2px 5px"
+            table_margin = "0.35em 0"
             list_margin = "0.1em 0 0.25em 0"
-            li_margin = "0.15em"
-            hr_margin = "0.4em 0"
-            blockquote_margin = "0.35em 0"
-            blockquote_padding = "0.3em 0.6em"
-        elif compact_mode in ("compact", "balanced"):
-            page_margin = "10mm 12mm 12mm 12mm"
+            li_margin = "0.12em"
+            hr_margin = "0.35em 0"
+            blockquote_margin = "0.3em 0"
+            blockquote_padding = "0.25em 0.5em"
+            img_max_height = "190px"
+        elif mode_clean in ("smart_dense", "compact", "balanced", "compact_paper"):
+            page_margin = "8mm 10mm 10mm 10mm" if not print_margins else "12mm 12mm 12mm 12mm"
+            body_font_size = "10pt"
+            body_line_height = "1.38"
+            p_margin_bottom = "0.30em"
+            h1_font_size = "14.5pt"
+            h1_margin = "0.45em 0 0.18em 0"
+            h2_font_size = "12pt"
+            h2_margin = "0.35em 0 0.15em 0"
+            h3_font_size = "10.5pt"
+            h3_margin = "0.28em 0 0.12em 0"
+            table_font_size = "8.5pt"
+            table_padding = "3px 6px"
+            table_margin = "0.45em 0"
+            list_margin = "0.12em 0 0.35em 0"
+            li_margin = "0.18em"
+            hr_margin = "0.5em 0"
+            blockquote_margin = "0.4em 0"
+            blockquote_padding = "0.35em 0.7em"
+            img_max_height = "220px"
+        elif print_margins:
+            page_margin = "16mm 16mm 16mm 16mm"
             body_font_size = "11pt"
-            body_line_height = "1.52"
+            body_line_height = "1.50"
             p_margin_bottom = "0.45em"
             h1_font_size = "16pt"
+            h1_margin = "0.6em 0 0.25em 0"
+            h2_font_size = "13.5pt"
+            h2_margin = "0.5em 0 0.2em 0"
+            h3_font_size = "11pt"
+            h3_margin = "0.35em 0 0.15em 0"
+            table_font_size = "9pt"
+            table_padding = "4px 7px"
+            table_margin = "0.6em 0"
+            list_margin = "0.15em 0 0.4em 0"
+            li_margin = "0.2em"
+            hr_margin = "0.6em 0"
+            blockquote_margin = "0.5em 0"
+            blockquote_padding = "0.4em 0.8em"
+            img_max_height = "250px"
+        else: # standard
+            page_margin = "10mm 12mm 12mm 12mm"
+            body_font_size = "11pt"
+            body_line_height = "1.48"
+            p_margin_bottom = "0.45em"
+            h1_font_size = "16.5pt"
             h1_margin = "0.65em 0 0.25em 0"
             h2_font_size = "13.5pt"
             h2_margin = "0.5em 0 0.2em 0"
-            h3_font_size = "11.5pt"
-            h3_margin = "0.4em 0 0.15em 0"
-            table_font_size = "9.5pt"
+            h3_font_size = "11pt"
+            h3_margin = "0.35em 0 0.15em 0"
+            table_font_size = "9pt"
             table_padding = "5px 8px"
             table_margin = "0.6em 0"
             list_margin = "0.15em 0 0.4em 0"
@@ -94,25 +119,7 @@ class PDFCompiler:
             hr_margin = "0.6em 0"
             blockquote_margin = "0.5em 0"
             blockquote_padding = "0.4em 0.8em"
-        else: # standard
-            page_margin = "12mm 14mm 14mm 14mm"
-            body_font_size = "12pt"
-            body_line_height = "1.62"
-            p_margin_bottom = "0.65em"
-            h1_font_size = "19pt"
-            h1_margin = "0.9em 0 0.4em 0"
-            h2_font_size = "15pt"
-            h2_margin = "0.8em 0 0.3em 0"
-            h3_font_size = "12.5pt"
-            h3_margin = "0.6em 0 0.25em 0"
-            table_font_size = "10pt"
-            table_padding = "6px 10px"
-            table_margin = "0.8em 0"
-            list_margin = "0.2em 0 0.6em 0"
-            li_margin = "0.3em"
-            hr_margin = "1em 0"
-            blockquote_margin = "0.8em 0"
-            blockquote_padding = "0.6em 1em"
+            img_max_height = "260px"
 
         page_size = "297mm 210mm" if is_landscape else "A4 portrait"
 
@@ -209,12 +216,25 @@ class PDFCompiler:
             }}
             
             img {{ 
-                max-width: 100%; 
-                height: auto; 
+                max-width: 90% !important; 
+                max-height: {img_max_height} !important; 
+                object-fit: contain;
                 display: block;
-                margin: 0.8em auto;
+                margin: 0.4em auto;
                 border-radius: 4px;
                 break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+            
+            .diagram-container {{
+                margin: 6px 0 !important;
+                text-align: center;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }}
+            
+            .diagram-container img {{
+                max-height: {img_max_height} !important;
             }}
             
             table {{
