@@ -115,75 +115,33 @@ export default function ResultCard({
         </span>
       </div>
 
-      {/* Metrics Grid per Tool */}
-      <div className="result-metrics-grid">
-        {tool === 'clean_format' && (
-          <>
-            <div className="metric-tile">
-              <div className="metric-val">{origMB} MB → {compMB} MB</div>
-              <div className="metric-label">File Size</div>
-            </div>
-            <div className="metric-tile">
-              <div className="metric-val highlight">−{sizeSavedPct}%</div>
-              <div className="metric-label">Size Saved</div>
-            </div>
-            <div className="metric-tile">
-              <div className="metric-val">100%</div>
-              <div className="metric-label">Text Sharpness</div>
-            </div>
-          </>
-        )}
+      {/* L4: Production-Grade Metrics Grid */}
+      <div className="result-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', margin: '16px 0' }}>
+        <div className="metric-tile" style={{ padding: '10px 12px', background: 'var(--bg-surface-2, rgba(255,255,255,0.03))', borderRadius: 'var(--radius-sm, 8px)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))', textAlign: 'center' }}>
+          <div className="metric-val" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1, #fff)' }}>{compMB} MB</div>
+          <div className="metric-label" style={{ fontSize: '11px', color: 'var(--text-3, #94a3b8)', marginTop: '2px' }}>File Size ({origMB}MB orig)</div>
+        </div>
 
-        {tool === 'compress' && (
-          <>
-            <div className="metric-tile">
-              <div className="metric-val highlight">−50%</div>
-              <div className="metric-label">Fewer Pages</div>
-            </div>
-            <div className="metric-tile">
-              <div className="metric-val">{origMB} MB → {compMB} MB</div>
-              <div className="metric-label">Compressed Size</div>
-            </div>
-            <div className="metric-tile">
-              <div className="metric-val highlight">Saved ₹120</div>
-              <div className="metric-label">Est. Print Cost</div>
-            </div>
-          </>
-        )}
+        <div className="metric-tile" style={{ padding: '10px 12px', background: 'var(--bg-surface-2, rgba(255,255,255,0.03))', borderRadius: 'var(--radius-sm, 8px)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))', textAlign: 'center' }}>
+          <div className="metric-val" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent, #6366f1)' }}>
+            {jobStatus?.pages_processed || jobStatus?.page_count || '100%'}
+          </div>
+          <div className="metric-label" style={{ fontSize: '11px', color: 'var(--text-3, #94a3b8)', marginTop: '2px' }}>Pages Restored</div>
+        </div>
 
-        {tool === 'extract_text' && (
-          <>
-            <div className="metric-tile">
-              <div className="metric-val">Markdown</div>
-              <div className="metric-label">Export Format</div>
-            </div>
-            <div className="metric-tile">
-              <div className="metric-val highlight">100%</div>
-              <div className="metric-label">Tables Preserved</div>
-            </div>
-            <div className="metric-tile">
-              <div className="metric-val">LaTeX</div>
-              <div className="metric-label">Math Formulas</div>
-            </div>
-          </>
-        )}
+        <div className="metric-tile" style={{ padding: '10px 12px', background: 'var(--bg-surface-2, rgba(255,255,255,0.03))', borderRadius: 'var(--radius-sm, 8px)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))', textAlign: 'center' }}>
+          <div className="metric-val highlight" style={{ fontSize: '15px', fontWeight: 700, color: '#10b981' }}>
+            {jobStatus?.processing_time_sec ? `${jobStatus.processing_time_sec}s` : '< 20s'}
+          </div>
+          <div className="metric-label" style={{ fontSize: '11px', color: 'var(--text-3, #94a3b8)', marginTop: '2px' }}>Processing Time</div>
+        </div>
 
-        {tool === 'translate' && (
-          <>
-            <div className="metric-tile">
-              <div className="metric-val">Translated</div>
-              <div className="metric-label">Language Mode</div>
-            </div>
-            <div className="metric-tile">
-              <div className="metric-val highlight">Intact</div>
-              <div className="metric-label">Diagrams &amp; Math</div>
-            </div>
-            <div className="metric-tile">
-              <div className="metric-val">PDF</div>
-              <div className="metric-label">Ready to Print</div>
-            </div>
-          </>
-        )}
+        <div className="metric-tile" style={{ padding: '10px 12px', background: 'var(--bg-surface-2, rgba(255,255,255,0.03))', borderRadius: 'var(--radius-sm, 8px)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))', textAlign: 'center' }}>
+          <div className="metric-val" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent-cyan, #06b6d4)' }}>
+            {jobStatus?.api_calls_used != null ? `${jobStatus.api_calls_used}` : (tool === 'translate' ? '1 call' : '0 (Local Fast-Path)')}
+          </div>
+          <div className="metric-label" style={{ fontSize: '11px', color: 'var(--text-3, #94a3b8)', marginTop: '2px' }}>API Calls Used</div>
+        </div>
       </div>
 
       {/* Primary Actions */}

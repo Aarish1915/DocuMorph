@@ -15,7 +15,10 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && python -m playwright install --with-deps chromium \
-    && chmod -R 777 /ms-playwright
+    && chmod -R 777 /ms-playwright \
+    && mkdir -p /app/static/mathjax \
+    && curl -sL https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js -o /app/static/mathjax/tex-svg.js \
+    && chmod -R 777 /app/static
 
 # Set up user for HuggingFace / non-root environments (must run as non-root on port 7860)
 RUN useradd -m -u 1000 user

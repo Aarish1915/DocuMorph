@@ -350,6 +350,10 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 
                 # Fetch next round-robin key
                 current_key = self.router.get_next_key()
+                rate_wait = self.router.get_rate_wait_seconds(current_key)
+                if rate_wait > 0:
+                    logger.info(f"RateLimitShield: Pacing request for {rate_wait:.2f}s (async)...")
+                    await asyncio.sleep(rate_wait)
                 client = genai.Client(api_key=current_key)
                 
                 # Authoritative current Gemini models in 2026
@@ -372,7 +376,6 @@ Output the raw markdown for each image in the exact order they appear. If multip
                             config=config
                         )
                         if response:
-                            self.model_name = candidate
                             break
                     except Exception as model_err:
                         err_text = str(model_err).lower()
@@ -443,6 +446,9 @@ Output the raw markdown for each image in the exact order they appear. If multip
                 return omni_translated
 
         current_key = self.router.get_next_key()
+        rate_wait = self.router.get_rate_wait_seconds(current_key)
+        if rate_wait > 0:
+            await asyncio.sleep(rate_wait)
         client = genai.Client(api_key=current_key)
         candidate_models = [self.model_name, "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash"]
         for candidate in candidate_models:

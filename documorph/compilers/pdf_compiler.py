@@ -540,39 +540,63 @@ class PDFCompiler:
             </script>
             """
 
-        has_math = bool("$" in markdown_text or "\\(" in markdown_text or "\\[" in markdown_text)
+        # FIX D: Tighten math detection. Lone "$" (currency, shell vars) must NOT trigger
+        # a full 8s MathJax CDN fetch + rendering wait. Only real LaTeX triggers it.
+        has_math = False
+        if re.search(r'\$\$|\\\[|\\\(|\\begin\{', markdown_text):
+            has_math = True
+        elif re.search(r'\\(frac|sqrt|int|sum|prod|alpha|beta|gamma|theta|pi|sigma|partial|infty|times|cdot|le|ge|neq|approx|pm|mathbf|mathrm|text)\b', markdown_text):
+            has_math = True
+        else:
+            for m in re.finditer(r'\$([^$\n]+)\$', markdown_text):
+                inner = m.group(1).strip()
+                if re.fullmatch(r'[\d,.]+', inner):
+                    continue
+                if any(c in inner for c in ['^', '_', '\\', '=', '<', '>', '+', '±', '×', '÷']):
+                    has_math = True
+                    break
+                if re.fullmatch(r'[a-zA-Z]', inner):
+                    has_math = True
+                    break
         
         if has_math:
-            mathjax_block = """
+            mathjax_candidates = [
+                "/app/static/mathjax/tex-svg.js",
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "static", "mathjax", "tex-svg.js")),
+                "/home/user/app/static/mathjax/tex-svg.js"
+            ]
+            mathjax_local = next((p for p in mathjax_candidates if os.path.exists(p)), None)
+            mathjax_src = f"file:///{mathjax_local.replace(os.sep, '/')}" if mathjax_local else "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"
+            mathjax_block = f"""
             <script>
-              window.MathJax = {
-                options: {
+              window.MathJax = {{
+                options: {{
                   enableMenu: false
-                },
-                tex: {
+                }},
+                tex: {{
                   inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
                   displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
-                  packages: {'[+]': ['noerrors']},
-                  formatError: (jax, err) => {
+                  packages: {{'[+]': ['noerrors']}},
+                  formatError: (jax, err) => {{
                     const span = document.createElement('span');
                     span.className = 'math-raw-fallback';
                     span.textContent = jax.latex || '';
                     return span;
-                  }
-                },
-                loader: {
+                  }}
+                }},
+                loader: {{
                   load: ['[tex]/noerrors']
-                },
-                startup: {
-                  pageReady: () => {
-                    return MathJax.startup.defaultPageReady().then(() => {
+                }},
+                startup: {{
+                  pageReady: () => {{
+                    return MathJax.startup.defaultPageReady().then(() => {{
                       window.mathjax_is_done = true;
-                    });
-                  }
-                }
-              };
+                    }});
+                  }}
+                }}
+              }};
             </script>
-            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+            <script id="MathJax-script" async src="{mathjax_src}"></script>
             """
         else:
             mathjax_block = """
@@ -674,15 +698,34 @@ class PDFCompiler:
 
             page = browser.new_page()
             page.set_default_timeout(60000)
+            # FIX E: Write HTML to a temp file; use page.goto() instead of page.set_content().
+            # page.set_content() with base64-encoded images inflates DOM by 1MB+ and can OOM
+            # Chromium on Render's 512MB container. File-based loading is O(1) on RAM.
+            import tempfile
+            tmp_html_path = None
             try:
-                page.set_content(full_html, wait_until="domcontentloaded", timeout=30000)
-            except Exception as set_ex:
-                logger.warning(f"DOM load warning, attempting commit fallback: {set_ex}")
+                with tempfile.NamedTemporaryFile(
+                    suffix=".html", delete=False, mode="w", encoding="utf-8"
+                ) as tmp:
+                    tmp.write(full_html)
+                    tmp_html_path = tmp.name
+
+                file_url = "file:///" + tmp_html_path.replace(os.sep, "/").lstrip("/")
                 try:
-                    page.set_content(full_html, wait_until="commit", timeout=20000)
-                    page.wait_for_load_state("domcontentloaded", timeout=15000)
-                except Exception:
-                    pass
+                    page.goto(file_url, wait_until="domcontentloaded", timeout=30000)
+                except Exception as nav_ex:
+                    logger.warning(f"page.goto domcontentloaded failed ({nav_ex}), retrying with commit...")
+                    try:
+                        page.goto(file_url, wait_until="commit", timeout=20000)
+                        page.wait_for_load_state("domcontentloaded", timeout=15000)
+                    except Exception:
+                        pass
+            finally:
+                if tmp_html_path and os.path.exists(tmp_html_path):
+                    try:
+                        os.unlink(tmp_html_path)
+                    except Exception:
+                        pass
 
             try:
                 page.wait_for_selector("body", state="attached", timeout=10000)

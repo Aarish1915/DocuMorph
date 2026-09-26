@@ -83,15 +83,8 @@ class LightningSweeper:
                 logger.info(f"Page {i}: Classified as CORRUPTED (Detected CamScanner/OKEN repeating OCR noise).")
                 continue
 
-            # 3. DIGITAL FAST-PATH (<15ms/page):
-            # If the page has rich, valid digital text (>= 80 chars) and no dominating scan image,
-            # it is definitively a digital native document. Use fast local PyMuPDF extraction!
-            if total_chars >= 80 and readable_ratio >= 0.65:
-                classifications[i] = "clean"
-                logger.info(f"Page {i}: Classified as CLEAN ({total_chars} chars, digital native fast-path).")
-                continue
-
-            # 4. Check Layout Complexity for low-text or drawing-heavy pages
+            # 4. Check Layout Complexity — must run BEFORE the digital fast-path so we can
+            # detect diagram-heavy pages even when they have sufficient text.
             vector_area = 0
             crop_count = len(images)
             try:
@@ -103,7 +96,6 @@ class LightningSweeper:
                         # Ignore decorative header/footer banners (top 8% and bottom 8%)
                         if r.y0 < page.rect.height * 0.08 or r.y1 > page.rect.height * 0.92:
                             continue
-                            
                         if r.width > page.rect.width * 0.2 and r.height > 10:
                             crop_count += 1
                             vector_area += (r.width * r.height)
@@ -111,9 +103,23 @@ class LightningSweeper:
                 logger.warning(f"Failed to parse drawings on page {i}: {e}")
                 classifications[i] = "corrupted"
                 continue
-                
+
             vector_ratio = vector_area / total_area if total_area > 0 else 0
             combined_ratio = image_ratio + vector_ratio
+
+            # 3. DIGITAL FAST-PATH (<15ms/page):
+            # Rich valid digital text — BUT check for dominant vector diagrams first.
+            # FIX F: A digital-native page with >15% vector drawing area contains diagrams
+            # that PyMuPDF's text extractor cannot describe. Send to Vision AI so the
+            # diagram content is not silently dropped from the output.
+            if total_chars >= 80 and readable_ratio >= 0.65:
+                if vector_ratio > 0.15:
+                    classifications[i] = "complex"
+                    logger.info(f"Page {i}: COMPLEX override — digital text but vector-diagram heavy ({vector_ratio:.2f}). Sending to Vision AI.")
+                else:
+                    classifications[i] = "clean"
+                    logger.info(f"Page {i}: Classified as CLEAN ({total_chars} chars, digital native fast-path).")
+                continue
 
             # Low-text page with significant drawings/images requires Vision AI
             if total_chars < 80 and (combined_ratio > 0.20 or crop_count >= 3):
@@ -122,5 +128,5 @@ class LightningSweeper:
             else:
                 classifications[i] = "clean"
                 logger.info(f"Page {i}: Classified as CLEAN ({total_chars} chars).")
-                
+
         return classifications

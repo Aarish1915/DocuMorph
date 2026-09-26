@@ -73,17 +73,14 @@ class APIRouter:
 
     def get_next_key(self) -> str:
         """
-        Returns the optimal API key, pacing requests to strictly stay below Free Tier RPM limits.
-        If all keys are saturated, cleanly sleeps the required interval to prevent HTTP 429 drops.
+        Returns the optimal API key for round-robin balancing.
+        Non-blocking: records key usage and returns the least-used key.
+        Call get_rate_wait_seconds() to handle async pacing if needed.
         """
         if not self.keys:
             return None
 
         import time
-        from documorph.core.tier_manager import TierManager
-        tier_profile = TierManager().get_profile()
-        is_free_tier = TierManager().active_tier == "gemini_free"
-        max_rpm = 14 if is_free_tier else 1000
 
         with self.lock:
             now = time.time()
@@ -94,19 +91,35 @@ class APIRouter:
 
             # Pick the least-used key
             best_key = min(self.keys, key=lambda k: len(self.key_history.get(k, [])))
-            usage = len(self.key_history.get(best_key, []))
-
-            # If even the least-used key has reached max_rpm in the last 60 seconds:
-            if usage >= max_rpm:
-                oldest_call = min(self.key_history[best_key])
-                wait_time = max(0.1, 60.0 - (now - oldest_call) + 0.1)
-                logger.info(f"RateLimitShield: All API keys reached {max_rpm} RPM. Pacing request for {wait_time:.2f}s...")
-                time.sleep(wait_time)
-                now = time.time()
-                self.key_history[best_key] = [t for t in self.key_history.get(best_key, []) if now - t < 60.0]
-
             self.key_history[best_key].append(now)
             return best_key
+
+    def get_rate_wait_seconds(self, key: str = None) -> float:
+        """
+        Returns seconds to wait before executing an API call with this key.
+        Non-blocking check; caller is responsible for awaiting asyncio.sleep().
+        """
+        if not self.keys:
+            return 0.0
+
+        import time
+        from documorph.core.tier_manager import TierManager
+        is_free_tier = TierManager().active_tier == "gemini_free"
+        max_rpm = 14 if is_free_tier else 1000
+
+        with self.lock:
+            now = time.time()
+            target_key = key if (key and key in self.keys) else min(self.keys, key=lambda k: len(self.key_history.get(k, [])))
+            # Prune timestamps older than 60 seconds
+            self.key_history[target_key] = [t for t in self.key_history.get(target_key, []) if now - t < 60.0]
+            usage = len(self.key_history.get(target_key, []))
+
+            # Since get_next_key() records the timestamp, usage > max_rpm means pacing is required
+            if usage > max_rpm:
+                oldest_call = min(self.key_history[target_key])
+                wait_time = max(0.1, 60.0 - (now - oldest_call) + 0.1)
+                return wait_time
+            return 0.0
 
     def probe_omniroute(self) -> bool:
         """

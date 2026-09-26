@@ -212,8 +212,12 @@ class DocuMorphOrchestrator:
             classifications = sweeper.sweep()
             
             if self.service_type == "translate":
+                # FIX C: Only force complex for pages that are GENUINELY scanned/corrupted.
+                # Digital-native pages stay "clean" and use the batched text translation path,
+                # which saves 15-20 vision API calls per job.
                 for p in range(len(doc)):
-                    classifications[p] = "complex"
+                    if classifications.get(p) not in ("complex", "corrupted"):
+                        classifications[p] = "clean"
             
             ai_pages = [p for p, c in classifications.items() if c in ("complex", "corrupted")]
             local_pages = [p for p in range(len(doc)) if p not in ai_pages]
@@ -574,16 +578,10 @@ class DocuMorphOrchestrator:
                                 b_idx = c["block_idx"]
                                 final_markdown_pages[pnum][b_idx] = f"\n\n{extracted_text}\n\n"
                                 
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    loop = None
-                    
-                if loop and loop.is_running():
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        pool.submit(asyncio.run, process_all_chunks()).result()
-                else:
-                    asyncio.run(process_all_chunks())
+                # FIX B: Always use asyncio.run() directly. The worker daemon thread
+                # never has a running event loop, so the ThreadPoolExecutor branch was
+                # dead code that caused thread contention when accidentally triggered.
+                asyncio.run(process_all_chunks())
                 self._report(f"AI Reading: Completed.", 65)
                 # Combine pages
                 for p in range(len(doc)):
@@ -600,28 +598,34 @@ class DocuMorphOrchestrator:
                 sanitized_text = self.spam_filter.clean_text(text)
                 # Strip redundant diagram label tables that bloat document page counts
                 sanitized_text = re.sub(r'\|?\s*Diagram Label \(Original\)\s*\|?\s*Translation \([^\)]+\)\s*\|?[\s\S]*?(?=\n\n|\Z)', '', sanitized_text)
-                
-                # If translation service and local page, translate directly using fast text model
-                if self.service_type == "translate" and p_idx in local_pages and len(sanitized_text.strip()) > 10:
-                    try:
-                        translated = asyncio.run(self.vision_engine.translate_text_direct(sanitized_text, self.target_lang or "Hindi"))
-                        return p_idx, translated
-                    except Exception as t_err:
-                        logger.warning(f"Error translating local page {p_idx}: {t_err}")
-                        return p_idx, sanitized_text
-                        
-                # Fast local AST formatting for digital pages (instant <5ms, saves 25s!)
-                try:
-                    fixed_text = self.format_fixer.fix_markdown(sanitized_text)
-                    return p_idx, fixed_text
-                except Exception as e:
-                    logger.warning(f"Local formatting fallback on page {p_idx}: {e}")
-                    return p_idx, sanitized_text
+                # FIX G: format_fixer runs once on the full joined document (post-processing step).
+                # Running it per-page here caused double-pass corruption on cross-page math blocks.
+                return p_idx, sanitized_text
 
             polished_pages = {}
             for p in range(len(final_markdown_pages)):
                 idx, text = polish_page_worker(p, "\n".join(final_markdown_pages[p]))
                 polished_pages[idx] = text
+
+            # FIX A: Batch-translate all local (digital-native) pages in ONE API call.
+            # Previously: N serial asyncio.run() calls = N * 4s = up to 80s overhead.
+            # Now: one call with ---PAGE_BREAK--- delimiters = ~4s total, regardless of N.
+            if self.service_type == "translate" and local_pages:
+                local_pages_with_text = {p: polished_pages[p] for p in local_pages if p in polished_pages and polished_pages[p].strip()}
+                if local_pages_with_text:
+                    try:
+                        self._report("Translating digital pages (batched)...", 68)
+                        combined_src = "\n\n---PAGE_BREAK---\n\n".join(local_pages_with_text.values())
+                        translated_combined = asyncio.run(
+                            self.vision_engine.translate_text_direct(combined_src, self.target_lang or "Hindi")
+                        )
+                        parts = [p.strip() for p in translated_combined.split("---PAGE_BREAK---")]
+                        for i, p_idx in enumerate(local_pages_with_text.keys()):
+                            if i < len(parts) and parts[i]:
+                                polished_pages[p_idx] = parts[i]
+                        logger.info(f"Batched translation: {len(local_pages_with_text)} local pages translated in 1 API call.")
+                    except Exception as t_err:
+                        logger.warning(f"Batched translation failed ({t_err}), pages will remain in source language.")
 
             format_polisher_calls_count = 0
             logger.info("Smart Polisher formatted all pages with local AST normalizer in <5ms.")

@@ -162,9 +162,19 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Failed to seed community data or run security purge: {e}")
     cleanup_old_files()
     
+    def should_start_embedded_worker() -> bool:
+        if os.getenv("DISABLE_EMBEDDED_WORKER", "").lower() in ("1", "true", "yes"):
+            return False
+        render_svc = os.getenv("RENDER_SERVICE_TYPE", "")
+        if os.getenv("RENDER") == "true" and render_svc == "web":
+            if os.getenv("WORKER_SERVICE_URL"):
+                logger.info("Render web: external worker detected, disabling embedded worker.")
+                return False
+        return True
+
     # Auto-spawn queue worker in background daemon thread if not running standalone
     if _embedded_worker_thread is None or not _embedded_worker_thread.is_alive():
-        if os.getenv("DISABLE_EMBEDDED_WORKER", "false").lower() != "true":
+        if should_start_embedded_worker():
             from documorph.worker.queue_worker import run_worker
             _embedded_worker_thread = threading.Thread(
                 target=run_worker, 
@@ -177,6 +187,8 @@ async def lifespan(app: FastAPI):
                 sys.stdout.flush()
             except Exception:
                 pass
+        else:
+            logger.info("Embedded DocuMorph Queue Worker disabled by environment or external worker configuration.")
     yield
 
 app.router.lifespan_context = lifespan
