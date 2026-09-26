@@ -41,7 +41,8 @@ COPY --chown=user:user . .
 # Ensure the startup script is executable
 RUN chmod +x start.sh
 
-# Expose HuggingFace Space port
+# Expose Render standard port (10000) and HuggingFace Space port (7860)
+EXPOSE 10000
 EXPOSE 7860
 
 CMD ["./start.sh"]
