@@ -89,7 +89,8 @@ def run_worker():
                 nonlocal last_progress_time, last_progress_pct
                 now = time.time()
                 is_terminal = pct == 100 or pct == -1
-                is_significant = abs(pct - last_progress_pct) >= 3 and (now - last_progress_time >= 1.2)
+                is_milestone = pct in (65, 70, 80, 86, 90, 95)
+                is_significant = ((abs(pct - last_progress_pct) >= 3 and (now - last_progress_time >= 1.2)) or is_milestone)
                 if is_terminal or is_significant or last_progress_pct == -1:
                     last_progress_time = now
                     # Enforce strict monotonicity: progress must never drop backwards
